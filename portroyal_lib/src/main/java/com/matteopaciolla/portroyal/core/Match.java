@@ -5,9 +5,13 @@ import java.util.*;
 import com.matteopaciolla.portroyal.confs.Configuration;
 import com.matteopaciolla.portroyal.confs.Emojis;
 import com.matteopaciolla.portroyal.core.cards.contracts.abst.ContractCard;
+import com.matteopaciolla.portroyal.core.cards.contracts.abst.ManualContractCard;
 import com.matteopaciolla.portroyal.core.cards.employees.EmployeeCard;
+import com.matteopaciolla.portroyal.core.cards.expeditions.Expedition;
+import com.matteopaciolla.portroyal.core.cards.ships.CargoShip;
 import com.matteopaciolla.portroyal.core.cards.ships.Ship;
 import com.matteopaciolla.portroyal.core.effects.JesterEffect;
+import com.matteopaciolla.portroyal.core.enums.BotDifficulty;
 import com.matteopaciolla.portroyal.core.enums.EventType;
 import com.matteopaciolla.portroyal.core.enums.MoveAction;
 import com.matteopaciolla.portroyal.core.phases.*;
@@ -15,6 +19,7 @@ import com.matteopaciolla.portroyal.exceptions.internal.*;
 import com.matteopaciolla.portroyal.exceptions.userinput.*;
 import com.matteopaciolla.portroyal.core.cards.Card;
 import com.matteopaciolla.portroyal.core.cards.enums.ExpeditionEmployee;
+import com.matteopaciolla.portroyal.core.cards.enums.ShipColor;
 
 import lombok.AccessLevel;
 import lombok.Getter;
@@ -344,7 +349,8 @@ public class Match {
         return event;
     }
 
-    //-----------------MOVES-----------------
+    //|-----------------MOVES-----------------|
+    //V---------------------------------------V
 
     public Card discover() throws UserInputException {
         if (matchEnded) throw new MoveEndedMatchException();
@@ -453,7 +459,243 @@ public class Match {
         movesHistory.add(move);
     }
 
+    //^-----------------MOVES-----------------^
+    //|---------------------------------------|
+
     public boolean comparePhase(Class<? extends Phase> phaseClass) {
         return currentPhase.getClass().equals(phaseClass);
+    }
+
+    /**
+     * Calculates the next move record for the bot player based on the current game state and the specified difficulty level.
+     * The method decides and executes exactly one atomic move (the same way a human player would trigger one of the
+     * public move methods), appending the resulting {@link MoveRecord} to the moves history and returning it.
+     * Callers are expected to invoke this method repeatedly until the bot's turn ends.
+     *
+     * @param botDifficulty The difficulty level of the bot (EASY, MEDIUM, HARD).
+     * @return The calculated MoveRecord representing the bot's next move, or null if the match already ended.
+     */
+    public MoveRecord calculateNextMoveRecord(BotDifficulty botDifficulty) {
+        if (matchEnded || currentPhase == null) {
+            return null;
+        }
+        try {
+            return switch (currentPhase) {
+                case RepelPhase repelPhase -> calculateRepelMove(botDifficulty);
+                // TradeHireSubPhase must be checked before TradeHireMainPhase since it extends it
+                case TradeHireSubPhase tradeHireSubPhase -> calculateTradeHireMove(botDifficulty, false);
+                case TradeHireMainPhase tradeHireMainPhase -> calculateTradeHireMove(botDifficulty, true);
+                case DiscoverPhase discoverPhase -> calculateDiscoverMove(botDifficulty);
+                default -> throw new IllegalStateException("Unknown phase, can't calculate a bot move: " + currentPhase);
+            };
+        } catch (UserInputException e) {
+            throw new IllegalStateException("Bot was not able to compute a valid move for difficulty " + botDifficulty, e);
+        }
+    }
+
+    private MoveRecord calculateRepelMove(BotDifficulty botDifficulty) throws UserInputException {
+        Ship ship = repellingShip;
+        boolean shouldRepel = table.isBustCase(ship);
+        if (!shouldRepel && botDifficulty == BotDifficulty.HARD) {
+            // Repelling a not-yet-repelled color works toward "ship colors repelled" contracts;
+            // only worth giving up the harbor opportunity once it already holds some value and the ship is a real threat.
+            shouldRepel = configuration.isJOMC_ExpansionUsed()
+                    && !getRunningPlayer().getShipColorsRepelled().contains(ship.getColor())
+                    && table.getShipsInHarborNumber() >= 2
+                    && ship.getPower() >= 3;
+        }
+        if (shouldRepel) {
+            repelShip();
+        } else {
+            acceptShip();
+        }
+        return getLastMove();
+    }
+
+    private MoveRecord calculateDiscoverMove(BotDifficulty botDifficulty) throws UserInputException {
+        Player runningPlayer = getRunningPlayer();
+        OptionalInt expeditionIndex = pickBestCommittableExpeditionIndex(runningPlayer, botDifficulty);
+        if (expeditionIndex.isPresent()) {
+            return performCommitExpedition(expeditionIndex.getAsInt(), runningPlayer);
+        }
+        OptionalInt contractIndex = pickBestSignableContractIndex(runningPlayer);
+        if (contractIndex.isPresent()) {
+            signContract(contractIndex.getAsInt());
+            return getLastMove();
+        }
+        if (shouldKeepDiscovering(runningPlayer, botDifficulty)) {
+            discover();
+        } else {
+            finishDiscovering();
+        }
+        return getLastMove();
+    }
+
+    private MoveRecord calculateTradeHireMove(BotDifficulty botDifficulty, boolean isActivePlayerTurn) throws UserInputException {
+        Player runningPlayer = getRunningPlayer();
+        if (isActivePlayerTurn) {
+            OptionalInt expeditionIndex = pickBestCommittableExpeditionIndex(runningPlayer, botDifficulty);
+            if (expeditionIndex.isPresent()) {
+                return performCommitExpedition(expeditionIndex.getAsInt(), runningPlayer);
+            }
+            OptionalInt contractIndex = pickBestSignableContractIndex(runningPlayer);
+            if (contractIndex.isPresent()) {
+                signContract(contractIndex.getAsInt());
+                return getLastMove();
+            }
+        }
+        OptionalInt harborIndex = runningPlayer.getTradingCapacity() > 0
+                ? pickBestHarborCardIndex(runningPlayer, isActivePlayerTurn, botDifficulty)
+                : OptionalInt.empty();
+        if (harborIndex.isPresent()) {
+            Card card = table.getHarbor().get(harborIndex.getAsInt());
+            int pickPlayerIndex = card instanceof CargoShip ? pickCargoBeneficiaryIndex() : -1;
+            tradeHire(harborIndex.getAsInt(), pickPlayerIndex, false);
+        } else {
+            endTurn();
+        }
+        return getLastMove();
+    }
+
+    /**
+     * Decides whether the bot should keep drawing cards during the discover phase or stop and move on to trading.
+     * The risk of a bust grows with the number of distinct ship colors already sitting in the harbor, so the
+     * tolerated harbor size grows with the bot's difficulty (and with the running player's power, since a
+     * powerful player can often repel the next dangerous ship instead of being forced to accept it).
+     */
+    private boolean shouldKeepDiscovering(Player runningPlayer, BotDifficulty botDifficulty) {
+        int shipsInHarbor = table.getShipsInHarborNumber();
+        if (shipsInHarbor >= ShipColor.values().length - 1) {
+            // one more distinct-colored ship would guarantee a repeated color somewhere: too risky regardless of difficulty
+            return false;
+        }
+        int riskTolerance = switch (botDifficulty) {
+            case EASY -> 1;
+            case MEDIUM -> 2;
+            case HARD -> 3;
+        };
+        if (runningPlayer.getPowerValue() >= 3) {
+            riskTolerance++;
+        }
+        return shipsInHarbor < riskTolerance;
+    }
+
+    /**
+     * Picks the harbor card index that is the most worth trading or hiring.
+     * Hiring an affordable employee is preferred over trading a ship, since employees provide lasting
+     * points/power while a ship only provides a one-off coin gain.
+     */
+    private OptionalInt pickBestHarborCardIndex(Player runningPlayer, boolean isActivePlayer, BotDifficulty botDifficulty) {
+        List<Card> harbor = table.getHarbor();
+        int bestEmployeeIndex = -1;
+        int bestEmployeeScore = Integer.MIN_VALUE;
+        int bestShipIndex = -1;
+        int bestShipGain = -1;
+        for (int i = 0; i < harbor.size(); i++) {
+            Card card = harbor.get(i);
+            if (card instanceof EmployeeCard employeeCard) {
+                if (!runningPlayer.canAffordHiring(employeeCard, isActivePlayer)) {
+                    continue;
+                }
+                int score = botDifficulty == BotDifficulty.EASY
+                        ? employeeCard.getPoints()
+                        : employeeCard.getPoints() * 3 - runningPlayer.getActualCost(employeeCard);
+                if (score > bestEmployeeScore) {
+                    bestEmployeeScore = score;
+                    bestEmployeeIndex = i;
+                }
+            } else if (card instanceof Ship ship && ship.getGain() > bestShipGain) {
+                bestShipGain = ship.getGain();
+                bestShipIndex = i;
+            }
+        }
+        if (bestEmployeeIndex != -1) {
+            return OptionalInt.of(bestEmployeeIndex);
+        }
+        return bestShipIndex != -1 ? OptionalInt.of(bestShipIndex) : OptionalInt.empty();
+    }
+
+    /**
+     * Picks the poorest other player to benefit from a cargo ship's extra coin, helping balance the game.
+     */
+    private int pickCargoBeneficiaryIndex() {
+        int beneficiaryIndex = -1;
+        int lowestMoney = Integer.MAX_VALUE;
+        for (int i = 0; i < players.size(); i++) {
+            if (i == runningPlayerIndex) {
+                continue;
+            }
+            int money = players.get(i).getMoneyValue();
+            if (money < lowestMoney) {
+                lowestMoney = money;
+                beneficiaryIndex = i;
+            }
+        }
+        return beneficiaryIndex;
+    }
+
+    /**
+     * Picks the best expedition the running player is able to commit to (considering handymen as substitutes),
+     * favoring the one with the highest points/money return. An EASY bot settles for the first committable one.
+     */
+    private OptionalInt pickBestCommittableExpeditionIndex(Player player, BotDifficulty botDifficulty) {
+        List<Expedition> expeditions = table.getExpeditionCards();
+        int bestIndex = -1;
+        int bestScore = Integer.MIN_VALUE;
+        for (int i = 0; i < expeditions.size(); i++) {
+            Expedition expedition = expeditions.get(i);
+            if (!expedition.isPlayerAbleToCommitExpedition(player, true)) {
+                continue;
+            }
+            if (botDifficulty == BotDifficulty.EASY) {
+                return OptionalInt.of(i);
+            }
+            int score = expedition.getPoints() * 2 + expedition.getMoney();
+            if (score > bestScore) {
+                bestScore = score;
+                bestIndex = i;
+            }
+        }
+        return bestIndex == -1 ? OptionalInt.empty() : OptionalInt.of(bestIndex);
+    }
+
+    private MoveRecord performCommitExpedition(int expeditionIndex, Player player) throws UserInputException {
+        Expedition expedition = table.getExpeditionCards().get(expeditionIndex);
+        List<ExpeditionEmployee> employeesTypes = expedition.getPossibleEmployeesTypesList(player);
+        commitExpedition(expeditionIndex, employeesTypes);
+        return getLastMove();
+    }
+
+    /**
+     * Picks the manual contract with the highest immediate reward that the running player currently meets the
+     * requirements for. Automatic contracts are signed automatically by {@link #evaluateContracts()} and are
+     * therefore skipped here.
+     */
+    private OptionalInt pickBestSignableContractIndex(Player player) {
+        ContractsBoard contractsBoard = table.getContractsBoard();
+        if (!configuration.isJOMC_ExpansionUsed() || contractsBoard == null
+                || player.getContractsCompleted() >= configuration.getMaxContractsCompletablePerPlayer()) {
+            return OptionalInt.empty();
+        }
+        List<ContractCard> contracts = contractsBoard.getContracts();
+        int bestIndex = -1;
+        int bestReward = -1;
+        for (int i = 0; i < contracts.size(); i++) {
+            ContractCard contract = contracts.get(i);
+            if (!(contract instanceof ManualContractCard)
+                    || contractsBoard.isFull(i)
+                    || contractsBoard.getSignedPlayers(i).contains(player)
+                    || !contract.requirementsMet(player)) {
+                continue;
+            }
+            int[] rewards = contract.getRewards();
+            int slotIndex = contractsBoard.getSignedPlayers(i).size();
+            int reward = slotIndex < rewards.length ? rewards[slotIndex] : 0;
+            if (reward > bestReward) {
+                bestReward = reward;
+                bestIndex = i;
+            }
+        }
+        return bestIndex == -1 ? OptionalInt.empty() : OptionalInt.of(bestIndex);
     }
 }
