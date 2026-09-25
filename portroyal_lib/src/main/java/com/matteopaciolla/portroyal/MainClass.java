@@ -5,17 +5,48 @@ import com.matteopaciolla.portroyal.core.Match;
 import com.matteopaciolla.portroyal.core.MatchCreator;
 import com.matteopaciolla.portroyal.core.MoveRecord;
 import com.matteopaciolla.portroyal.core.Player;
+import com.matteopaciolla.portroyal.core.enums.BotDifficulty;
 import com.matteopaciolla.portroyal.exceptions.IOGameException;
 import com.matteopaciolla.portroyal.exceptions.internal.InternalGameException;
 import com.matteopaciolla.portroyal.facades.IOFacade;
 
 import java.util.List;
+import java.util.Map;
 
 public class MainClass {
 
     public static void main(String[] args) throws InternalGameException {
         System.out.println("Playing...");
-        playMatch0();
+        playMatchVsBots();
+    }
+
+    /**
+     * Starts a match where "Matteo" is played interactively while "EasBot", "MedBot" and "HarBot"
+     * are driven automatically by {@link Match#calculateNextMoveRecord(BotDifficulty)}, one at each difficulty.
+     */
+    private static void playMatchVsBots() throws InternalGameException {
+        String filename = "match_vs_bots";
+        List<Player> players = List.of(
+                new Player("Matteo"),
+                new Player("EasBot"),
+                new Player("MedBot"),
+                new Player("HarBot")
+        );
+        Map<String, BotDifficulty> botPlayers = Map.of(
+                "EasBot", BotDifficulty.EASY,
+                "MedBot", BotDifficulty.MEDIUM,
+                "HarBot", BotDifficulty.HARD
+        );
+        List<MoveRecord> moveRecords = null;
+        try {
+            moveRecords = IOFacade.loadMovesFromExternalCSV(filename);
+        } catch (IOGameException e) {
+            System.err.println("Error loading moves from external CSV " + e.getMessage());
+        }
+        Configuration configuration = Configuration.builder().JOMC_ExpansionUsed(true).build();
+        Match match = MatchCreator.createMatch(0, players, configuration, moveRecords);
+        GamerUI gamerUI = new GamerUI(match, filename, botPlayers);
+        gamerUI.playMatch();
     }
 
     private static void playMatch0() throws InternalGameException {
