@@ -51,6 +51,6 @@ logs/**
 /create-schema.sql
 /drop-schema.sql
 .editorconfig
-/portroyal_lib/csv_files/*.csv
+/csv_files/*.csv
 /portroyal_be/mvnw.cmd
 /portroyal_be/mvnw
