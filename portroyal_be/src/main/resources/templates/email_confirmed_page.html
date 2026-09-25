@@ -1,0 +1,16 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>Email Confirmed</title>
+        <link rel="stylesheet" th:href="@{/css/styles.css}"/>
+    </head>
+    <body>
+        <div class="container">
+            <h1 class="c_green" th:text="${title}">Email Confirmed!</h1>
+            <p th:utext="${message}">Thank you! Your email address has been successfully confirmed.</p>
+    <!--        <a href="/" class="button c_green">Go to Homepage</a>-->
+        </div>
+    </body>
+</html>

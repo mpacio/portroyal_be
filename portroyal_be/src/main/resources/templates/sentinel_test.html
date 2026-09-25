@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <link rel="icon" href="/ship_icon.png">
+    <title>Spring SSE Demo</title>
+</head>
+<body>
+<h1>Server-Sent Events (<span id="semaphore" style="background-color: red;">SSE</span>) with Spring</h1>
+<button onclick="instantiateSse()">Start</button>
+<button onclick="callStop()">Stop</button>
+<button onclick="closeConnection()">Close connection</button>
+<p>----------------------------------------------------</p>
+<div id="events"></div>
+<p>----------------------------------------------------</p>
+<button onclick="clearEvents()">Clear events</button>
+<div id="error_space"></div>
+</body>
+</html>
+
+<script>
+    var eventSource = null;
+
+    function instantiateSse() {
+        eventSource = new EventSource("/api/v1/sentinel/sse/subscribe?keyCode=test&timeout=10000000");
+        document.getElementById("semaphore").style.color = "";
+        document.getElementById("semaphore").style.backgroundColor = "green";
+
+        eventSource.onmessage = (event) => {
+            const div = document.createElement("div");
+            div.textContent = `Event received: ${event.data}`;
+            document.getElementById("events").appendChild(div);
+        };
+
+        eventSource.onerror = (error) => {
+            console.error("Error occurred:", error);
+            document.getElementById("error_space").textContent = `Error occurred: ${error}`;
+            eventSource.close();
+        };
+    }
+
+    function callStop() {
+        fetch("/api/v1/sentinel/sse/stop", {"method": "POST"})
+            .then(response => {
+                if (response.ok) {
+                    console.log("Stop request sent successfully");
+                    document.getElementById("semaphore").style.color = "";
+                    document.getElementById("semaphore").style.backgroundColor = "red";
+                } else {
+                    console.error("Error occurred:", response);
+                    document.getElementById("error_space").textContent = `Error occurred: ${response}`;
+                }
+            })
+            .catch(error => {
+                console.error("Error occurred:", error);
+                document.getElementById("error_space").textContent = `Error occurred: ${error}`;
+            });
+    }
+
+    function closeConnection() {
+        try {
+            eventSource.close();
+            document.getElementById("semaphore").style.color = "yellow";
+            document.getElementById("semaphore").style.backgroundColor = "red";
+        } catch (error) {
+            console.error("Error occurred:", error);
+            document.getElementById("error_space").textContent = `Error occurred: ${error}`;
+        }
+    }
+
+    function clearEvents() {
+        document.getElementById("events").innerHTML = "";
+    }
+</script>

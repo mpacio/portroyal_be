@@ -1,0 +1,357 @@
+timeIndex;runningPlayerIndex;move;choiceIndex;pickPlayerIndex;expeditionEmployees;notes
+0;0;DISCOVER;-1;-1;;BLUE Ship discovered
+1;0;FINISH_DISCOVER;-1;-1;;
+2;0;TRADE;0;-1;;Matteo got 3 coins from the BLUE Ship trade
+3;1;DISCOVER;-1;-1;;RED Ship discovered
+4;1;DISCOVER;-1;-1;;Mademoiselle discovered
+5;1;DISCOVER;-1;-1;;Bust case
+6;0;DISCOVER;-1;-1;;MinPointsTax activated
+7;0;DISCOVER;-1;-1;;Sailor discovered
+8;0;DISCOVER;-1;-1;;YELLOW CargoShip discovered
+9;0;DISCOVER;-1;-1;;BLUE CargoShip discovered
+10;0;FINISH_DISCOVER;-1;-1;;
+11;0;TRADE;1;1;;Matteo got 3 coins from the YELLOW CargoShip trade, Giulia got 1 coin from the CargoShip traded by Matteo
+12;1;HIRE;0;-1;;Giulia paid 1 coin fee to Matteo, Giulia hired Sailor
+13;1;DISCOVER;-1;-1;;Gunner discovered
+14;1;DISCOVER;-1;-1;;BLACK Ship discovered
+15;1;DISCOVER;-1;-1;;Captain discovered
+16;1;DISCOVER;-1;-1;;MaxPowerTax activated
+17;1;DISCOVER;-1;-1;;Clerk discovered
+18;1;DISCOVER;-1;-1;;Bust case
+19;0;DISCOVER;-1;-1;;GREEN Ship discovered
+20;0;DISCOVER;-1;-1;;BLACK CargoShip discovered
+21;0;FINISH_DISCOVER;-1;-1;;
+22;0;TRADE;0;-1;;Matteo got 3 coins from the GREEN Ship trade
+23;1;TRADE;0;0;;Giulia got 3 coins from the BLACK CargoShip trade, Matteo got 1 coin from the CargoShip traded by Giulia, Giulia paid 1 coin fee to Matteo
+24;1;DISCOVER;-1;-1;;Merchant discovered
+25;1;DISCOVER;-1;-1;;Deputy discovered
+26;1;DISCOVER;-1;-1;;Captain discovered
+27;1;DISCOVER;-1;-1;;Clerk discovered
+28;1;DISCOVER;-1;-1;;BLACK CargoShip discovered
+29;1;FINISH_DISCOVER;-1;-1;;
+30;1;TRADE;4;0;;Giulia got 3 coins from the BLACK CargoShip trade, Matteo got 1 coin from the CargoShip traded by Giulia
+31;0;HIRE;3;-1;;Matteo paid 1 coin fee to Giulia, Matteo hired Clerk
+32;0;DISCOVER;-1;-1;;Sailor discovered
+33;0;DISCOVER;-1;-1;;Clerk discovered
+34;0;DISCOVER;-1;-1;;Clerk discovered
+35;0;DISCOVER;-1;-1;;YELLOW Ship discovered
+36;0;FINISH_DISCOVER;-1;-1;;
+37;0;HIRE;2;-1;;Matteo hired Clerk
+38;1;HIRE;0;-1;;Giulia paid 1 coin fee to Matteo, Giulia hired Sailor
+39;1;DISCOVER;-1;-1;;BLACK Ship discovered
+40;1;FINISH_DISCOVER;-1;-1;;
+41;1;TRADE;0;-1;;Giulia got 3 coins from the BLACK Ship trade
+42;0;DISCOVER;-1;-1;;YELLOW Ship discovered
+43;0;DISCOVER;-1;-1;;RED Ship discovered
+44;0;DISCOVER;-1;-1;;Bust case
+45;1;DISCOVER;-1;-1;;Admiral discovered
+46;1;DISCOVER;-1;-1;;Admiral discovered
+47;1;DISCOVER;-1;-1;;
+48;1;REPEL;-1;-1;;
+49;1;DISCOVER;-1;-1;;
+50;1;REPEL;-1;-1;;
+51;1;DISCOVER;-1;-1;;Pirate discovered
+52;1;DISCOVER;-1;-1;;GREEN Ship discovered
+53;1;FINISH_DISCOVER;-1;-1;;
+54;1;HIRE;2;-1;;Giulia hired Pirate
+55;0;TRADE;2;-1;;Matteo got 3 coins from the GREEN Ship trade, Matteo paid 1 coin fee to Giulia
+56;0;DISCOVER;-1;-1;;Sailor discovered
+57;0;DISCOVER;-1;-1;;Sailor discovered
+58;0;DISCOVER;-1;-1;;BLUE Ship discovered
+59;0;DISCOVER;-1;-1;;Bust case
+60;1;SIGN_CONTRACT;0;-1;;Giulia signed the contract Mercenary
+61;1;DISCOVER;-1;-1;;Jester discovered
+62;1;DISCOVER;-1;-1;;Expedition discovered
+63;1;DISCOVER;-1;-1;;Sailor discovered
+64;1;DISCOVER;-1;-1;;Pirate discovered
+65;1;DISCOVER;-1;-1;;Jester discovered
+66;1;DISCOVER;-1;-1;;Expedition discovered
+67;1;DISCOVER;-1;-1;;Gunner discovered
+68;1;DISCOVER;-1;-1;;
+69;1;REPEL;-1;-1;;
+70;1;DISCOVER;-1;-1;;Deputy discovered
+71;1;DISCOVER;-1;-1;;RED Ship discovered
+72;1;FINISH_DISCOVER;-1;-1;;
+73;1;TRADE;6;-1;;Giulia got 3 coins from the RED Ship trade
+74;0;HIRE;3;-1;;Matteo paid 1 coin fee to Giulia, Matteo hired Jester
+75;0;DISCOVER;-1;-1;;BLACK Ship discovered
+76;0;DISCOVER;-1;-1;;Expedition discovered
+77;0;DISCOVER;-1;-1;;GREEN CargoShip discovered
+78;0;DISCOVER;-1;-1;;YELLOW Ship discovered
+79;0;FINISH_DISCOVER;-1;-1;;3 different ship colors in harbor
+80;0;TRADE;2;-1;;Matteo got 2 coins from the YELLOW Ship trade, Matteo got 1 more trading capacity from the clerk effect
+81;0;TRADE;1;1;;Matteo got 3 coins from the GREEN CargoShip trade, Giulia got 1 coin from the CargoShip traded by Matteo
+82;1;TRADE;0;-1;;Giulia got 1 coins from the BLACK Ship trade, Giulia paid 1 coin fee to Matteo
+83;1;DISCOVER;-1;-1;;Mademoiselle discovered
+84;1;DISCOVER;-1;-1;;
+85;1;REPEL;-1;-1;;
+86;1;DISCOVER;-1;-1;;Merchant discovered
+87;1;DISCOVER;-1;-1;;Handyman discovered
+88;1;DISCOVER;-1;-1;;Captain discovered
+89;1;DISCOVER;-1;-1;;
+90;1;ACCEPT;-1;-1;;
+91;1;FINISH_DISCOVER;-1;-1;;
+92;1;HIRE;2;-1;;Giulia hired Handyman
+93;0;HIRE;2;-1;;Matteo paid 1 coin fee to Giulia, Matteo hired Captain
+94;0;DISCOVER;-1;-1;;Merchant discovered
+95;0;DISCOVER;-1;-1;;BLACK Ship discovered
+96;0;DISCOVER;-1;-1;;Settler discovered
+97;0;DISCOVER;-1;-1;;Settler discovered
+98;0;DISCOVER;-1;-1;;RED Ship discovered
+99;0;FINISH_DISCOVER;-1;-1;;
+100;0;TRADE;4;-1;;Matteo got 2 coins from the RED Ship trade, Matteo got 1 more trading capacity from the clerk effect
+101;0;HIRE;0;-1;;Matteo hired Merchant
+102;1;HIRE;1;-1;;Giulia paid 1 coin fee to Matteo, Giulia hired Settler
+103;1;DISCOVER;-1;-1;;Priest discovered
+104;1;DISCOVER;-1;-1;;Pirate discovered
+105;1;DISCOVER;-1;-1;;Handyman discovered
+106;1;DISCOVER;-1;-1;;
+107;1;ACCEPT;-1;-1;;
+108;1;DISCOVER;-1;-1;;Admiral discovered
+109;1;DISCOVER;-1;-1;;Sailor discovered
+110;1;DISCOVER;-1;-1;;Merchant discovered
+111;1;DISCOVER;-1;-1;;Merchant discovered
+112;1;DISCOVER;-1;-1;;Priest discovered
+113;1;DISCOVER;-1;-1;;MinPointsTax activated
+114;1;DISCOVER;-1;-1;;Governor discovered
+115;1;DISCOVER;-1;-1;;Merchant discovered
+116;1;DISCOVER;-1;-1;;Priest discovered
+117;1;DISCOVER;-1;-1;;Merchant discovered
+118;1;DISCOVER;-1;-1;;Deputy discovered
+119;1;DISCOVER;-1;-1;;Governor discovered
+120;1;DISCOVER;-1;-1;;Deputy discovered
+121;1;DISCOVER;-1;-1;;Mademoiselle discovered
+122;1;DISCOVER;-1;-1;;Priest discovered
+123;1;DISCOVER;-1;-1;;Jester discovered
+124;1;DISCOVER;-1;-1;;Merchant discovered
+125;1;DISCOVER;-1;-1;;Merchant discovered
+126;1;DISCOVER;-1;-1;;
+127;1;REPEL;-1;-1;;
+128;1;DISCOVER;-1;-1;;
+129;1;REPEL;-1;-1;;
+130;1;DISCOVER;-1;-1;;RED CargoShip discovered
+131;1;DISCOVER;-1;-1;;Governor discovered
+132;1;DISCOVER;-1;-1;;
+133;1;ACCEPT;-1;-1;;
+134;1;DISCOVER;-1;-1;;
+135;1;ACCEPT;-1;-1;;
+136;1;DISCOVER;-1;-1;;Settler discovered
+137;1;DISCOVER;-1;-1;;Handyman discovered
+138;1;DISCOVER;-1;-1;;
+139;1;REPEL;-1;-1;;
+140;1;DISCOVER;-1;-1;;
+141;1;REPEL;-1;-1;;
+142;1;DISCOVER;-1;-1;;Sailor discovered
+143;1;DISCOVER;-1;-1;;
+144;1;REPEL;-1;-1;;
+145;1;DISCOVER;-1;-1;;
+146;1;ACCEPT;-1;-1;;
+147;1;FINISH_DISCOVER;-1;-1;;5 different ship colors in harbor
+148;1;TRADE;28;-1;;Giulia got 2 coins from the BLUE Ship trade
+149;1;TRADE;23;-1;;Giulia got 2 coins from the GREEN Ship trade
+150;1;TRADE;3;-1;;Giulia got 3 coins from the YELLOW Ship trade
+151;0;TRADE;20;1;;Matteo got 3 coins from the RED CargoShip trade, Matteo got 1 coins from the merchant effect, Giulia got 1 coin from the CargoShip traded by Matteo, Matteo got 1 more trading capacity from the clerk effect, Matteo paid 1 coin fee to Giulia
+152;0;END_TURN;-1;-1;;Giulia auto signed Major Speculator
+153;0;DISCOVER;-1;-1;;GREEN CargoShip discovered
+154;0;DISCOVER;-1;-1;;BLACK CargoShip discovered
+155;0;FINISH_DISCOVER;-1;-1;;
+156;0;TRADE;0;1;;Matteo got 3 coins from the GREEN CargoShip trade, Giulia got 1 coin from the CargoShip traded by Matteo
+157;1;TRADE;0;0;;Giulia got 3 coins from the BLACK CargoShip trade, Matteo got 1 coin from the CargoShip traded by Giulia, Giulia paid 1 coin fee to Matteo
+158;1;DISCOVER;-1;-1;;Clerk discovered
+159;1;DISCOVER;-1;-1;;
+160;1;REPEL;-1;-1;;
+161;1;DISCOVER;-1;-1;;Clerk discovered
+162;1;DISCOVER;-1;-1;;Merchant discovered
+163;1;DISCOVER;-1;-1;;
+164;1;ACCEPT;-1;-1;;
+165;1;FINISH_DISCOVER;-1;-1;;
+166;1;HIRE;0;-1;;Giulia hired Clerk
+167;0;TRADE;2;-1;;Matteo got 3 coins from the YELLOW Ship trade, Matteo got 1 more trading capacity from the clerk effect, Matteo paid 1 coin fee to Giulia
+168;0;HIRE;1;-1;;Matteo paid 1 coin fee to Giulia, Matteo hired Merchant
+169;0;DISCOVER;-1;-1;;Captain discovered
+170;0;DISCOVER;-1;-1;;Expedition discovered
+171;0;DISCOVER;-1;-1;;Sailor discovered
+172;0;DISCOVER;-1;-1;;Pirate discovered
+173;0;DISCOVER;-1;-1;;Gunner discovered
+174;0;DISCOVER;-1;-1;;RED Ship discovered
+175;0;FINISH_DISCOVER;-1;-1;;
+176;0;TRADE;4;-1;;Matteo got 2 coins from the RED Ship trade, Matteo got 1 coins from the merchant effect, Matteo got 1 more trading capacity from the clerk effect
+177;0;HIRE;2;-1;;Matteo hired Pirate
+178;1;HIRE;2;-1;;Giulia paid 1 coin fee to Matteo, Giulia hired Gunner
+179;1;DISCOVER;-1;-1;;
+180;1;REPEL;-1;-1;;
+181;1;DISCOVER;-1;-1;;Settler discovered
+182;1;DISCOVER;-1;-1;;Captain discovered
+183;1;DISCOVER;-1;-1;;
+184;1;REPEL;-1;-1;;
+185;1;DISCOVER;-1;-1;;Gunner discovered
+186;1;DISCOVER;-1;-1;;Admiral discovered
+187;1;DISCOVER;-1;-1;;
+188;1;REPEL;-1;-1;;
+189;1;DISCOVER;-1;-1;;Settler discovered
+190;1;DISCOVER;-1;-1;;
+191;1;ACCEPT;-1;-1;;
+192;1;DISCOVER;-1;-1;;RED Ship discovered
+193;1;DISCOVER;-1;-1;;BLUE Ship discovered
+194;1;FINISH_DISCOVER;-1;-1;;3 different ship colors in harbor
+195;1;TRADE;7;-1;;Giulia got 3 coins from the BLUE Ship trade, Giulia got 1 more trading capacity from the clerk effect, Giulia got 2 coins from the gunner effect
+196;1;HIRE;1;-1;;Giulia hired Captain, Giulia got 1 coins from the gunner effect
+197;0;TRADE;4;1;;Matteo got 3 coins from the YELLOW CargoShip trade, Giulia got 1 coin from the CargoShip traded by Matteo, Matteo got 1 more trading capacity from the clerk effect, Matteo paid 1 coin fee to Giulia
+198;0;TRADE;4;-1;;Matteo got 4 coins from the RED Ship trade, Matteo got 1 coins from the merchant effect, Matteo got 1 more trading capacity from the clerk effect, Matteo paid 1 coin fee to Giulia
+199;0;HIRE;3;-1;;Matteo paid 1 coin fee to Giulia, Matteo hired Settler
+200;0;DISCOVER;-1;-1;;
+201;0;ACCEPT;-1;-1;;
+202;0;DISCOVER;-1;-1;;
+203;0;REPEL;-1;-1;;
+204;0;DISCOVER;-1;-1;;YELLOW Ship discovered
+205;0;FINISH_DISCOVER;-1;-1;;
+206;0;TRADE;1;-1;;Matteo got 4 coins from the YELLOW Ship trade, Matteo got 1 more trading capacity from the clerk effect
+207;0;TRADE;0;1;;Matteo got 3 coins from the BLUE CargoShip trade, Giulia got 1 coin from the CargoShip traded by Matteo
+208;1;DISCOVER;-1;-1;;Sailor discovered
+209;1;DISCOVER;-1;-1;;
+210;1;REPEL;-1;-1;;
+211;1;DISCOVER;-1;-1;;
+212;1;REPEL;-1;-1;;
+213;1;DISCOVER;-1;-1;;
+214;1;REPEL;-1;-1;;
+215;1;DISCOVER;-1;-1;;Expedition discovered
+216;1;DISCOVER;-1;-1;;
+217;1;REPEL;-1;-1;;
+218;1;DISCOVER;-1;-1;;MaxPowerTax activated
+219;1;DISCOVER;-1;-1;;
+220;1;REPEL;-1;-1;;
+221;1;DISCOVER;-1;-1;;
+222;1;REPEL;-1;-1;;
+223;1;DISCOVER;-1;-1;;Governor discovered
+224;1;FINISH_DISCOVER;-1;-1;;
+225;1;HIRE;0;-1;;Giulia hired Sailor
+226;0;HIRE;0;-1;;Matteo paid 1 coin fee to Giulia, Matteo hired Governor
+227;0;DISCOVER;-1;-1;;GREEN Ship discovered
+228;0;DISCOVER;-1;-1;;
+229;0;REPEL;-1;-1;;
+230;0;DISCOVER;-1;-1;;Sailor discovered
+231;0;DISCOVER;-1;-1;;
+232;0;REPEL;-1;-1;;
+233;0;DISCOVER;-1;-1;;
+234;0;REPEL;-1;-1;;
+235;0;DISCOVER;-1;-1;;Jester discovered
+236;0;FINISH_DISCOVER;-1;-1;;Matteo got 1 more trading capacity from the governor effect
+237;0;TRADE;0;-1;;Matteo got 3 coins from the GREEN Ship trade
+238;0;HIRE;0;-1;;Matteo hired Sailor
+239;1;END_TURN;-1;-1;;
+240;1;DISCOVER;-1;-1;;
+241;1;REPEL;-1;-1;;
+242;1;DISCOVER;-1;-1;;Admiral discovered
+243;1;DISCOVER;-1;-1;;
+244;1;REPEL;-1;-1;;
+245;1;DISCOVER;-1;-1;;
+246;1;REPEL;-1;-1;;
+247;1;DISCOVER;-1;-1;;Captain discovered
+248;1;DISCOVER;-1;-1;;Deputy discovered
+249;1;DISCOVER;-1;-1;;Settler discovered
+250;1;DISCOVER;-1;-1;;Handyman discovered
+251;1;DISCOVER;-1;-1;;
+252;1;REPEL;-1;-1;;
+253;1;DISCOVER;-1;-1;;
+254;1;REPEL;-1;-1;;
+255;1;DISCOVER;-1;-1;;RED Ship discovered
+256;1;FINISH_DISCOVER;-1;-1;;
+257;1;HIRE;3;-1;;Giulia hired Settler
+258;0;TRADE;4;-1;;Matteo got 3 coins from the RED Ship trade, Matteo got 1 coins from the merchant effect, Matteo got 1 more trading capacity from the clerk effect, Matteo paid 1 coin fee to Giulia
+259;0;END_TURN;-1;-1;;
+260;0;DISCOVER;-1;-1;;
+261;0;REPEL;-1;-1;;
+262;0;DISCOVER;-1;-1;;Merchant discovered
+263;0;DISCOVER;-1;-1;;
+264;0;REPEL;-1;-1;;
+265;0;DISCOVER;-1;-1;;Deputy discovered
+266;0;DISCOVER;-1;-1;;Gunner discovered
+267;0;DISCOVER;-1;-1;;Handyman discovered
+268;0;DISCOVER;-1;-1;;MinPointsTax activated
+269;0;DISCOVER;-1;-1;;RED Ship discovered
+270;0;DISCOVER;-1;-1;;Sailor discovered
+271;0;DISCOVER;-1;-1;;
+272;0;REPEL;-1;-1;;
+273;0;DISCOVER;-1;-1;;BLACK Ship discovered
+274;0;FINISH_DISCOVER;-1;-1;;Matteo got 1 more trading capacity from the governor effect
+275;0;TRADE;4;-1;;Matteo got 3 coins from the RED Ship trade, Matteo got 1 coins from the merchant effect, Matteo got 1 more trading capacity from the clerk effect
+276;0;TRADE;5;-1;;Matteo got 2 coins from the BLACK Ship trade, Matteo got 1 coins from the merchant effect
+277;0;HIRE;0;-1;;Matteo hired Merchant
+278;1;DISCOVER;-1;-1;;
+279;1;REPEL;-1;-1;;
+280;1;DISCOVER;-1;-1;;
+281;1;REPEL;-1;-1;;
+282;1;DISCOVER;-1;-1;;
+283;1;REPEL;-1;-1;;
+284;1;DISCOVER;-1;-1;;Captain discovered
+285;1;DISCOVER;-1;-1;;
+286;1;REPEL;-1;-1;;
+287;1;DISCOVER;-1;-1;;Merchant discovered
+288;1;DISCOVER;-1;-1;;RED Ship discovered
+289;1;DISCOVER;-1;-1;;
+290;1;REPEL;-1;-1;;
+291;1;DISCOVER;-1;-1;;
+292;1;REPEL;-1;-1;;
+293;1;DISCOVER;-1;-1;;
+294;1;REPEL;-1;-1;;
+295;1;DISCOVER;-1;-1;;Governor discovered
+296;1;DISCOVER;-1;-1;;
+297;1;REPEL;-1;-1;;
+298;1;DISCOVER;-1;-1;;
+299;1;REPEL;-1;-1;;
+300;1;DISCOVER;-1;-1;;
+301;1;REPEL;-1;-1;;
+302;1;DISCOVER;-1;-1;;Merchant discovered
+303;1;DISCOVER;-1;-1;;Admiral discovered
+304;1;DISCOVER;-1;-1;;Jester discovered
+305;1;DISCOVER;-1;-1;;
+306;1;REPEL;-1;-1;;
+307;1;DISCOVER;-1;-1;;Deputy discovered
+308;1;DISCOVER;-1;-1;;
+309;1;REPEL;-1;-1;;
+310;1;DISCOVER;-1;-1;;
+311;1;REPEL;-1;-1;;
+312;1;DISCOVER;-1;-1;;
+313;1;REPEL;-1;-1;;
+314;1;DISCOVER;-1;-1;;Settler discovered
+315;1;DISCOVER;-1;-1;;Priest discovered
+316;1;DISCOVER;-1;-1;;
+317;1;REPEL;-1;-1;;
+318;1;DISCOVER;-1;-1;;Governor discovered
+319;1;DISCOVER;-1;-1;;Merchant discovered
+320;1;DISCOVER;-1;-1;;
+321;1;REPEL;-1;-1;;
+322;1;DISCOVER;-1;-1;;
+323;1;REPEL;-1;-1;;
+324;1;DISCOVER;-1;-1;;Sailor discovered
+325;1;DISCOVER;-1;-1;;Admiral discovered
+326;1;DISCOVER;-1;-1;;Sailor discovered
+327;1;DISCOVER;-1;-1;;MinPointsTax activated
+328;1;DISCOVER;-1;-1;;
+329;1;REPEL;-1;-1;;
+330;1;DISCOVER;-1;-1;;Gunner discovered
+331;1;DISCOVER;-1;-1;;Mademoiselle discovered
+332;1;FINISH_DISCOVER;-1;-1;;
+333;1;HIRE;11;-1;;Giulia hired Merchant
+334;0;TRADE;2;-1;;Matteo got 3 coins from the RED Ship trade, Matteo got 1 coins from the merchant effect, Matteo got 1 more trading capacity from the clerk effect, Matteo paid 1 coin fee to Giulia
+335;0;HIRE;14;-1;;Matteo paid 1 coin fee to Giulia, Matteo hired Mademoiselle
+336;0;SIGN_CONTRACT;0;-1;;Matteo signed the contract Mercenary
+337;0;SIGN_CONTRACT;2;-1;;Matteo signed the contract Bruja
+338;0;SIGN_CONTRACT;3;-1;;Matteo signed the contract Thrifty Staff
+339;0;DISCOVER;-1;-1;;
+340;0;REPEL;-1;-1;;
+341;0;DISCOVER;-1;-1;;Admiral discovered
+342;0;DISCOVER;-1;-1;;Deputy discovered
+343;0;DISCOVER;-1;-1;;Priest discovered
+344;0;DISCOVER;-1;-1;;Priest discovered
+345;0;FINISH_DISCOVER;-1;-1;;Matteo got 1 more trading capacity from the governor effect
+346;0;HIRE;2;-1;;Matteo got 1 discount from the mademoiselle effect, Matteo hired Priest
+347;0;HIRE;2;-1;;Matteo got 1 discount from the mademoiselle effect, Matteo hired Priest
+348;1;SIGN_CONTRACT;3;-1;;Giulia signed the contract Thrifty Staff
+349;1;COMMIT_EXPEDITION;1;-1;[CAPTAIN, HANDYMAN, SETTLER];Giulia got 3 money from the expedition
+350;1;DISCOVER;-1;-1;;Sailor discovered
+351;1;DISCOVER;-1;-1;;Pirate discovered
+352;1;DISCOVER;-1;-1;;Governor discovered
+353;1;FINISH_DISCOVER;-1;-1;;
+354;1;HIRE;1;-1;;Giulia hired Pirate, Giulia triggered the final turn condition
+355;0;HIRE;0;-1;;Matteo got 1 discount from the mademoiselle effect, Matteo paid 1 coin fee to Giulia, Matteo hired Sailor

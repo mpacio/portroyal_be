@@ -1,0 +1,17 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>Token Expired</title>
+        <link rel="stylesheet" th:href="@{/css/styles.css}"/>
+    </head>
+    <body>
+        <div class="container">
+            <h1 class="c_red">Token Expired</h1>
+            <p>Oops! It looks like your confirmation token has expired.</p>
+            <p>Please click the button below to request a new confirmation email.</p>
+            <a href="/request-new-token" class="button bgc_red">Request New Email</a>
+        </div>
+    </body>
+</html>

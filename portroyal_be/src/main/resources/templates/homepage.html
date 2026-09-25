@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="icon" href="/ship_icon.png">
+    <title>Port Royal Back End Homepage</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 0;
+            display: flex;
+            flex-direction: column;
+            min-height: 100vh;
+        }
+        header, footer {
+            background-color: #333;
+            color: white;
+            text-align: center;
+            padding: 1em 0;
+        }
+        main {
+            flex: 1;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            background-color: #f4f4f4;
+            padding: 20px; /* Added padding for small screen spacing */
+        }
+        .button-container {
+            text-align: center;
+            width: 100%; /* Ensures container spans full width */
+        }
+        .button-container a {
+            display: block;
+            margin: 10px auto;
+            padding: 15px 25px;
+            font-size: 16px;
+            color: white;
+            background-color: #62A03F;
+            text-decoration: none;
+            border-radius: 5px;
+            transition: background-color 0.3s ease;
+            width: 80%; /* Uses percentage for width */
+            max-width: 300px; /* Sets maximum width */
+            box-sizing: border-box; /* Includes padding and border in width calculation */
+        }
+        .button-container a:hover {
+            background-color: #4f8033;
+        }
+        .button-container a.login {
+            background-color: #007bbf;
+        }
+        .button-container a.login:hover {
+            background-color: #006399;
+        }
+        .button-container a.logout {
+            background-color: #e62e00;
+        }
+        .button-container a.logout:hover {
+            background-color: #b32400;
+        }
+
+        /* Media query for smaller screens (phones) */
+        @media (max-width: 768px) {
+            .button-container a {
+                font-size: 14px; /* Reduces font size on small screens */
+                padding: 12px 20px;
+                width: 95%; /* Increases width on small screens */
+            }
+            main {
+                padding: 10px; /* Reduces main section padding on small screens */
+            }
+            header h1{
+               font-size: 1.2em; /* make heading smaller on small screens*/
+            }
+            footer p{
+                font-size: 0.8em; /* make footer text smaller */
+            }
+        }
+    </style>
+</head>
+<body>
+<header>
+    <h1>Port Royal Back End</h1>
+</header>
+<main>
+    <div class="button-container">
+        <a href="/swagger-ui/index.html">Swagger UI</a>
+        <a href="/api/v1/api-docs">JSON API Model</a>
+        <a href="/api/v1/api-docs.yaml">YAML API Model</a>
+        <br>
+        <a th:if="${isLoggedIn}" href="/logout" class="logout">Logout</a>
+        <a th:if="${!isLoggedIn}" href="/login" class="login">Login</a>
+    </div>
+</main>
+<footer>
+    <p>&copy; 2025 Matteo Paciolla. All rights reserved.</p>
+</footer>
+</body>
+</html>
