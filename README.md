@@ -209,6 +209,15 @@ cd portroyal_be
 mvn spring-boot:run
 ```
 
+Run the standalone CLI tester against the Spring API running on localhost:8080:
+
+```bash
+cd portroyal_be
+mvn exec:java -Dexec.mainClass=com.matteopaciolla.prbe.cli.PortRoyalCli
+```
+
+This CLI can register users, inspect the current user, list/host/join/start matches, issue arbitrary HTTP calls to the REST API, and play a match interactively without starting the Spring app in the same JVM.
+
 or run the packaged jar:
 
 ```bash
