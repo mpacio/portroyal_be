@@ -7,10 +7,10 @@ standalone Java library.
 
 This repository is a **Maven multi-module** project:
 
-| Module | Type | Responsibility |
-|---|---|---|
-| [`portroyal_lib`](portroyal_lib) | Plain Java library (Java 21) | The **game engine**: all Port Royal rules, cards, phases, effects and match/move validation logic. No web, no persistence, no framework dependency. |
-| [`portroyal_be`](portroyal_be) | Spring Boot 3 application (Java 21) | The **REST API**: authentication, persistence (PostgreSQL/JPA), match/user orchestration, real-time notifications. Delegates every rule decision to `portroyal_lib`. |
+| Module                           | Type                                | Responsibility                                                                                                                                                       |
+|----------------------------------|-------------------------------------|----------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| [`portroyal_lib`](portroyal_lib) | Plain Java library (Java 21)        | The **game engine**: all Port Royal rules, cards, phases, effects and match/move validation logic. No web, no persistence, no framework dependency.                  |
+| [`portroyal_be`](portroyal_be)   | Spring Boot 3 application (Java 21) | The **REST API**: authentication, persistence (PostgreSQL/JPA), match/user orchestration, real-time notifications. Delegates every rule decision to `portroyal_lib`. |
 
 The root [`pom.xml`](pom.xml) is a `pom`-packaged aggregator; building it builds both modules in the
 correct order (the library is built/installed before the API, since `portroyal_be` depends on it).
@@ -149,18 +149,18 @@ Configuration lives in [`portroyal_be/src/main/resources/application.properties`
 The following are the properties you are expected to provide via environment variables (or a
 Spring `application-*.properties`/`application.yml` override) when running the service:
 
-| Property / env var | Required | Default | Description |
-|---|---|---|---|
-| `SPRING_DATASOURCE_URL` | yes | — | JDBC URL of the PostgreSQL database, e.g. `jdbc:postgresql://host:5432/prdb` |
-| `SPRING_DATASOURCE_USERNAME` | yes | — | Database user |
-| `SPRING_DATASOURCE_PASSWORD` | yes | — | Database password |
-| `server.port` | no | `8080` | HTTP port the API listens on |
-| `be_app.baseurl` | no | `prbe.mightyshaman.com` | Public base URL used to build links sent in emails (e.g. email confirmation links) |
-| `be_app.user.telegram_unification.enabled` | no | `true` | Feature flag for the Telegram/email account unification flow |
-| `be_app.user.telegram_unification.max_retries` | no | `3` | Max allowed OTP attempts for Telegram unification |
-| `be_app.cache.match.seconds-to-expire` | no | `60` (set in `application.properties`; falls back to `300` in code if the property is absent entirely) | TTL, in seconds, of the **per-instance** in-memory `Match` cache described above (`MatchRetainer`). This is purely a local performance cache, safe to tune per instance/environment. |
-| `springdoc.api-docs.path` | no | `/api-docs` | Path where the raw OpenAPI JSON is served |
-| `portroyal.lib.version` | derived | from `pom.xml` | Injected automatically at build time from the Maven `prlib.version` property; not meant to be set manually |
+| Property / env var                             | Required | Default                                                                                                | Description                                                                                                                                                                          |
+|------------------------------------------------|----------|--------------------------------------------------------------------------------------------------------|--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| `SPRING_DATASOURCE_URL`                        | yes      | —                                                                                                      | JDBC URL of the PostgreSQL database, e.g. `jdbc:postgresql://host:5432/prdb`                                                                                                         |
+| `SPRING_DATASOURCE_USERNAME`                   | yes      | —                                                                                                      | Database user                                                                                                                                                                        |
+| `SPRING_DATASOURCE_PASSWORD`                   | yes      | —                                                                                                      | Database password                                                                                                                                                                    |
+| `server.port`                                  | no       | `8080`                                                                                                 | HTTP port the API listens on                                                                                                                                                         |
+| `be_app.baseurl`                               | no       | `prbe.mightyshaman.com`                                                                                | Public base URL used to build links sent in emails (e.g. email confirmation links)                                                                                                   |
+| `be_app.user.telegram_unification.enabled`     | no       | `true`                                                                                                 | Feature flag for the Telegram/email account unification flow                                                                                                                         |
+| `be_app.user.telegram_unification.max_retries` | no       | `3`                                                                                                    | Max allowed OTP attempts for Telegram unification                                                                                                                                    |
+| `be_app.cache.match.seconds-to-expire`         | no       | `60` (set in `application.properties`; falls back to `300` in code if the property is absent entirely) | TTL, in seconds, of the **per-instance** in-memory `Match` cache described above (`MatchRetainer`). This is purely a local performance cache, safe to tune per instance/environment. |
+| `springdoc.api-docs.path`                      | no       | `/api-docs`                                                                                            | Path where the raw OpenAPI JSON is served                                                                                                                                            |
+| `portroyal.lib.version`                        | derived  | from `pom.xml`                                                                                         | Injected automatically at build time from the Maven `prlib.version` property; not meant to be set manually                                                                           |
 
 Logging is configured via [`logback-spring.xml`](portroyal_be/src/main/resources/logback-spring.xml),
 and HTTP request/response logging is provided by [Logbook](https://github.com/zalando/logbook)
@@ -248,35 +248,35 @@ standing up the full API/database stack.
   `BOT` (see [Designed for many kinds of clients](#designed-for-many-kinds-of-clients) for how `BOT`
   callers mediate for other users via the `tgId` header).
 
-| Tag | Base path | Purpose |
-|---|---|---|
-| Public | `/api/v1/public` | Registration, email confirmation, OTP requests — no authentication required |
-| User | `/api/v1/user` | Current-user lookup, retrieve/update/delete users, password change, bot registration & Telegram unification |
-| Match | `/api/v1/match` | Host/join/start/close a match, list matches, poll match status/state |
-| Move (Game) | `/api/v1/game` | Play a move, fetch a single move or paged move history |
-| Cards | `/api/v1/card` | Read-only catalog of cards and contract cards from `portroyal_lib`'s deck dictionaries |
-| Sentinel | `/api/v1/sentinel` | Real-time match notifications: webhook callback, long polling, Server-Sent Events, unsubscribe |
+| Tag         | Base path          | Purpose                                                                                                     |
+|-------------|--------------------|-------------------------------------------------------------------------------------------------------------|
+| Public      | `/api/v1/public`   | Registration, email confirmation, OTP requests — no authentication required                                 |
+| User        | `/api/v1/user`     | Current-user lookup, retrieve/update/delete users, password change, bot registration & Telegram unification |
+| Match       | `/api/v1/match`    | Host/join/start/close a match, list matches, poll match status/state                                        |
+| Move (Game) | `/api/v1/game`     | Play a move, fetch a single move or paged move history                                                      |
+| Cards       | `/api/v1/card`     | Read-only catalog of cards and contract cards from `portroyal_lib`'s deck dictionaries                      |
+| Sentinel    | `/api/v1/sentinel` | Real-time match notifications: webhook callback, long polling, Server-Sent Events, unsubscribe              |
 
 Selected endpoints:
 
-| Method & path | Description |
-|---|---|
-| `POST /public/register` | Register a new user (username/email/password, web/app flow) |
-| `POST /user/register/telegram` | Register a new user from the bot (Telegram id only) — `BOT` role only |
-| `GET /public/newTgUnifyEmailOtp` | Request an OTP to unify a Telegram id with an email account |
-| `POST /user/unify` | Confirm Telegram/email unification with the OTP — `BOT` role only |
-| `GET /user/me` | Get the currently authenticated user |
-| `POST /match/host` | Host a new match (optionally with a custom configuration) |
-| `PUT /match/join?keyCode=...` | Join an open, not-yet-started match |
-| `PUT /match/start` | Start the match you are hosting (requires ≥ 2 players) |
-| `GET /match/status` | Get the match currently being played by the caller, if any |
-| `GET /match/retrieve?keyCode=...&moveNumber=...` | Get full match state; poll with `moveNumber` to cheaply check "any new moves?" |
-| `POST /game/move` | Play a move (`DISCOVER`, `TRADE`, `HIRE`, `COMMIT_EXPEDITION`, `SIGN_CONTRACT`, `END_TURN`, ...); validated entirely by `portroyal_lib` |
-| `GET /game/moves?keyCode=...` | Paged move history of a match |
-| `GET /card`, `GET /card/contract` | Static card catalog |
-| `POST /sentinel/callback/subscribe` | Register a webhook URL to be called on match alerts (works across any instance) |
-| `GET /sentinel/long-polling/subscribe?keyCode=...` | Long-poll for the next match alert (requires sticky routing at scale) |
-| `GET /sentinel/sse/subscribe?keyCode=...` | Subscribe to match alerts via Server-Sent Events (requires sticky routing at scale) |
+| Method & path                                      | Description                                                                                                                             |
+|----------------------------------------------------|-----------------------------------------------------------------------------------------------------------------------------------------|
+| `POST /public/register`                            | Register a new user (username/email/password, web/app flow)                                                                             |
+| `POST /user/register/telegram`                     | Register a new user from the bot (Telegram id only) — `BOT` role only                                                                   |
+| `GET /public/newTgUnifyEmailOtp`                   | Request an OTP to unify a Telegram id with an email account                                                                             |
+| `POST /user/unify`                                 | Confirm Telegram/email unification with the OTP — `BOT` role only                                                                       |
+| `GET /user/me`                                     | Get the currently authenticated user                                                                                                    |
+| `POST /match/host`                                 | Host a new match (optionally with a custom configuration)                                                                               |
+| `PUT /match/join?keyCode=...`                      | Join an open, not-yet-started match                                                                                                     |
+| `PUT /match/start`                                 | Start the match you are hosting (requires ≥ 2 players)                                                                                  |
+| `GET /match/status`                                | Get the match currently being played by the caller, if any                                                                              |
+| `GET /match/retrieve?keyCode=...&moveNumber=...`   | Get full match state; poll with `moveNumber` to cheaply check "any new moves?"                                                          |
+| `POST /game/move`                                  | Play a move (`DISCOVER`, `TRADE`, `HIRE`, `COMMIT_EXPEDITION`, `SIGN_CONTRACT`, `END_TURN`, ...); validated entirely by `portroyal_lib` |
+| `GET /game/moves?keyCode=...`                      | Paged move history of a match                                                                                                           |
+| `GET /card`, `GET /card/contract`                  | Static card catalog                                                                                                                     |
+| `POST /sentinel/callback/subscribe`                | Register a webhook URL to be called on match alerts (works across any instance)                                                         |
+| `GET /sentinel/long-polling/subscribe?keyCode=...` | Long-poll for the next match alert (requires sticky routing at scale)                                                                   |
+| `GET /sentinel/sse/subscribe?keyCode=...`          | Subscribe to match alerts via Server-Sent Events (requires sticky routing at scale)                                                     |
 
 Bot-mediated calls (`MatchController`, `GameController`, `UserController#registerTelegramPlayer`,
 `UserController#unifyTelegramAndEmailAccounts`) require the `tgId` request header, set to the
