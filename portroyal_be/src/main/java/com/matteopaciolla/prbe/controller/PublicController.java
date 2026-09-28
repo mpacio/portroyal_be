@@ -10,7 +10,14 @@ import com.matteopaciolla.prbe.exceptions.user.TelegramAccountAlreadyUnifiedExce
 import com.matteopaciolla.prbe.model.entity.UserEntity;
 import com.matteopaciolla.prbe.service.UserService;
 import com.matteopaciolla.prbe.util.StringManipulationUtils;
+import io.swagger.v3.oas.annotations.Hidden;
 import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.Parameter;
+import io.swagger.v3.oas.annotations.media.Content;
+import io.swagger.v3.oas.annotations.media.ExampleObject;
+import io.swagger.v3.oas.annotations.media.Schema;
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -25,6 +32,7 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.ResourceBundle;
 
+@Tag(name = "Public", description = "Public registration and OTP flows that do not require authentication.")
 @Slf4j
 @Controller
 @RequestMapping(Paths.PUBLIC_PATH)
@@ -33,6 +41,7 @@ public class PublicController {
     @Autowired
     private UserService userService;
 
+    @Hidden
     @RequestMapping("/confirmEmail")
     public ModelAndView confirmEmail(@RequestParam String token, ModelMap model) {
         log.info("Confirming email with token: {}", token);
@@ -46,7 +55,16 @@ public class PublicController {
         return new ModelAndView("email_confirmed_page");
     }
 
-    @Operation(summary = "Register a new user", description = "Register a new user", tags = {"User"})
+    @Operation(
+        summary = "Register a new user",
+        description = "Creates a standard user account that can later confirm its email and play matches through the authenticated API.",
+        responses = {
+            @ApiResponse(responseCode = "201", description = "User registered successfully",
+                content = @Content(mediaType = "application/json", schema = @Schema(implementation = UserResponse.class),
+                examples = @ExampleObject(value = "{\"status\":201,\"message\":\"User registered successfully\",\"data\":{\"id\":42,\"username\":\"alice\",\"email\":\"alice@example.com\",\"enabled\":true,\"roles\":[\"USER\"]}}"))),
+            @ApiResponse(responseCode = "400", description = "Validation error or invalid user payload")
+        }
+    )
     @PostMapping("/register")
     public ResponseEntity<UserResponse> registerUser(@Valid @RequestBody UserReqDto userReqDto) {
         UserDto savedUserDto = userService.registerUser(userReqDto, false);
@@ -55,23 +73,24 @@ public class PublicController {
         return new ResponseEntity<>(res, HttpStatus.CREATED);
     }
 
-    @Operation(summary = "Ask for otp email confirmation", description = """
-Confirm email with the provided token. The token is sent to the user's email address during registration.
-The token is valid for 24 hours.""", tags = {"User"}, hidden = true)
+    @Operation(summary = "Request email confirmation OTP", description = "Sends an email containing the confirmation token required to activate the account.", hidden = true)
     @GetMapping("/newEmailConfirmation")
-    public ResponseEntity<VoidResponse> requestEmailConfirmation(@RequestParam String email) {
+    public ResponseEntity<VoidResponse> requestEmailConfirmation(
+            @Parameter(description = "Email address for which to request confirmation", required = true, example = "alice@example.com")
+            @RequestParam String email) {
         UserEntity user = userService.getUserEntityByEmail(email);
         userService.sendEmailConfirmationEmail(user);
         log.info("Email confirmation requested for email {}", email);
         return new ResponseEntity<>(new VoidResponse("Email confirmation sent"), HttpStatus.OK);
     }
 
-    @Operation(summary = "Request Telegram unification OTP", description = """
-Request a one-time password (OTP) for Telegram unification. The OTP is sent to the user's email address.
-The OTP is valid for 24 hours.
-The user must be registered and have a confirmed email address.""", tags = {"User"}, hidden = true)
+    @Operation(summary = "Request Telegram unification OTP", description = "Sends a one-time token to the user email so that a Telegram-only account can be merged with the email account.", hidden = true)
     @GetMapping("/newTgUnifyEmailOtp")
-    public ResponseEntity<VoidResponse> requestTgUnifyEmailOtp(@RequestParam String email, @RequestParam(required = false) String telegramId) {
+    public ResponseEntity<VoidResponse> requestTgUnifyEmailOtp(
+            @Parameter(description = "Email of the account to unify", required = true, example = "alice@example.com")
+            @RequestParam String email,
+            @Parameter(description = "Optional Telegram id associated with the target account for the unification flow", required = false, example = "123456789")
+            @RequestParam(required = false) String telegramId) {
         UserEntity user = userService.getUserEntityByEmail(email);
         if (!user.isEmailConfirmed()) {
             throw new EmailNotConfirmedException();
