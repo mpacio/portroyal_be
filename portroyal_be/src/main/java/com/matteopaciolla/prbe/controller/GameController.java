@@ -29,8 +29,6 @@ import org.springframework.data.domain.Sort;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
-import java.util.concurrent.ExecutionException;
-
 import static com.matteopaciolla.prbe.util.AuthenticationUtils.getUserName;
 import static com.matteopaciolla.prbe.util.AuthenticationUtils.isBotUser;
 
@@ -68,7 +66,7 @@ public class GameController {
     @PostMapping(path = "/move", consumes = "application/json", produces = "application/json")
     public ResponseEntity<MoveResponse> move(
             @RequestHeader(value = BH, required = false) String tgId,
-            @Valid @RequestBody MoveReqDto moveReqDto) throws ExecutionException {
+            @Valid @RequestBody MoveReqDto moveReqDto) {
         MoveResponse moveResponse;
         if (isBotUser()) {
             if (tgId == null) {

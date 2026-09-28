@@ -39,7 +39,6 @@ import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Locale;
 import java.util.Optional;
-import java.util.concurrent.ExecutionException;
 import java.util.stream.Collectors;
 
 @Slf4j
@@ -64,7 +63,7 @@ public class GameService {
     @Autowired
     private UserRepository userRepository;
 
-    public MoveResponse insertMoveWithUsername(String username, MoveReqDto moveReqDto) throws ExecutionException {
+    public MoveResponse insertMoveWithUsername(String username, MoveReqDto moveReqDto) {
         UserEntity user = userRepository.findByUsername(username)
                 .orElseThrow(() -> new ResourceNotFoundException("User not found"));
         Pageable pageable = PageRequest.of(0, 1, Sort.by(Sort.Order.desc("createdAt")));
@@ -77,7 +76,7 @@ public class GameService {
         }
     }
 
-    public MoveResponse insertMoveWithTelegramId(String telegramId, MoveReqDto moveReqDto) throws ExecutionException {
+    public MoveResponse insertMoveWithTelegramId(String telegramId, MoveReqDto moveReqDto) {
         UserEntity user = userRepository.findByTelegramId(telegramId)
                 .orElseThrow(() -> new ResourceNotFoundException("User not found"));
         Pageable pageable = PageRequest.of(0, 1, Sort.by(Sort.Order.desc("createdAt")));
@@ -90,7 +89,7 @@ public class GameService {
         }
     }
 
-    public MoveResponse insertMove(MoveReqDto moveReqDto, MatchEntity matchEntity, UserEntity user) throws ExecutionException {
+    public MoveResponse insertMove(MoveReqDto moveReqDto, MatchEntity matchEntity, UserEntity user) {
         String username = user.getUsername();
         String keyCode = matchEntity.getKeyCode();
         if (!matchEntity.getPlayers().stream().map(UserEntity::getUsername).toList().contains(username)) {

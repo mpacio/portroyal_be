@@ -1,8 +1,8 @@
 package com.matteopaciolla.prbe.repository.cachingproxy;
 
-import com.google.common.cache.CacheBuilder;
-import com.google.common.cache.CacheLoader;
-import com.google.common.cache.LoadingCache;
+import com.github.benmanes.caffeine.cache.Caffeine;
+import com.github.benmanes.caffeine.cache.CacheLoader;
+import com.github.benmanes.caffeine.cache.LoadingCache;
 import com.matteopaciolla.portroyal.confs.Configuration;
 import com.matteopaciolla.portroyal.core.Match;
 import com.matteopaciolla.portroyal.core.MatchCreator;
@@ -15,6 +15,7 @@ import com.matteopaciolla.prbe.model.entity.ConfigPropertyEntity;
 import com.matteopaciolla.prbe.model.entity.MatchEntity;
 import com.matteopaciolla.prbe.repository.ConfigPropertyRepository;
 import com.matteopaciolla.prbe.repository.MatchRepository;
+import jakarta.annotation.PostConstruct;
 import lombok.NonNull;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -24,7 +25,6 @@ import org.springframework.stereotype.Repository;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Optional;
-import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 
 @Slf4j
@@ -40,18 +40,25 @@ public class MatchRetainer {
     @Value("${be_app.cache.match.seconds-to-expire:300}")
     private int secondsToExpire;
 
-    private final LoadingCache<String, Match> matchCache = CacheBuilder.newBuilder()
-            .expireAfterAccess(secondsToExpire, TimeUnit.SECONDS)
-            .build(new CacheLoader<String, Match>() {
-                        @Override
-                        public Match load(@NonNull String key) {
-                            Optional<MatchEntity> matchEntity = matchRepository.findByKeyCode(key);
-                            return matchEntity.map(MatchRetainer.this::createMatch)
-                                    .orElseThrow(() -> new IllegalArgumentException("Match not found"));
-                        }
-                    });
+    private LoadingCache<String, Match> matchCache;
 
-    public Match getMatch(MatchEntity matchEntity) throws ExecutionException {
+    // Built in @PostConstruct (not as a field initializer) so that secondsToExpire
+    // is already populated by @Value injection, which happens after construction.
+    @PostConstruct
+    private void initMatchCache() {
+        matchCache = Caffeine.newBuilder()
+                .expireAfterAccess(secondsToExpire, TimeUnit.SECONDS)
+                .build(new CacheLoader<String, Match>() {
+                            @Override
+                            public Match load(@NonNull String key) {
+                                Optional<MatchEntity> matchEntity = matchRepository.findByKeyCode(key);
+                                return matchEntity.map(MatchRetainer.this::createMatch)
+                                        .orElseThrow(() -> new IllegalArgumentException("Match not found"));
+                            }
+                        });
+    }
+
+    public Match getMatch(MatchEntity matchEntity) {
         if (matchEntity == null) {
             throw new IllegalArgumentException("Match entity cannot be null");
         }

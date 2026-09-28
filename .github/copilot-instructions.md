@@ -51,7 +51,7 @@ Every `portroyal_be` instance must remain stateless and disposable:
 
 - **PostgreSQL is the single source of truth.** Every accepted move is persisted (`moves` table)
   before the API responds.
-- **`MatchRetainer`** keeps a Guava `LoadingCache<String, Match>` purely as a performance
+- **`MatchRetainer`** keeps a Caffeine `LoadingCache<String, Match>` purely as a performance
   optimization. Before returning a cached `Match`, it compares the cached move count against the
   persisted move count and **invalidates/rebuilds** (`MatchCreator.createMatch(...)`) on mismatch.
   Never treat this cache as authoritative state.

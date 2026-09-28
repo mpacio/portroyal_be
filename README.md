@@ -104,7 +104,7 @@ This works because of a specific design:
    linked to `matches`) before the API responds. No match state is considered authoritative unless
    it is durably stored.
 2. **Each instance keeps only a local, disposable projection of that state.** `MatchRetainer` uses a
-   Guava `LoadingCache<String, Match>` to avoid replaying the full move history for every request.
+   Caffeine `LoadingCache<String, Match>` to avoid replaying the full move history for every request.
    The cache is purely a performance optimization, never a source of truth: before returning a
    cached `Match`, `MatchRetainer#getMatch` compares the number of moves in the cached object
    against the number of moves persisted for that match in the database. On any mismatch it
