@@ -10,19 +10,22 @@ import lombok.Value;
 
 import java.util.List;
 
-@Schema(title = "Move insert body", description = "Request to make a move in the game")
+@Schema(title = "MoveRequest", description = "Payload sent to execute a game move. The move type determines which optional fields are meaningful.")
 @Value
 public class MoveReqDto {
 
-    @Schema(example = "DISCOVER", description = "The move to make")
+    @Schema(example = "DISCOVER", description = "Name of the move to execute. Examples include DISCOVER, HIRE, TRADE, or COMMIT_EXPEDITION.", requiredMode = Schema.RequiredMode.REQUIRED)
     @NotNull
     @EnumString(enumClass=MoveAction.class, ignoreCase=true)
     String move;
-    @Schema(example = "0", description = "The index of the card on which the move is made")
+
+    @Schema(example = "0", description = "Index of the target card or element involved in the move, when the move requires one.")
     Integer parameterIndex;
-    @Schema(example = "-1", description = "The index of the player on which the move is made")
+
+    @Schema(example = "-1", description = "Index of the target player involved in the move; use -1 when not applicable.")
     Integer pickPlayerIndex;
-    @Schema(example = "[\"CAPTAIN\", \"CAPTAIN\", \"SETTLER\"]", description = "The list of employees needed for the expedition (only for COMMIT_EXPEDITION)")
+
+    @Schema(example = "[\"CAPTAIN\", \"CAPTAIN\", \"SETTLER\"]", description = "Employee list used only for COMMIT_EXPEDITION or other expedition-related moves.")
     @EnumStringList(enumClass= ExpeditionEmployee.class)
     List<String> expeditionEmployeesList;
 }

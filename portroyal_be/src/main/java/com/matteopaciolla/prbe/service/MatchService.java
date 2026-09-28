@@ -30,7 +30,6 @@ import java.time.LocalDateTime;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Optional;
-import java.util.concurrent.ExecutionException;
 
 @Slf4j
 @Service
@@ -54,12 +53,8 @@ public class MatchService {
         if (!matchEntity.getStarted()) {
             res = MatchConverter.toDto(matchEntity, null, fromBot);
         } else {
-            try {
-                Match match = matchRetainer.getMatch(matchEntity);
-                res = MatchConverter.toDto(matchEntity, match, fromBot);
-            } catch (ExecutionException e) {
-                throw new MatchCreationException(e);
-            }
+            Match match = matchRetainer.getMatch(matchEntity);
+            res = MatchConverter.toDto(matchEntity, match, fromBot);
         }
         return res;
     }
@@ -182,12 +177,8 @@ public class MatchService {
         matchEntity.setStarted(true);
         matchEntity.setStartedAt(LocalDateTime.now());
         matchRepository.save(matchEntity);
-        try {
-            Match match = matchRetainer.getMatch(matchEntity);
-            return MatchConverter.toDto(matchEntity, match, includeTgIds);
-        } catch (ExecutionException e) {
-            throw new MatchCreationException(e);
-        }
+        Match match = matchRetainer.getMatch(matchEntity);
+        return MatchConverter.toDto(matchEntity, match, includeTgIds);
     }
 
     public Optional<MatchDto> getPlayingMatch(UserEntity user, boolean includeTgIds) {
@@ -200,12 +191,8 @@ public class MatchService {
             MatchEntity matchEntity = matches.getContent().getFirst();
             // check if the match is started
             if (matchEntity.getStarted() != null && matchEntity.getStarted()) {
-                try {
-                    Match match = matchRetainer.getMatch(matchEntity);
-                    return Optional.ofNullable(MatchConverter.toDto(matchEntity, match, includeTgIds));
-                } catch (ExecutionException e) {
-                    throw new ResourceNotFoundException("Match not found with keyCode " + matchEntity.getKeyCode());
-                }
+                Match match = matchRetainer.getMatch(matchEntity);
+                return Optional.ofNullable(MatchConverter.toDto(matchEntity, match, includeTgIds));
             } else {
                 return Optional.ofNullable(MatchConverter.toDto(matchEntity, null, includeTgIds));
             }

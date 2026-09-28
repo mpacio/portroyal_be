@@ -26,9 +26,18 @@ import java.util.List;
 				scheme = "basic"
 		)
 })
-@OpenAPIDefinition(info = @Info(title = "Port Royal Back End", description = "The Port Royal Game APIs", version = "1.0"),
-//		security = {@SecurityRequirement(name = "basicAuth")},// this extends basicAuth to all endpoints
-		servers = {@Server(url = "http://localhost:8080"), @Server(url = "https://prbe.matteopaciolla.com")}
+@OpenAPIDefinition(
+		info = @Info(
+				title = "Port Royal Back End",
+				description = "Port Royal game backend API. The service exposes the game state, match lifecycle, authentication, user management and bot-mediated operations for the Port Royal game. " +
+					"All endpoints under /api/v1 are protected via HTTP Basic Authentication unless explicitly marked as public. " +
+					"Bot integrations must send the mandatory tgId header when acting as the shaslabot technical account.",
+				version = "1.0"
+		),
+		servers = {
+				@Server(url = "http://localhost:8080", description = "Local development environment"),
+				@Server(url = "https://prbe.matteopaciolla.com", description = "Production / hosted API")
+		}
 )
 @Slf4j
 @SpringBootApplication
