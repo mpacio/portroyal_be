@@ -67,6 +67,7 @@ public class MatchConverter {
         matchInfoDto.setCreatedAt(match.getCreatedAt() != null ? match.getCreatedAt().format(DATE_TIME_FORMATTER) : null);
         matchInfoDto.setConfigurationId(match.getConfigurationId());
         matchInfoDto.setPlayerUsernames(match.getPlayers() != null ? match.getPlayers().stream().map(UserEntity::getUsername).collect(Collectors.toList()) : null);
+        matchInfoDto.setPlayers(match.getPlayers() != null ? match.getPlayers().stream().map(player -> UserConverter.toDtoLight(player, false)).collect(Collectors.toList()) : null);
         matchInfoDto.setHostUsername(match.getHostUser() != null ? match.getHostUser().getUsername() : null);
         matchInfoDto.setWinnerUsername(match.getWinner() != null ? match.getWinner().getUsername() : null);
         matchInfoDto.setEnded(match.getEnded());

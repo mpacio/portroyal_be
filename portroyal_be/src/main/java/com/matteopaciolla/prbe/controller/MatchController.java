@@ -5,10 +5,12 @@ import com.matteopaciolla.prbe.constants.Paths;
 import com.matteopaciolla.prbe.constants.enums.SentinelAlertMessage;
 import com.matteopaciolla.prbe.dto.MatchDto;
 import com.matteopaciolla.prbe.dto.MatchInfoDto;
+import com.matteopaciolla.prbe.dto.request.AddBotReqDto;
 import com.matteopaciolla.prbe.dto.request.MatchConfigReqDto;
 import com.matteopaciolla.prbe.dto.response.*;
 import com.matteopaciolla.prbe.exceptions.common.MandatoryBotParamException;
 import com.matteopaciolla.prbe.exceptions.match.MultipleHostingDemandException;
+import jakarta.validation.Valid;
 import com.matteopaciolla.prbe.model.entity.UserEntity;
 import com.matteopaciolla.prbe.repository.MatchRepository;
 import com.matteopaciolla.prbe.service.MatchService;
@@ -187,6 +189,54 @@ public class MatchController {
         log.info("User {} started the match with keyCode = {}", user.getUsername(), matchDto.getKeyCode());
         sentinelService.sendUpdate(matchDto.getKeyCode(), user.getUsername(), SentinelAlertMessage.MATCH_STARTED);
         return ResponseEntity.ok(new MatchResponse("Match started successfully. Time to insert moves", matchDto));
+    }
+
+    @Operation(
+            summary = "Add a bot player",
+            description = "Adds an autonomous bot player, at the given difficulty, to the not-yet-started match hosted by the authenticated user. The backend plays the bot's turns automatically once the match starts.",
+            parameters = {
+                    @Parameter(name = BH, description = "Mandatory only for bot-mediated requests; identifies the real acting user.", required = false, schema = @Schema(type = "string"), in = ParameterIn.HEADER)
+            },
+            responses = {
+                    @ApiResponse(responseCode = "200", description = "Bot added successfully",
+                            content = @Content(mediaType = "application/json", schema = @Schema(implementation = MatchInfoResponse.class))),
+                    @ApiResponse(responseCode = "400", description = "Match is already started, full, or not hosted by the authenticated user")
+            }
+    )
+    @PostMapping(path = "/bot", produces = "application/json")
+    public ResponseEntity<MatchInfoResponse> addBot(
+            @Parameter(name = BH, description = "Mandatory only for bot-mediated requests; identifies the real acting user.", required = false, schema = @Schema(type = "string"), in = ParameterIn.HEADER)
+            @RequestHeader(value = BH, required = false) String tgId,
+            @Valid @RequestBody AddBotReqDto addBotReqDto) {
+        UserEntity host = getUserEntity(tgId);
+        MatchInfoDto matchInfoDto = matchService.addBot(host, addBotReqDto);
+        log.info("Host {} added a bot to the match with keyCode = {}", host.getUsername(), matchInfoDto.getKeyCode());
+        sentinelService.sendUpdate(matchInfoDto.getKeyCode(), host.getUsername(), SentinelAlertMessage.PLAYER_JOINED);
+        return ResponseEntity.ok(new MatchInfoResponse(matchInfoDto));
+    }
+
+    @Operation(
+            summary = "Remove a bot player",
+            description = "Removes a previously added bot player from the not-yet-started match hosted by the authenticated user.",
+            parameters = {
+                    @Parameter(name = BH, description = "Mandatory only for bot-mediated requests; identifies the real acting user.", required = false, schema = @Schema(type = "string"), in = ParameterIn.HEADER)
+            },
+            responses = {
+                    @ApiResponse(responseCode = "200", description = "Bot removed successfully"),
+                    @ApiResponse(responseCode = "400", description = "Match is already started, not hosted by the authenticated user, or the given username is not a bot in this match")
+            }
+    )
+    @DeleteMapping(path = "/bot", produces = "application/json")
+    public ResponseEntity<VoidResponse> removeBot(
+            @Parameter(name = BH, description = "Mandatory only for bot-mediated requests; identifies the real acting user.", required = false, schema = @Schema(type = "string"), in = ParameterIn.HEADER)
+            @RequestHeader(value = BH, required = false) String tgId,
+            @Parameter(description = "Username of the bot player to remove", example = "ABC123-bot-1", required = true)
+            @RequestParam String botUsername) {
+        UserEntity host = getUserEntity(tgId);
+        String keyCode = matchService.removeBot(host, botUsername);
+        log.info("Host {} removed bot {} from the match with keyCode = {}", host.getUsername(), botUsername, keyCode);
+        sentinelService.sendUpdate(keyCode, botUsername, SentinelAlertMessage.PLAYER_LEFT);
+        return ResponseEntity.ok(new VoidResponse("Bot removed successfully"));
     }
 
     @Operation(

@@ -2,8 +2,11 @@ package com.matteopaciolla.prbe.service;
 
 import com.matteopaciolla.portroyal.confs.Configuration;
 import com.matteopaciolla.portroyal.core.Match;
+import com.matteopaciolla.portroyal.core.enums.BotDifficulty;
+import com.matteopaciolla.prbe.constants.enums.UserRole;
 import com.matteopaciolla.prbe.converter.MatchConfigConverter;
 import com.matteopaciolla.prbe.converter.MatchConverter;
+import com.matteopaciolla.prbe.dto.request.AddBotReqDto;
 import com.matteopaciolla.prbe.dto.request.MatchConfigReqDto;
 import com.matteopaciolla.prbe.dto.MatchDto;
 import com.matteopaciolla.prbe.dto.MatchInfoDto;
@@ -16,6 +19,7 @@ import com.matteopaciolla.prbe.model.entity.ConfigPropertyEntity;
 import com.matteopaciolla.prbe.model.entity.MatchEntity;
 import com.matteopaciolla.prbe.model.entity.UserEntity;
 import com.matteopaciolla.prbe.repository.ConfigPropertyRepository;
+import com.matteopaciolla.prbe.repository.UserRepository;
 import com.matteopaciolla.prbe.repository.cachingproxy.MatchRetainer;
 import com.matteopaciolla.prbe.repository.MatchRepository;
 import com.matteopaciolla.prbe.util.Base36StringUtils;
@@ -24,26 +28,38 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDateTime;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Optional;
+import java.util.UUID;
 
 @Slf4j
 @Service
 public class MatchService {
 
+    private static final int MAX_PLAYERS = 5;
+
     private final MatchRepository matchRepository;
     private final ConfigPropertyRepository configPropertyRepository;
+    private final UserRepository userRepository;
+    private final PasswordEncoder passwordEncoder;
 
     private final MatchRetainer matchRetainer;
+    private final GameService gameService;
 
-    public MatchService(MatchRepository matchRepository, ConfigPropertyRepository configPropertyRepository, MatchRetainer matchRetainer) {
+    public MatchService(MatchRepository matchRepository, ConfigPropertyRepository configPropertyRepository,
+                         UserRepository userRepository, PasswordEncoder passwordEncoder,
+                         MatchRetainer matchRetainer, GameService gameService) {
         this.matchRepository = matchRepository;
         this.configPropertyRepository = configPropertyRepository;
+        this.userRepository = userRepository;
+        this.passwordEncoder = passwordEncoder;
         this.matchRetainer = matchRetainer;
+        this.gameService = gameService;
     }
 
     public MatchDto getMatch(String keyCode, boolean fromBot) {
@@ -153,7 +169,7 @@ public class MatchService {
             throw new JoiningAlreadyStartedMatchException(keyCode);
         }
         // check if the match is already full
-        if (matchEntity.getPlayers().size() == 5) {
+        if (matchEntity.getPlayers().size() == MAX_PLAYERS) {
             throw new MatchFullException(keyCode);
         }
         // check if the user is already in the match
@@ -178,7 +194,60 @@ public class MatchService {
         matchEntity.setStartedAt(LocalDateTime.now());
         matchRepository.save(matchEntity);
         Match match = matchRetainer.getMatch(matchEntity);
+        // the first active player is chosen randomly by the library, so it may already be a bot:
+        // play out any leading bot turns before returning the match state to the caller.
+        gameService.autoPlayBotTurns(match, matchEntity);
         return MatchConverter.toDto(matchEntity, match, includeTgIds);
+    }
+
+    public MatchInfoDto addBot(UserEntity host, AddBotReqDto addBotReqDto) {
+        MatchEntity matchEntity = findHostedOpenMatch(host.getUsername());
+        if (Boolean.TRUE.equals(matchEntity.getStarted())) {
+            throw new MatchCompositionLockedException(matchEntity.getKeyCode());
+        }
+        if (matchEntity.getPlayers().size() >= MAX_PLAYERS) {
+            throw new MatchFullException(matchEntity.getKeyCode());
+        }
+        long botSlot = matchEntity.getPlayers().stream()
+                .filter(player -> player.getRoles().contains(UserRole.AI))
+                .count() + 1;
+        String botUsername = matchEntity.getKeyCode() + "-bot-" + botSlot;
+        UserEntity bot = new UserEntity(botUsername, passwordEncoder.encode(UUID.randomUUID().toString()), List.of(UserRole.AI));
+        String displayName = addBotReqDto.getName() != null && !addBotReqDto.getName().isBlank()
+                ? addBotReqDto.getName()
+                : "Bot " + botSlot;
+        bot.setFirstName(displayName);
+        BotDifficulty difficulty = addBotReqDto.getDifficulty();
+        bot.setBotDifficulty(difficulty);
+        bot.setEnabled(false);
+        bot.setEmailConfirmed(false);
+        UserEntity savedBot = userRepository.save(bot);
+        matchEntity.addPlayer(savedBot);
+        MatchEntity savedMatchEntity = matchRepository.save(matchEntity);
+        log.info("Bot {} (difficulty {}) added to match with keyCode {}", botUsername, difficulty, savedMatchEntity.getKeyCode());
+        return MatchConverter.toInfoDto(savedMatchEntity);
+    }
+
+    public String removeBot(UserEntity host, String botUsername) {
+        MatchEntity matchEntity = findHostedOpenMatch(host.getUsername());
+        if (Boolean.TRUE.equals(matchEntity.getStarted())) {
+            throw new MatchCompositionLockedException(matchEntity.getKeyCode());
+        }
+        UserEntity bot = matchEntity.getPlayers().stream()
+                .filter(player -> player.getUsername().equals(botUsername) && player.getRoles().contains(UserRole.AI))
+                .findFirst()
+                .orElseThrow(() -> new ResourceNotFoundException(
+                        "Bot player with username " + botUsername + " not found in match with keyCode " + matchEntity.getKeyCode()));
+        matchEntity.getPlayers().remove(bot);
+        matchRepository.save(matchEntity);
+        userRepository.delete(bot);
+        log.info("Bot {} removed from match with keyCode {}", botUsername, matchEntity.getKeyCode());
+        return matchEntity.getKeyCode();
+    }
+
+    private MatchEntity findHostedOpenMatch(String hostUsername) {
+        return matchRepository.findFirstByHostUserUsernameAndEnded(hostUsername, false)
+                .orElseThrow(() -> new ResourceNotFoundException("No open match hosted by user " + hostUsername));
     }
 
     public Optional<MatchDto> getPlayingMatch(UserEntity user, boolean includeTgIds) {

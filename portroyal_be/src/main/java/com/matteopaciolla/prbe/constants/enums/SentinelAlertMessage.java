@@ -17,7 +17,8 @@ public enum SentinelAlertMessage {
     PLAYER_JOINED(1103, "A player joined the match"),
     MOVES_UPDATED(1104, "A player made a move"),
     YOUR_TURN(    1105, "It's your turn"),
-    MATCH_CLOSED( 1106, "Match has been closed");
+    MATCH_CLOSED( 1106, "Match has been closed"),
+    PLAYER_LEFT(  1107, "A player left the match");
 
 
     private final int code;

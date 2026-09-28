@@ -29,6 +29,9 @@ public class MatchInfoDto {
     @Schema(description = "Usernames of all players currently in the match.", example = "[\"alice\", \"bob\"]")
     private List<String> playerUsernames;
 
+    @Schema(description = "Full player profiles for all players currently in the match, including role and bot difficulty when applicable.")
+    private List<com.matteopaciolla.prbe.dto.UserDto> players;
+
     @Schema(description = "Username of the host user who created or owns the match.", example = "alice")
     private String hostUsername;
 
