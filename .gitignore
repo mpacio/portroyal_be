@@ -54,3 +54,4 @@ logs/**
 /csv_files/*.csv
 /portroyal_be/mvnw.cmd
 /portroyal_be/mvnw
+/portroyal_lib/csv_files/*.csv
