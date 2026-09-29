@@ -180,6 +180,14 @@ public class GameService {
             }
             anyAiMovePlayed = true;
             lastActingAiPlayerUsername = aiPlayer.get().getUsername();
+            log.info("AI player {} executed move {} in match {} (difficulty={}, timeIndex={}, choiceIndex={}, pickPlayerIndex={})",
+                    lastActingAiPlayerUsername,
+                    aiMove.getMove(),
+                    keyCode,
+                    aiPlayer.get().getDifficulty(),
+                    aiMove.getTimeIndex(),
+                    aiMove.getChoiceIndex(),
+                    aiMove.getPickPlayerIndex());
             MoveEntity aiMoveEntity = MoveConverter.toEntity(aiMove, matchEntity, prlibVersion);
             moveRepository.save(aiMoveEntity);
             matchEntity.addMove(aiMoveEntity);
