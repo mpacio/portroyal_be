@@ -46,7 +46,7 @@ public class TradeHireMainPhase extends Phase {
     @Override
     public Card tradeHire(int cardIndex, int pickPlayerIndex, boolean renounce) throws NotEnoughMoneyForHiringException,
             NotEnoughHiringCapacityException, EmptyHarborDemandException,
-            UndefinedPickPlayerIndexException, SelfPickPlayerIndexException {
+            UndefinedPickPlayerIndexException, SelfPickPlayerIndexException, HarborCardIndexNotValidException {
         tradeHireChecks(cardIndex, pickPlayerIndex);
         Card card = match.getTable().getHarbor().get(cardIndex);
         if (card instanceof CargoShip && !pickPlayerChecksPassed(pickPlayerIndex)) {
@@ -153,14 +153,14 @@ public class TradeHireMainPhase extends Phase {
         return nextPlayerIndex;
     }
 
-    private void checkCardIndex(int cardIndex) {
+    private void checkHarborCardIndex(int cardIndex) throws HarborCardIndexNotValidException {
         if (cardIndex < 0 || cardIndex >= match.getTable().getHarbor().size()) {
-            throw new IllegalArgumentException("Invalid card index");
+            throw new HarborCardIndexNotValidException("Invalid harbor card index: " + cardIndex);
         }
     }
 
-    private void tradeHireChecks(int cardIndex, int pickPlayerIndex) throws NotEnoughHiringCapacityException, EmptyHarborDemandException, SelfPickPlayerIndexException {
-        checkCardIndex(cardIndex);
+    private void tradeHireChecks(int cardIndex, int pickPlayerIndex) throws NotEnoughHiringCapacityException, EmptyHarborDemandException, SelfPickPlayerIndexException, HarborCardIndexNotValidException {
+        checkHarborCardIndex(cardIndex);
         if (match.getRunningPlayer().getTradingCapacity() == 0) {
             throw new NotEnoughHiringCapacityException("You don't have enough trading capacity to trade/hire.");
         }
