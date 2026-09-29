@@ -1,4 +1,6 @@
 
+    create sequence ai_players_id_seq start with 1 increment by 1;
+
     create sequence emails_queue_id_seq start with 1 increment by 1;
 
     create sequence game_configurations_id_seq start with 1 increment by 1;
@@ -10,6 +12,16 @@
     create sequence temporary_tokens_id_seq start with 1 increment by 1;
 
     create sequence users_id_seq start with 1 increment by 1;
+
+    create table ai_players (
+        created_at timestamp(6) not null,
+        id bigint not null,
+        match_id bigint not null,
+        difficulty varchar(255) not null check (difficulty in ('EASY','MEDIUM','HARD')),
+        display_name varchar(255),
+        username varchar(255) not null unique,
+        primary key (id)
+    );
 
     create table callbacks (
         created_at timestamp(6) not null,
@@ -120,6 +132,11 @@
         roles varchar(255) array not null,
         primary key (id)
     );
+
+    alter table if exists ai_players
+       add constraint FK23ccqrehgw53j6pv17nqs9j1c
+       foreign key (match_id)
+       references matches;
 
     alter table if exists match_user
        add constraint FK32qnb8qnbu72aj944gt4wiepa

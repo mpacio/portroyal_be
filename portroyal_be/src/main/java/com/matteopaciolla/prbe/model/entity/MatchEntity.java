@@ -60,8 +60,20 @@ public class MatchEntity {
     private LocalDateTime startedAt;
     private LocalDateTime lastMoveAt;
 
+    @OneToMany(mappedBy = "match", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.EAGER)
+    @OrderBy("id ASC")
+    private List<AIPlayerEntity> aiPlayers = new LinkedList<>();
+
     public void addPlayer(UserEntity player) {
         players.add(player);
+    }
+
+    public void addAiPlayer(AIPlayerEntity aiPlayer) {
+        aiPlayer.setMatch(this);
+        if (aiPlayers == null) {
+            aiPlayers = new LinkedList<>();
+        }
+        aiPlayers.add(aiPlayer);
     }
 
     public void addMove(MoveEntity entity) {
@@ -69,5 +81,30 @@ public class MatchEntity {
             moves = new LinkedList<>();
         }
         moves.add(entity);
+    }
+
+    /**
+     * Total number of participants in the match, humans (from {@link #players}) plus autonomous
+     * AI players (from {@link #aiPlayers}).
+     */
+    public int getPlayerCount() {
+        return (players != null ? players.size() : 0) + (aiPlayers != null ? aiPlayers.size() : 0);
+    }
+
+    /**
+     * Usernames of every participant in the match, humans followed by AI players, in a stable
+     * order matching the play order used to build the library's {@code Match#getPlayers()} list
+     * (see {@code MatchRetainer#createMatch}) and to resolve move-by-index usernames (see
+     * {@code MoveConverter#toEntity}).
+     */
+    public List<String> getAllPlayerUsernames() {
+        List<String> usernames = new LinkedList<>();
+        if (players != null) {
+            players.forEach(player -> usernames.add(player.getUsername()));
+        }
+        if (aiPlayers != null) {
+            aiPlayers.forEach(aiPlayer -> usernames.add(aiPlayer.getUsername()));
+        }
+        return usernames;
     }
 }

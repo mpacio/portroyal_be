@@ -32,6 +32,9 @@ public class UserDto {
     @Schema(description = "Whether the account is currently enabled and usable.", example = "true")
     private Boolean enabled;
 
-    @Schema(description = "Role list granted to the user; typical values are USER, ADMIN or BOT.", example = "[\"USER\", \"ADMIN\"]")
+    @Schema(description = "Role list granted to the user; typical values are USER, ADMIN, BOT or AI.", example = "[\"USER\", \"ADMIN\"]")
     private List<String> roles;
+
+    @Schema(description = "AI difficulty, present only for autonomous AI players operated by the backend.", example = "MEDIUM")
+    private String aiDifficulty;
 }

@@ -4,6 +4,7 @@ import com.matteopaciolla.portroyal.confs.Configuration;
 import com.matteopaciolla.portroyal.core.Match;
 import com.matteopaciolla.prbe.converter.MatchConfigConverter;
 import com.matteopaciolla.prbe.converter.MatchConverter;
+import com.matteopaciolla.prbe.dto.request.AddAiPlayerReqDto;
 import com.matteopaciolla.prbe.dto.request.MatchConfigReqDto;
 import com.matteopaciolla.prbe.dto.MatchDto;
 import com.matteopaciolla.prbe.dto.MatchInfoDto;
@@ -12,6 +13,7 @@ import com.matteopaciolla.prbe.exceptions.common.MandatoryParamException;
 import com.matteopaciolla.prbe.exceptions.common.ResourceNotFoundException;
 import com.matteopaciolla.prbe.exceptions.game.NotSinglePlayerMatchException;
 import com.matteopaciolla.prbe.exceptions.match.*;
+import com.matteopaciolla.prbe.model.entity.AIPlayerEntity;
 import com.matteopaciolla.prbe.model.entity.ConfigPropertyEntity;
 import com.matteopaciolla.prbe.model.entity.MatchEntity;
 import com.matteopaciolla.prbe.model.entity.UserEntity;
@@ -35,15 +37,20 @@ import java.util.Optional;
 @Service
 public class MatchService {
 
+    private static final int MAX_PLAYERS = 5;
+
     private final MatchRepository matchRepository;
     private final ConfigPropertyRepository configPropertyRepository;
 
     private final MatchRetainer matchRetainer;
+    private final GameService gameService;
 
-    public MatchService(MatchRepository matchRepository, ConfigPropertyRepository configPropertyRepository, MatchRetainer matchRetainer) {
+    public MatchService(MatchRepository matchRepository, ConfigPropertyRepository configPropertyRepository,
+                         MatchRetainer matchRetainer, GameService gameService) {
         this.matchRepository = matchRepository;
         this.configPropertyRepository = configPropertyRepository;
         this.matchRetainer = matchRetainer;
+        this.gameService = gameService;
     }
 
     public MatchDto getMatch(String keyCode, boolean fromBot) {
@@ -152,8 +159,8 @@ public class MatchService {
         if (matchEntity.getStarted() || matchEntity.getEnded()) {
             throw new JoiningAlreadyStartedMatchException(keyCode);
         }
-        // check if the match is already full
-        if (matchEntity.getPlayers().size() == 5) {
+        // check if the match is already full (counting both human and bot players)
+        if (matchEntity.getPlayerCount() >= MAX_PLAYERS) {
             throw new MatchFullException(keyCode);
         }
         // check if the user is already in the match
@@ -171,14 +178,58 @@ public class MatchService {
         if (matchEntity.getStarted() == null || matchEntity.getStarted()) {
             throw new MultipleMatchStartAttemptException(matchEntity.getKeyCode());
         }
-        if (matchEntity.getPlayers().size() < 2) {
+        if (matchEntity.getPlayerCount() < 2) {
             throw new NotSinglePlayerMatchException(matchEntity.getKeyCode());
         }
         matchEntity.setStarted(true);
         matchEntity.setStartedAt(LocalDateTime.now());
         matchRepository.save(matchEntity);
         Match match = matchRetainer.getMatch(matchEntity);
+        // the first active player is chosen randomly by the library, so it may already be an AI player:
+        // play out any leading AI turns before returning the match state to the caller.
+        gameService.autoPlayAiTurns(match, matchEntity);
         return MatchConverter.toDto(matchEntity, match, includeTgIds);
+    }
+
+    public MatchInfoDto addAiPlayer(UserEntity host, AddAiPlayerReqDto addAiPlayerReqDto) {
+        MatchEntity matchEntity = findHostedOpenMatch(host.getUsername());
+        if (Boolean.TRUE.equals(matchEntity.getStarted())) {
+            throw new MatchCompositionLockedException(matchEntity.getKeyCode());
+        }
+        if (matchEntity.getPlayerCount() >= MAX_PLAYERS) {
+            throw new MatchFullException(matchEntity.getKeyCode());
+        }
+        long aiPlayerSlot = matchEntity.getAiPlayers().size() + 1;
+        String aiPlayerUsername = matchEntity.getKeyCode() + "-ai-" + aiPlayerSlot;
+        String displayName = addAiPlayerReqDto.getName() != null && !addAiPlayerReqDto.getName().isBlank()
+                ? addAiPlayerReqDto.getName()
+                : "AI Player " + aiPlayerSlot;
+        AIPlayerEntity aiPlayer = new AIPlayerEntity(aiPlayerUsername, displayName, addAiPlayerReqDto.getDifficulty());
+        matchEntity.addAiPlayer(aiPlayer);
+        MatchEntity savedMatchEntity = matchRepository.save(matchEntity);
+        log.info("AI player {} (difficulty {}) added to match with keyCode {}", aiPlayerUsername, addAiPlayerReqDto.getDifficulty(), savedMatchEntity.getKeyCode());
+        return MatchConverter.toInfoDto(savedMatchEntity);
+    }
+
+    public String removeAiPlayer(UserEntity host, String aiPlayerUsername) {
+        MatchEntity matchEntity = findHostedOpenMatch(host.getUsername());
+        if (Boolean.TRUE.equals(matchEntity.getStarted())) {
+            throw new MatchCompositionLockedException(matchEntity.getKeyCode());
+        }
+        AIPlayerEntity aiPlayer = matchEntity.getAiPlayers().stream()
+                .filter(player -> player.getUsername().equals(aiPlayerUsername))
+                .findFirst()
+                .orElseThrow(() -> new ResourceNotFoundException(
+                        "AI player with username " + aiPlayerUsername + " not found in match with keyCode " + matchEntity.getKeyCode()));
+        matchEntity.getAiPlayers().remove(aiPlayer);
+        matchRepository.save(matchEntity);
+        log.info("AI player {} removed from match with keyCode {}", aiPlayerUsername, matchEntity.getKeyCode());
+        return matchEntity.getKeyCode();
+    }
+
+    private MatchEntity findHostedOpenMatch(String hostUsername) {
+        return matchRepository.findFirstByHostUserUsernameAndEnded(hostUsername, false)
+                .orElseThrow(() -> new ResourceNotFoundException("No open match hosted by user " + hostUsername));
     }
 
     public Optional<MatchDto> getPlayingMatch(UserEntity user, boolean includeTgIds) {

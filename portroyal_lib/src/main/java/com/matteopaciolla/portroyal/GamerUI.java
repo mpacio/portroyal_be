@@ -12,6 +12,7 @@ import com.matteopaciolla.portroyal.core.cards.employees.EmployeeCard;
 import com.matteopaciolla.portroyal.core.cards.enums.ExpeditionEmployee;
 import com.matteopaciolla.portroyal.core.cards.ships.CargoShip;
 import com.matteopaciolla.portroyal.core.cards.ships.Ship;
+import com.matteopaciolla.portroyal.core.enums.BotDifficulty;
 import com.matteopaciolla.portroyal.core.phases.RepelPhase;
 import com.matteopaciolla.portroyal.core.phases.TradeHireMainPhase;
 import com.matteopaciolla.portroyal.exceptions.IOGameException;
@@ -21,6 +22,7 @@ import com.matteopaciolla.portroyal.facades.IOFacade;
 
 import java.util.LinkedList;
 import java.util.List;
+import java.util.Map;
 import java.util.Scanner;
 import java.util.Set;
 import java.util.stream.Collectors;
@@ -32,10 +34,19 @@ public class GamerUI {
     private final Match match;
     List<MoveRecord> movesBackup = new LinkedList<>();
     private final String movesBackupFileName;
+    // maps a player's name to the difficulty it should be played at by the bot; players not present here are human
+    private final Map<String, BotDifficulty> botPlayers;
+    // once set to true (by typing "auto" when prompted), bot moves stop pausing for the rest of the match
+    private boolean autoPlayBots = false;
 
     public GamerUI(Match match, String movesBackupFileName) {
+        this(match, movesBackupFileName, Map.of());
+    }
+
+    public GamerUI(Match match, String movesBackupFileName, Map<String, BotDifficulty> botPlayers) {
         this.match = match;
         this.movesBackupFileName = movesBackupFileName;
+        this.botPlayers = botPlayers;
     }
 
     public void playMatch() {
@@ -49,64 +60,69 @@ public class GamerUI {
             int runningPlayerIndex = match.getRunningPlayerIndex();
             int activePlayerIndex = match.getActivePlayerIndex();
             System.out.println("-------------------------------------------------------");
-            try {
-                System.out.println("Which move you want to do?");
-                System.out.println("1. discover");
-                System.out.println("2. finish discover");
-                System.out.println("3. trade or hire");
-                System.out.println("4. end your turn");
-                System.out.println("5. commit an expedition");
-                System.out.println("6. sign a contract");
-                System.out.println("7. renounce a ship");
-                System.out.println("8. exit the game and save the moves on file.");
-                //read the console input
-                int choice = getSinglePositiveIntegerInput(match.getRunningPlayer().getName() + "'s choice: ", 1, 11);
-                switch (choice) {
-                    case 1: {
-                        discover();
-                        break;
+            BotDifficulty botDifficulty = botPlayers.get(match.getRunningPlayer().getName());
+            if (botDifficulty != null) {
+                playBotMove(botDifficulty);
+            } else {
+                try {
+                    System.out.println("Which move you want to do?");
+                    System.out.println("1. discover");
+                    System.out.println("2. finish discover");
+                    System.out.println("3. trade or hire");
+                    System.out.println("4. end your turn");
+                    System.out.println("5. commit an expedition");
+                    System.out.println("6. sign a contract");
+                    System.out.println("7. renounce a ship");
+                    System.out.println("8. exit the game and save the moves on file.");
+                    //read the console input
+                    int choice = getSinglePositiveIntegerInput(match.getRunningPlayer().getName() + "'s choice: ", 1, 11);
+                    switch (choice) {
+                        case 1: {
+                            discover();
+                            break;
+                        }
+                        case 2: {
+                            finishDiscovering();
+                            break;
+                        }
+                        case 3: {
+                            tradeHire(false);
+                            break;
+                        }
+                        case 4: {
+                            endTurn();
+                            break;
+                        }
+                        case 5: {
+                            commitExpedition();
+                            break;
+                        }
+                        case 6: {
+                            signContract();
+                            break;
+                        }
+                        case 7: {
+                            tradeHire(true);
+                            break;
+                        }
+                        case 8: {
+                            System.out.println("Exiting the game...");
+                            gameExited = true;
+                            break;
+                        }
+                        default:
+                            throw new UserInputException("Invalid choice");
                     }
-                    case 2: {
-                        finishDiscovering();
-                        break;
+                    if (choice != 8) {
+                        backupMove();
                     }
-                    case 3: {
-                        tradeHire(false);
-                        break;
-                    }
-                    case 4: {
-                        endTurn();
-                        break;
-                    }
-                    case 5: {
-                        commitExpedition();
-                        break;
-                    }
-                    case 6: {
-                        signContract();
-                        break;
-                    }
-                    case 7: {
-                        tradeHire(true);
-                        break;
-                    }
-                    case 8: {
-                        System.out.println("Exiting the game...");
-                        gameExited = true;
-                        break;
-                    }
-                    default:
-                        throw new UserInputException("Invalid choice");
+                } catch (UserInputException e) {
+                    System.err.println("Error: " + e.getMessage());
+                } catch (Exception e) {
+                    // faulty
+                    // saveMovesOnFile(true);
+                    e.printStackTrace();
                 }
-                if (choice != 8) {
-                    backupMove();
-                }
-            } catch (UserInputException e) {
-                System.err.println("Error: " + e.getMessage());
-            } catch (Exception e) {
-                // faulty
-                // saveMovesOnFile(true);
-                e.printStackTrace();
             }
             if (match.getRunningPlayerIndex() != runningPlayerIndex) {
                 System.out.println("-->>-->>-->>-->>--The running player changed, new player is " + match.getRunningPlayer().getName() + "-->>-->>-->>-->>--");
@@ -170,6 +186,35 @@ public class GamerUI {
 
     private void backupMove() {
         movesBackup.add(match.getLastMove());
+    }
+
+    /**
+     * Lets the bot compute and execute exactly one move for the currently running player, printing what it did.
+     * Since {@link Match#calculateNextMoveRecord(BotDifficulty)} only performs one atomic move per call, a bot's
+     * whole turn is played out over several iterations of the main game loop, just like a human player's turn.
+     */
+    private void playBotMove(BotDifficulty botDifficulty) {
+        String actingPlayerName = match.getRunningPlayer().getName();
+        try {
+            MoveRecord moveRecord = match.calculateNextMoveRecord(botDifficulty);
+            if (moveRecord == null) {
+                System.out.println("Bot " + actingPlayerName + " has no move to compute (the match probably ended).");
+                return;
+            }
+            System.out.println(actingPlayerName + " (bot, " + botDifficulty + ") played -> " + moveRecord);
+            backupMove();
+        } catch (Exception e) {
+            System.err.println("Bot " + actingPlayerName + " error: " + e.getMessage());
+            e.printStackTrace();
+            return;
+        }
+        if (!autoPlayBots) {
+            System.out.print("Press Enter to continue, or type 'auto' to stop pausing on bot moves: ");
+            String input = scanner.nextLine();
+            if ("auto".equalsIgnoreCase(input.trim())) {
+                autoPlayBots = true;
+            }
+        }
     }
 
     private void discover() throws UserInputException {

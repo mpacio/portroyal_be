@@ -21,6 +21,7 @@ import com.matteopaciolla.prbe.exceptions.game.NotRunningPlayerException;
 import com.matteopaciolla.prbe.exceptions.game.NotStartedMatchException;
 import com.matteopaciolla.prbe.model.entity.MatchEntity;
 import com.matteopaciolla.prbe.model.entity.MoveEntity;
+import com.matteopaciolla.prbe.model.entity.AIPlayerEntity;
 import com.matteopaciolla.prbe.model.entity.UserEntity;
 import com.matteopaciolla.prbe.repository.UserRepository;
 import com.matteopaciolla.prbe.repository.cachingproxy.MatchRetainer;
@@ -136,7 +137,72 @@ public class GameService {
         matchRepository.save(matchEntity);
         MoveDto moveDto = MoveConverter.toDto(addedMove, match.getCurrentPhase().getClass().getSimpleName());
         sentinelService.sendUpdate(keyCode, user.getUsername(), SentinelAlertMessage.MOVES_UPDATED);
+        autoPlayAiTurns(match, matchEntity);
         return new MoveResponse("Move added successfully", moveDto);
+    }
+
+    private static final int MAX_AUTO_AI_MOVES_PER_TURN_LOOP = 500;
+
+    /**
+     * Plays out every consecutive AI player turn starting from the match's current running
+     * player, by repeatedly calling {@code Match#calculateNextMoveRecord(BotDifficulty)} (already
+     * available in portroyal_lib, which validates and executes exactly one atomic move per call)
+     * and persisting the resulting moves exactly like a human-submitted one. Stops as soon as a
+     * human player becomes the running player, the match ends, or a safety cap is reached
+     * (defensive guard against an unexpected infinite loop in the underlying AI logic).
+     */
+    public void autoPlayAiTurns(Match match, MatchEntity matchEntity) {
+        String keyCode = matchEntity.getKeyCode();
+        boolean anyAiMovePlayed = false;
+        String lastActingAiPlayerUsername = null;
+        int iterations = 0;
+        while (!match.isMatchEnded()) {
+            String runningPlayerName = match.getRunningPlayer().getName();
+            Optional<AIPlayerEntity> aiPlayer = matchEntity.getAiPlayers().stream()
+                    .filter(player -> player.getUsername().equals(runningPlayerName))
+                    .findFirst();
+            if (aiPlayer.isEmpty()) {
+                break;
+            }
+            if (++iterations > MAX_AUTO_AI_MOVES_PER_TURN_LOOP) {
+                log.error("AI auto-play safety cap reached for match {}, stopping the auto-play loop", keyCode);
+                break;
+            }
+            MoveRecord aiMove;
+            try {
+                aiMove = match.calculateNextMoveRecord(aiPlayer.get().getDifficulty());
+            } catch (RuntimeException e) {
+                log.error("AI player {} failed to compute a move in match {}", runningPlayerName, keyCode, e);
+                break;
+            }
+            if (aiMove == null) {
+                break;
+            }
+            anyAiMovePlayed = true;
+            lastActingAiPlayerUsername = aiPlayer.get().getUsername();
+            log.info("AI player {} executed move {} in match {} (difficulty={}, timeIndex={}, choiceIndex={}, pickPlayerIndex={})",
+                    lastActingAiPlayerUsername,
+                    aiMove.getMove(),
+                    keyCode,
+                    aiPlayer.get().getDifficulty(),
+                    aiMove.getTimeIndex(),
+                    aiMove.getChoiceIndex(),
+                    aiMove.getPickPlayerIndex());
+            MoveEntity aiMoveEntity = MoveConverter.toEntity(aiMove, matchEntity, prlibVersion);
+            moveRepository.save(aiMoveEntity);
+            matchEntity.addMove(aiMoveEntity);
+            matchEntity.setLastMoveAt(LocalDateTime.now());
+            sentinelService.sendUpdate(keyCode, lastActingAiPlayerUsername, SentinelAlertMessage.MOVES_UPDATED);
+        }
+        if (!anyAiMovePlayed) {
+            return;
+        }
+        if (match.isMatchEnded() && !Boolean.TRUE.equals(matchEntity.getEnded())) {
+            matchEntity.setEnded(true);
+            matchEntity.setEndedAt(LocalDateTime.now());
+            sentinelService.sendUpdate(keyCode, lastActingAiPlayerUsername, SentinelAlertMessage.MATCH_ENDED);
+        }
+        matchRepository.save(matchEntity);
     }
 
     private MoveResponse getMatchEndedMoveResponse() {

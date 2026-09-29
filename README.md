@@ -21,6 +21,7 @@ correct order (the library is built/installed before the API, since `portroyal_b
 
 - [Where the game logic lives](#where-the-game-logic-lives)
 - [Designed for many kinds of clients](#designed-for-many-kinds-of-clients)
+  - [Autonomous (AI) players](#autonomous-ai-players)
 - [Designed to scale horizontally](#designed-to-scale-horizontally)
 - [Requirements](#requirements)
 - [Configuration / environment variables](#configuration--environment-variables)
@@ -90,6 +91,33 @@ authentication model.
 Because moves/matches are keyed by the domain user (via username or Telegram id), not by client type
 or session, any mix of frontends can interleave calls against the same match with no special
 handling required on the API side.
+
+### Autonomous (AI) players
+
+A match host can also fill empty seats with autonomous, backend-controlled AI players so humans and
+AI players can play side by side. This is a distinct concept from the single Telegram `BOT`
+technical account described above: that `BOT` role identifies one authenticated proxy account that
+mediates real human users, while an AI player is a per-match, never-authenticating participant
+computed by the backend.
+
+- AI players are **not** stored in the `users` table. Each one is an `AIPlayerEntity` row in a
+  dedicated `ai_players` table, owned by its `MatchEntity` (`ON DELETE CASCADE`-style cascading:
+  adding/removing an AI player, or deleting the match, creates/deletes its `ai_players` rows
+  automatically). They never authenticate and have no password, email, or role list of their own.
+- The API still exposes AI players through the same `UserDto` shape used for real accounts (a
+  virtual `UserRole.AI` tag), so clients can keep rendering one uniform player list; `MatchEntity`
+  combines humans (`players`) and AI players (`aiPlayers`) — in that order — to build the library's
+  ordered player list and to resolve `moves.active_player_username`/`running_player_username` by
+  index.
+- `POST /match/ai-player` (host-only, match not yet started) adds an AI player with a chosen
+  `BotDifficulty` (`EASY`/`MEDIUM`/`HARD`) and an optional display name; `DELETE
+  /match/ai-player?aiPlayerUsername=...` removes one before the match starts.
+- Once the match is running, `GameService#autoPlayAiTurns` plays out every consecutive AI player
+  turn by calling `Match#calculateNextMoveRecord(BotDifficulty)` (already implemented and tested in
+  `portroyal_lib`) and persisting the resulting moves exactly like a human move — no game-rule logic
+  is added to `portroyal_be`. This runs right after a human's move is inserted and right after the
+  match is started (in case the library randomly picks an AI player as the first player), so AI
+  turns are always fully played out before control returns to the API caller.
 
 ## Designed to scale horizontally
 
@@ -180,7 +208,11 @@ actually creating/updating the live schema).
 Key tables (see [`create-schema.sql`](create-schema.sql) for the authoritative, generated DDL):
 
 - `users` — accounts; unique on `username`, `email`, `telegram_id`; `roles` is a Postgres array of
-  `ADMIN`/`USER`/`BOT`.
+  `ADMIN`/`USER`/`BOT` (autonomous AI players are **not** stored here — see
+  [Autonomous (AI) players](#autonomous-ai-players)).
+- `ai_players` — one row per autonomous per-match AI player, FK'd to its owning `matches` row
+  (cascade-deleted with the match); holds `username`, `display_name`, and `difficulty`
+  (`EASY`/`MEDIUM`/`HARD`). See [Autonomous (AI) players](#autonomous-ai-players).
 - `matches` — one row per hosted match, keyed by a short, shareable `key_code`; tracks `started`,
   `ended`, `host_user_id`, `winner_user_id`, timestamps.
 - `match_user` — join table between `matches` and `users` (the players of a match).
@@ -216,7 +248,9 @@ cd portroyal_be
 mvn exec:java -Dexec.mainClass=com.matteopaciolla.prbe.cli.PortRoyalCli
 ```
 
-This CLI can register users, inspect the current user, list/host/join/start matches, issue arbitrary HTTP calls to the REST API, and play a match interactively without starting the Spring app in the same JVM.
+This CLI can register users, inspect the current user, list/host/join/start matches, add/remove
+autonomous AI players before starting a match, issue arbitrary HTTP calls to the REST API, and play
+a match interactively without starting the Spring app in the same JVM.
 
 or run the packaged jar:
 
@@ -246,7 +280,8 @@ standing up the full API/database stack.
 - Authentication: HTTP Basic Auth on essentially every endpoint under `/api/v1/**` (see
   [Designed to scale horizontally](#designed-to-scale-horizontally)); roles are `ADMIN`, `USER`,
   `BOT` (see [Designed for many kinds of clients](#designed-for-many-kinds-of-clients) for how `BOT`
-  callers mediate for other users via the `tgId` header).
+  callers mediate for other users via the `tgId` header) and `AI` (autonomous, per-match AI players
+  that never authenticate — see [Autonomous (AI) players](#autonomous-ai-players)).
 
 | Tag         | Base path          | Purpose                                                                                                     |
 |-------------|--------------------|-------------------------------------------------------------------------------------------------------------|
@@ -269,6 +304,8 @@ Selected endpoints:
 | `POST /match/host`                                 | Host a new match (optionally with a custom configuration)                                                                               |
 | `PUT /match/join?keyCode=...`                      | Join an open, not-yet-started match                                                                                                     |
 | `PUT /match/start`                                 | Start the match you are hosting (requires ≥ 2 players)                                                                                  |
+| `POST /match/ai-player`                            | Add an autonomous AI player (`EASY`/`MEDIUM`/`HARD`) to the match you are hosting, before it starts                                     |
+| `DELETE /match/ai-player?aiPlayerUsername=...`     | Remove a previously added AI player from the match you are hosting, before it starts                                                    |
 | `GET /match/status`                                | Get the match currently being played by the caller, if any                                                                              |
 | `GET /match/retrieve?keyCode=...&moveNumber=...`   | Get full match state; poll with `moveNumber` to cheaply check "any new moves?"                                                          |
 | `POST /game/move`                                  | Play a move (`DISCOVER`, `TRADE`, `HIRE`, `COMMIT_EXPEDITION`, `SIGN_CONTRACT`, `END_TURN`, ...); validated entirely by `portroyal_lib` |

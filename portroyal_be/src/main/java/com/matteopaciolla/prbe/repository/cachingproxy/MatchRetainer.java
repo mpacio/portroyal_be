@@ -79,8 +79,8 @@ public class MatchRetainer {
     }
 
     private Match createMatch(MatchEntity matchEntity) {
-        List<Player> players = matchEntity.getPlayers().stream()
-                .map(playerEntity -> new Player(playerEntity.getUsername()))
+        List<Player> players = matchEntity.getAllPlayerUsernames().stream()
+                .map(Player::new)
                 .collect(LinkedList::new, LinkedList::add, LinkedList::addAll);
 
         Configuration configuration = createConfiguration(matchEntity.getConfigurationId());

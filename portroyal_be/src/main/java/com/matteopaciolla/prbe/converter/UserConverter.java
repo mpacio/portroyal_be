@@ -28,6 +28,7 @@ public class UserConverter {
         if (includeTgId) {
             userDto.setTelegramId(userEntity.getTelegramId());
         }
+        userDto.setRoles(userEntity.getRoles().stream().map(UserRole::name).toList());
         return userDto;
     }
 

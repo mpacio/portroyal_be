@@ -36,11 +36,13 @@ public class PortRoyalCli {
                     case "4" -> listMatches(session, scanner);
                     case "5" -> hostMatch(session, scanner);
                     case "6" -> joinMatch(session, scanner);
-                    case "7" -> startMatch(session, scanner);
-                    case "8" -> viewMatch(session, scanner);
-                    case "9" -> playInteractiveMatch(session, scanner);
-                    case "10" -> apiExplorer(session, scanner);
-                    case "11" -> printQuickGuide();
+                    case "7" -> addAiPlayerToMatch(session, scanner);
+                    case "8" -> removeAiPlayerFromMatch(session, scanner);
+                    case "9" -> startMatch(session, scanner);
+                    case "10" -> viewMatch(session, scanner);
+                    case "11" -> playInteractiveMatch(session, scanner);
+                    case "12" -> apiExplorer(session, scanner);
+                    case "13" -> printQuickGuide();
                     case "0", "exit", "quit" -> {
                         System.out.println("Bye.");
                         return;
@@ -159,6 +161,37 @@ public class PortRoyalCli {
         }
         String path = "/api/v1/match/join?keyCode=" + urlEncode(keyCode);
         ApiClient.Response response = call(session, "PUT", path, null, session.tgId == null ? null : Map.of("tgId", session.tgId));
+        printResponse(response);
+    }
+
+    private static void addAiPlayerToMatch(Session session, Scanner scanner) {
+        System.out.println("AI difficulty: EASY, MEDIUM, HARD");
+        System.out.print("Difficulty [MEDIUM]: ");
+        String difficulty = scanner.nextLine().trim();
+        if (difficulty.isBlank()) {
+            difficulty = "MEDIUM";
+        }
+        System.out.print("AI player display name (optional): ");
+        String name = scanner.nextLine().trim();
+
+        Map<String, Object> payload = new LinkedHashMap<>();
+        payload.put("difficulty", difficulty.toUpperCase(Locale.ROOT));
+        if (!name.isBlank()) {
+            payload.put("name", name);
+        }
+        ApiClient.Response response = call(session, "POST", "/api/v1/match/ai-player", payload, session.tgId == null ? null : Map.of("tgId", session.tgId));
+        printResponse(response);
+    }
+
+    private static void removeAiPlayerFromMatch(Session session, Scanner scanner) {
+        System.out.print("AI player username to remove (e.g. ABC123-ai-1): ");
+        String aiPlayerUsername = scanner.nextLine().trim();
+        if (aiPlayerUsername.isBlank()) {
+            System.out.println("AI player username cannot be blank.");
+            return;
+        }
+        String path = "/api/v1/match/ai-player?aiPlayerUsername=" + urlEncode(aiPlayerUsername);
+        ApiClient.Response response = call(session, "DELETE", path, null, session.tgId == null ? null : Map.of("tgId", session.tgId));
         printResponse(response);
     }
 
@@ -309,6 +342,8 @@ public class PortRoyalCli {
         System.out.println("- The app calls the running Spring Boot instance via HTTP Basic Auth");
         System.out.println("- For Bot flows, set a tgId in the connection config and the CLI will include the tgId header");
         System.out.println("- To play a match, host it, join it, start it, then use the interactive move menu");
+        System.out.println("- To mix in autonomous players, host a match, use 'Add AI player' (EASY/MEDIUM/HARD) before starting it");
+        System.out.println("- AI turns are auto-played by the backend; poll 'View a match' to see their moves as they happen");
     }
 
     private static ApiClient.Response call(Session session, String method, String path, Object payload, Map<String, String> headers) {
@@ -349,11 +384,13 @@ public class PortRoyalCli {
         System.out.println("4. List matches");
         System.out.println("5. Host match");
         System.out.println("6. Join match");
-        System.out.println("7. Start match");
-        System.out.println("8. View a match by key code");
-        System.out.println("9. Play a match interactively");
-        System.out.println("10. API explorer / generic endpoint tester");
-        System.out.println("11. Quick guide");
+        System.out.println("7. Add AI player to hosted match");
+        System.out.println("8. Remove AI player from hosted match");
+        System.out.println("9. Start match");
+        System.out.println("10. View a match by key code");
+        System.out.println("11. Play a match interactively");
+        System.out.println("12. API explorer / generic endpoint tester");
+        System.out.println("13. Quick guide");
         System.out.println("0. Exit");
     }
 
@@ -397,9 +434,15 @@ public class PortRoyalCli {
         if (players != null && players.isArray()) {
             System.out.println("Players:");
             for (JsonNode player : players) {
-                String name = text(player, "name", "unknown");
-                String money = text(player, "moneyValue", "-");
-                System.out.println(" - " + name + " (money=" + money + ")");
+                String name = text(player, "username", "unknown");
+                String coins = text(player, "coins", "-");
+                String points = text(player, "points", "-");
+                JsonNode user = player.get("user");
+                String aiTag = "";
+                if (user != null && user.get("aiDifficulty") != null && !user.get("aiDifficulty").isNull()) {
+                    aiTag = " [AI/" + user.get("aiDifficulty").asText() + "]";
+                }
+                System.out.println(" - " + name + aiTag + " (coins=" + coins + ", points=" + points + ")");
             }
         }
         JsonNode table = match.get("table");
