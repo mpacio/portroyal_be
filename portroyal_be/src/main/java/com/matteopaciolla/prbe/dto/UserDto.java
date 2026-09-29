@@ -35,6 +35,6 @@ public class UserDto {
     @Schema(description = "Role list granted to the user; typical values are USER, ADMIN, BOT or AI.", example = "[\"USER\", \"ADMIN\"]")
     private List<String> roles;
 
-    @Schema(description = "Bot difficulty, present only for autonomous AI players operated by the backend.", example = "MEDIUM")
-    private String botDifficulty;
+    @Schema(description = "AI difficulty, present only for autonomous AI players operated by the backend.", example = "MEDIUM")
+    private String aiDifficulty;
 }

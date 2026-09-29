@@ -5,7 +5,7 @@ import com.matteopaciolla.prbe.constants.Paths;
 import com.matteopaciolla.prbe.constants.enums.SentinelAlertMessage;
 import com.matteopaciolla.prbe.dto.MatchDto;
 import com.matteopaciolla.prbe.dto.MatchInfoDto;
-import com.matteopaciolla.prbe.dto.request.AddBotReqDto;
+import com.matteopaciolla.prbe.dto.request.AddAiPlayerReqDto;
 import com.matteopaciolla.prbe.dto.request.MatchConfigReqDto;
 import com.matteopaciolla.prbe.dto.response.*;
 import com.matteopaciolla.prbe.exceptions.common.MandatoryBotParamException;
@@ -192,51 +192,51 @@ public class MatchController {
     }
 
     @Operation(
-            summary = "Add a bot player",
-            description = "Adds an autonomous bot player, at the given difficulty, to the not-yet-started match hosted by the authenticated user. The backend plays the bot's turns automatically once the match starts.",
+            summary = "Add an AI player",
+            description = "Adds an autonomous AI player, at the given difficulty, to the not-yet-started match hosted by the authenticated user. The backend plays the AI player's turns automatically once the match starts.",
             parameters = {
                     @Parameter(name = BH, description = "Mandatory only for bot-mediated requests; identifies the real acting user.", required = false, schema = @Schema(type = "string"), in = ParameterIn.HEADER)
             },
             responses = {
-                    @ApiResponse(responseCode = "200", description = "Bot added successfully",
+                    @ApiResponse(responseCode = "200", description = "AI player added successfully",
                             content = @Content(mediaType = "application/json", schema = @Schema(implementation = MatchInfoResponse.class))),
                     @ApiResponse(responseCode = "400", description = "Match is already started, full, or not hosted by the authenticated user")
             }
     )
-    @PostMapping(path = "/bot", produces = "application/json")
-    public ResponseEntity<MatchInfoResponse> addBot(
+    @PostMapping(path = "/ai-player", produces = "application/json")
+    public ResponseEntity<MatchInfoResponse> addAiPlayer(
             @Parameter(name = BH, description = "Mandatory only for bot-mediated requests; identifies the real acting user.", required = false, schema = @Schema(type = "string"), in = ParameterIn.HEADER)
             @RequestHeader(value = BH, required = false) String tgId,
-            @Valid @RequestBody AddBotReqDto addBotReqDto) {
+            @Valid @RequestBody AddAiPlayerReqDto addAiPlayerReqDto) {
         UserEntity host = getUserEntity(tgId);
-        MatchInfoDto matchInfoDto = matchService.addBot(host, addBotReqDto);
-        log.info("Host {} added a bot to the match with keyCode = {}", host.getUsername(), matchInfoDto.getKeyCode());
+        MatchInfoDto matchInfoDto = matchService.addAiPlayer(host, addAiPlayerReqDto);
+        log.info("Host {} added an AI player to the match with keyCode = {}", host.getUsername(), matchInfoDto.getKeyCode());
         sentinelService.sendUpdate(matchInfoDto.getKeyCode(), host.getUsername(), SentinelAlertMessage.PLAYER_JOINED);
         return ResponseEntity.ok(new MatchInfoResponse(matchInfoDto));
     }
 
     @Operation(
-            summary = "Remove a bot player",
-            description = "Removes a previously added bot player from the not-yet-started match hosted by the authenticated user.",
+            summary = "Remove an AI player",
+            description = "Removes a previously added AI player from the not-yet-started match hosted by the authenticated user.",
             parameters = {
                     @Parameter(name = BH, description = "Mandatory only for bot-mediated requests; identifies the real acting user.", required = false, schema = @Schema(type = "string"), in = ParameterIn.HEADER)
             },
             responses = {
-                    @ApiResponse(responseCode = "200", description = "Bot removed successfully"),
-                    @ApiResponse(responseCode = "400", description = "Match is already started, not hosted by the authenticated user, or the given username is not a bot in this match")
+                    @ApiResponse(responseCode = "200", description = "AI player removed successfully"),
+                    @ApiResponse(responseCode = "400", description = "Match is already started, not hosted by the authenticated user, or the given username is not an AI player in this match")
             }
     )
-    @DeleteMapping(path = "/bot", produces = "application/json")
-    public ResponseEntity<VoidResponse> removeBot(
+    @DeleteMapping(path = "/ai-player", produces = "application/json")
+    public ResponseEntity<VoidResponse> removeAiPlayer(
             @Parameter(name = BH, description = "Mandatory only for bot-mediated requests; identifies the real acting user.", required = false, schema = @Schema(type = "string"), in = ParameterIn.HEADER)
             @RequestHeader(value = BH, required = false) String tgId,
-            @Parameter(description = "Username of the bot player to remove", example = "ABC123-bot-1", required = true)
-            @RequestParam String botUsername) {
+            @Parameter(description = "Username of the AI player to remove", example = "ABC123-ai-1", required = true)
+            @RequestParam String aiPlayerUsername) {
         UserEntity host = getUserEntity(tgId);
-        String keyCode = matchService.removeBot(host, botUsername);
-        log.info("Host {} removed bot {} from the match with keyCode = {}", host.getUsername(), botUsername, keyCode);
-        sentinelService.sendUpdate(keyCode, botUsername, SentinelAlertMessage.PLAYER_LEFT);
-        return ResponseEntity.ok(new VoidResponse("Bot removed successfully"));
+        String keyCode = matchService.removeAiPlayer(host, aiPlayerUsername);
+        log.info("Host {} removed AI player {} from the match with keyCode = {}", host.getUsername(), aiPlayerUsername, keyCode);
+        sentinelService.sendUpdate(keyCode, aiPlayerUsername, SentinelAlertMessage.PLAYER_LEFT);
+        return ResponseEntity.ok(new VoidResponse("AI player removed successfully"));
     }
 
     @Operation(

@@ -8,7 +8,6 @@ import com.matteopaciolla.portroyal.core.cards.enums.ExpeditionEmployee;
 import com.matteopaciolla.portroyal.exceptions.userinput.MoveEndedMatchException;
 import com.matteopaciolla.portroyal.exceptions.userinput.UserInputException;
 import com.matteopaciolla.prbe.constants.enums.SentinelAlertMessage;
-import com.matteopaciolla.prbe.constants.enums.UserRole;
 import com.matteopaciolla.prbe.converter.CardConverter;
 import com.matteopaciolla.prbe.converter.MoveConverter;
 import com.matteopaciolla.prbe.dto.CardDto;
@@ -22,6 +21,7 @@ import com.matteopaciolla.prbe.exceptions.game.NotRunningPlayerException;
 import com.matteopaciolla.prbe.exceptions.game.NotStartedMatchException;
 import com.matteopaciolla.prbe.model.entity.MatchEntity;
 import com.matteopaciolla.prbe.model.entity.MoveEntity;
+import com.matteopaciolla.prbe.model.entity.AIPlayerEntity;
 import com.matteopaciolla.prbe.model.entity.UserEntity;
 import com.matteopaciolla.prbe.repository.UserRepository;
 import com.matteopaciolla.prbe.repository.cachingproxy.MatchRetainer;
@@ -137,62 +137,62 @@ public class GameService {
         matchRepository.save(matchEntity);
         MoveDto moveDto = MoveConverter.toDto(addedMove, match.getCurrentPhase().getClass().getSimpleName());
         sentinelService.sendUpdate(keyCode, user.getUsername(), SentinelAlertMessage.MOVES_UPDATED);
-        autoPlayBotTurns(match, matchEntity);
+        autoPlayAiTurns(match, matchEntity);
         return new MoveResponse("Move added successfully", moveDto);
     }
 
-    private static final int MAX_AUTO_BOT_MOVES_PER_TURN_LOOP = 500;
+    private static final int MAX_AUTO_AI_MOVES_PER_TURN_LOOP = 500;
 
     /**
-     * Plays out every consecutive bot turn starting from the match's current running player, by
-     * repeatedly calling {@code Match#calculateNextMoveRecord(BotDifficulty)} (already available in
-     * portroyal_lib, which validates and executes exactly one atomic move per call) and persisting
-     * the resulting moves exactly like a human-submitted one. Stops as soon as a human player
-     * becomes the running player, the match ends, or a safety cap is reached (defensive guard
-     * against an unexpected infinite loop in the underlying bot logic).
+     * Plays out every consecutive AI player turn starting from the match's current running
+     * player, by repeatedly calling {@code Match#calculateNextMoveRecord(BotDifficulty)} (already
+     * available in portroyal_lib, which validates and executes exactly one atomic move per call)
+     * and persisting the resulting moves exactly like a human-submitted one. Stops as soon as a
+     * human player becomes the running player, the match ends, or a safety cap is reached
+     * (defensive guard against an unexpected infinite loop in the underlying AI logic).
      */
-    public void autoPlayBotTurns(Match match, MatchEntity matchEntity) {
+    public void autoPlayAiTurns(Match match, MatchEntity matchEntity) {
         String keyCode = matchEntity.getKeyCode();
-        boolean anyBotMovePlayed = false;
-        String lastActingBotUsername = null;
+        boolean anyAiMovePlayed = false;
+        String lastActingAiPlayerUsername = null;
         int iterations = 0;
         while (!match.isMatchEnded()) {
             String runningPlayerName = match.getRunningPlayer().getName();
-            Optional<UserEntity> botPlayer = matchEntity.getPlayers().stream()
-                    .filter(player -> player.getUsername().equals(runningPlayerName) && player.getRoles().contains(UserRole.AI))
+            Optional<AIPlayerEntity> aiPlayer = matchEntity.getAiPlayers().stream()
+                    .filter(player -> player.getUsername().equals(runningPlayerName))
                     .findFirst();
-            if (botPlayer.isEmpty()) {
+            if (aiPlayer.isEmpty()) {
                 break;
             }
-            if (++iterations > MAX_AUTO_BOT_MOVES_PER_TURN_LOOP) {
-                log.error("Bot auto-play safety cap reached for match {}, stopping the auto-play loop", keyCode);
+            if (++iterations > MAX_AUTO_AI_MOVES_PER_TURN_LOOP) {
+                log.error("AI auto-play safety cap reached for match {}, stopping the auto-play loop", keyCode);
                 break;
             }
-            MoveRecord botMove;
+            MoveRecord aiMove;
             try {
-                botMove = match.calculateNextMoveRecord(botPlayer.get().getBotDifficulty());
+                aiMove = match.calculateNextMoveRecord(aiPlayer.get().getDifficulty());
             } catch (RuntimeException e) {
-                log.error("Bot player {} failed to compute a move in match {}", runningPlayerName, keyCode, e);
+                log.error("AI player {} failed to compute a move in match {}", runningPlayerName, keyCode, e);
                 break;
             }
-            if (botMove == null) {
+            if (aiMove == null) {
                 break;
             }
-            anyBotMovePlayed = true;
-            lastActingBotUsername = botPlayer.get().getUsername();
-            MoveEntity botMoveEntity = MoveConverter.toEntity(botMove, matchEntity, prlibVersion);
-            moveRepository.save(botMoveEntity);
-            matchEntity.addMove(botMoveEntity);
+            anyAiMovePlayed = true;
+            lastActingAiPlayerUsername = aiPlayer.get().getUsername();
+            MoveEntity aiMoveEntity = MoveConverter.toEntity(aiMove, matchEntity, prlibVersion);
+            moveRepository.save(aiMoveEntity);
+            matchEntity.addMove(aiMoveEntity);
             matchEntity.setLastMoveAt(LocalDateTime.now());
-            sentinelService.sendUpdate(keyCode, lastActingBotUsername, SentinelAlertMessage.MOVES_UPDATED);
+            sentinelService.sendUpdate(keyCode, lastActingAiPlayerUsername, SentinelAlertMessage.MOVES_UPDATED);
         }
-        if (!anyBotMovePlayed) {
+        if (!anyAiMovePlayed) {
             return;
         }
         if (match.isMatchEnded() && !Boolean.TRUE.equals(matchEntity.getEnded())) {
             matchEntity.setEnded(true);
             matchEntity.setEndedAt(LocalDateTime.now());
-            sentinelService.sendUpdate(keyCode, lastActingBotUsername, SentinelAlertMessage.MATCH_ENDED);
+            sentinelService.sendUpdate(keyCode, lastActingAiPlayerUsername, SentinelAlertMessage.MATCH_ENDED);
         }
         matchRepository.save(matchEntity);
     }

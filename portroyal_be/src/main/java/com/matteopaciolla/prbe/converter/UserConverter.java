@@ -19,7 +19,6 @@ public class UserConverter {
         userDto.setTelegramId(userEntity.getTelegramId());
         userDto.setRoles(userEntity.getRoles().stream().map(UserRole::name).toList());
         userDto.setEnabled(userEntity.isEnabled());
-        userDto.setBotDifficulty(userEntity.getBotDifficulty() != null ? userEntity.getBotDifficulty().name() : null);
         return userDto;
     }
 
@@ -30,7 +29,6 @@ public class UserConverter {
             userDto.setTelegramId(userEntity.getTelegramId());
         }
         userDto.setRoles(userEntity.getRoles().stream().map(UserRole::name).toList());
-        userDto.setBotDifficulty(userEntity.getBotDifficulty() != null ? userEntity.getBotDifficulty().name() : null);
         return userDto;
     }
 

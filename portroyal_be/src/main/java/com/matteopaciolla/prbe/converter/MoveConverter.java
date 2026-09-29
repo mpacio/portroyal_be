@@ -71,9 +71,10 @@ public class MoveConverter {
         entity.setConfigurationId(matchEntity.getConfigurationId());
         entity.setMatch(matchEntity);
         entity.setTimeIndex(move.getTimeIndex());
-        entity.setActivePlayerUsername(matchEntity.getPlayers().get(move.getRunningPlayerIndex()).getUsername());
+        String runningPlayerUsername = matchEntity.getAllPlayerUsernames().get(move.getRunningPlayerIndex());
+        entity.setActivePlayerUsername(runningPlayerUsername);
         entity.setActivePlayerIndex(move.getRunningPlayerIndex());
-        entity.setRunningPlayerUsername(matchEntity.getPlayers().get(move.getRunningPlayerIndex()).getUsername());
+        entity.setRunningPlayerUsername(runningPlayerUsername);
         entity.setRunningPlayerIndex(move.getRunningPlayerIndex());
         entity.setMoveName(move.getMove());
         entity.setParameterIndex(move.getChoiceIndex());

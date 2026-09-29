@@ -1,6 +1,5 @@
 package com.matteopaciolla.prbe.model.entity;
 
-import com.matteopaciolla.portroyal.core.enums.BotDifficulty;
 import com.matteopaciolla.prbe.constants.enums.UserRole;
 import jakarta.persistence.*;
 import lombok.Data;
@@ -58,14 +57,6 @@ public class UserEntity {
     private boolean emailConfirmed = false;
 
     private LocalDateTime lastLogin;
-
-    /**
-     * Set only for {@link UserRole#AI} users: the difficulty the backend uses when computing this
-     * player's moves via {@code Match#calculateNextMoveRecord(BotDifficulty)}. Null for every
-     * human-controlled account.
-     */
-    @Enumerated(EnumType.STRING)
-    private BotDifficulty botDifficulty;
 
     @ManyToMany(fetch = FetchType.EAGER, cascade = {}, targetEntity = MatchEntity.class)
     @JoinTable(name = "match_user",

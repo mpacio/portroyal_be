@@ -7,6 +7,7 @@ import com.matteopaciolla.portroyal.core.enums.BotDifficulty;
 import com.matteopaciolla.portroyal.core.enums.MoveAction;
 import com.matteopaciolla.prbe.constants.enums.SentinelAlertMessage;
 import com.matteopaciolla.prbe.constants.enums.UserRole;
+import com.matteopaciolla.prbe.model.entity.AIPlayerEntity;
 import com.matteopaciolla.prbe.model.entity.MatchEntity;
 import com.matteopaciolla.prbe.model.entity.UserEntity;
 import com.matteopaciolla.prbe.repository.MatchRepository;
@@ -50,13 +51,13 @@ class GameServiceTest {
 
     private MatchEntity matchEntity;
     private UserEntity human;
-    private UserEntity bot;
+    private AIPlayerEntity aiPlayer;
 
     @BeforeEach
     void setUp() {
         human = new UserEntity("alice", "encoded", List.of(UserRole.USER));
-        bot = new UserEntity("ABC123-bot-1", "encoded", List.of(UserRole.AI));
-        bot.setBotDifficulty(BotDifficulty.EASY);
+        aiPlayer = new AIPlayerEntity("ABC123-ai-1", "AI Player 1", BotDifficulty.EASY);
+        aiPlayer.setId(1L);
 
         matchEntity = new MatchEntity();
         matchEntity.setKeyCode("ABC123");
@@ -64,7 +65,7 @@ class GameServiceTest {
         matchEntity.setEnded(false);
     }
 
-    private MoveRecord botMoveRecord(int runningPlayerIndex) {
+    private MoveRecord aiMoveRecord(int runningPlayerIndex) {
         MoveRecord moveRecord = new MoveRecord();
         moveRecord.setRunningPlayerIndex(runningPlayerIndex);
         moveRecord.setMove(MoveAction.END_TURN);
@@ -74,13 +75,13 @@ class GameServiceTest {
     }
 
     @Test
-    void autoPlayBotTurns_stopsImmediatelyOnHumanTurn() {
+    void autoPlayAiTurns_stopsImmediatelyOnHumanTurn() {
         matchEntity.setPlayers(List.of(human));
         Match match = mock(Match.class);
         when(match.isMatchEnded()).thenReturn(false);
         when(match.getRunningPlayer()).thenReturn(new Player("alice"));
 
-        gameService.autoPlayBotTurns(match, matchEntity);
+        gameService.autoPlayAiTurns(match, matchEntity);
 
         verify(moveRepository, never()).save(any());
         verify(sentinelService, never()).sendUpdate(anyString(), anyString(), any());
@@ -88,46 +89,47 @@ class GameServiceTest {
     }
 
     @Test
-    void autoPlayBotTurns_playsConsecutiveBotTurnsThenStopsOnHumanTurn() {
-        matchEntity.setPlayers(List.of(bot, human));
+    void autoPlayAiTurns_playsConsecutiveAiTurnsThenStopsOnHumanTurn() {
+        matchEntity.setPlayers(List.of(human));
+        matchEntity.addAiPlayer(aiPlayer);
         Match match = mock(Match.class);
         when(match.isMatchEnded()).thenReturn(false);
-        when(match.getRunningPlayer()).thenReturn(new Player("ABC123-bot-1"), new Player("ABC123-bot-1"), new Player("alice"));
-        when(match.calculateNextMoveRecord(BotDifficulty.EASY)).thenReturn(botMoveRecord(0), botMoveRecord(0));
+        when(match.getRunningPlayer()).thenReturn(new Player("ABC123-ai-1"), new Player("ABC123-ai-1"), new Player("alice"));
+        when(match.calculateNextMoveRecord(BotDifficulty.EASY)).thenReturn(aiMoveRecord(0), aiMoveRecord(0));
 
-        gameService.autoPlayBotTurns(match, matchEntity);
+        gameService.autoPlayAiTurns(match, matchEntity);
 
         verify(moveRepository, times(2)).save(any());
-        verify(sentinelService, times(2)).sendUpdate("ABC123", "ABC123-bot-1", SentinelAlertMessage.MOVES_UPDATED);
+        verify(sentinelService, times(2)).sendUpdate("ABC123", "ABC123-ai-1", SentinelAlertMessage.MOVES_UPDATED);
         verify(matchRepository, times(1)).save(matchEntity);
         assertThat(matchEntity.getMoves()).hasSize(2);
     }
 
     @Test
-    void autoPlayBotTurns_marksMatchEndedWhenLibraryReportsMatchEnded() {
-        matchEntity.setPlayers(List.of(bot));
+    void autoPlayAiTurns_marksMatchEndedWhenLibraryReportsMatchEnded() {
+        matchEntity.addAiPlayer(aiPlayer);
         Match match = mock(Match.class);
         when(match.isMatchEnded()).thenReturn(false, true);
-        when(match.getRunningPlayer()).thenReturn(new Player("ABC123-bot-1"));
-        when(match.calculateNextMoveRecord(BotDifficulty.EASY)).thenReturn(botMoveRecord(0));
+        when(match.getRunningPlayer()).thenReturn(new Player("ABC123-ai-1"));
+        when(match.calculateNextMoveRecord(BotDifficulty.EASY)).thenReturn(aiMoveRecord(0));
 
-        gameService.autoPlayBotTurns(match, matchEntity);
+        gameService.autoPlayAiTurns(match, matchEntity);
 
         assertThat(matchEntity.getEnded()).isTrue();
         assertThat(matchEntity.getEndedAt()).isNotNull();
-        verify(sentinelService).sendUpdate("ABC123", "ABC123-bot-1", SentinelAlertMessage.MATCH_ENDED);
+        verify(sentinelService).sendUpdate("ABC123", "ABC123-ai-1", SentinelAlertMessage.MATCH_ENDED);
         verify(matchRepository, times(1)).save(matchEntity);
     }
 
     @Test
-    void autoPlayBotTurns_respectsSafetyCapAgainstInfiniteLoop() {
-        matchEntity.setPlayers(List.of(bot));
+    void autoPlayAiTurns_respectsSafetyCapAgainstInfiniteLoop() {
+        matchEntity.addAiPlayer(aiPlayer);
         Match match = mock(Match.class);
         when(match.isMatchEnded()).thenReturn(false);
-        when(match.getRunningPlayer()).thenReturn(new Player("ABC123-bot-1"));
-        when(match.calculateNextMoveRecord(BotDifficulty.EASY)).thenReturn(botMoveRecord(0));
+        when(match.getRunningPlayer()).thenReturn(new Player("ABC123-ai-1"));
+        when(match.calculateNextMoveRecord(BotDifficulty.EASY)).thenReturn(aiMoveRecord(0));
 
-        gameService.autoPlayBotTurns(match, matchEntity);
+        gameService.autoPlayAiTurns(match, matchEntity);
 
         verify(moveRepository, times(500)).save(any());
     }

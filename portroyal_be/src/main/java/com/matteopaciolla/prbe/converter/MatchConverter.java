@@ -6,9 +6,10 @@ import com.matteopaciolla.portroyal.core.Player;
 import com.matteopaciolla.portroyal.exceptions.userinput.UserInputException;
 import com.matteopaciolla.prbe.dto.MatchDto;
 import com.matteopaciolla.prbe.dto.MatchInfoDto;
+import com.matteopaciolla.prbe.dto.UserDto;
 import com.matteopaciolla.prbe.model.entity.MatchEntity;
-import com.matteopaciolla.prbe.model.entity.UserEntity;
 
+import java.util.LinkedList;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -26,7 +27,7 @@ public class MatchConverter {
             matchDto.setLastMoveAt(matchEntity.getLastMoveAt() != null ? matchEntity.getLastMoveAt().format(DATE_TIME_FORMATTER) : null);
             matchDto.setCreatedAt(matchEntity.getCreatedAt() != null ? matchEntity.getCreatedAt().format(DATE_TIME_FORMATTER) : null);
             matchDto.setConfigurationId(matchEntity.getConfigurationId());
-            matchDto.setPlayerUsers(matchEntity.getPlayers() != null ? matchEntity.getPlayers().stream().map(userEntity -> UserConverter.toDtoLight(userEntity, includeTgId)).collect(Collectors.toList()) : null);
+            matchDto.setPlayerUsers(toCombinedPlayerDtos(matchEntity, includeTgId));
             matchDto.setHostUser(UserConverter.toDtoLight(matchEntity.getHostUser(), includeTgId));
             matchDto.setWinnerUser(matchEntity.getWinner() != null ? UserConverter.toDto(matchEntity.getWinner()) : null);
             matchDto.setEnded(matchEntity.getEnded());
@@ -66,8 +67,8 @@ public class MatchConverter {
         matchInfoDto.setLastMoveAt(match.getLastMoveAt() != null ? match.getLastMoveAt().format(DATE_TIME_FORMATTER) : null);
         matchInfoDto.setCreatedAt(match.getCreatedAt() != null ? match.getCreatedAt().format(DATE_TIME_FORMATTER) : null);
         matchInfoDto.setConfigurationId(match.getConfigurationId());
-        matchInfoDto.setPlayerUsernames(match.getPlayers() != null ? match.getPlayers().stream().map(UserEntity::getUsername).collect(Collectors.toList()) : null);
-        matchInfoDto.setPlayers(match.getPlayers() != null ? match.getPlayers().stream().map(player -> UserConverter.toDtoLight(player, false)).collect(Collectors.toList()) : null);
+        matchInfoDto.setPlayerUsernames(match.getAllPlayerUsernames());
+        matchInfoDto.setPlayers(toCombinedPlayerDtos(match, false));
         matchInfoDto.setHostUsername(match.getHostUser() != null ? match.getHostUser().getUsername() : null);
         matchInfoDto.setWinnerUsername(match.getWinner() != null ? match.getWinner().getUsername() : null);
         matchInfoDto.setEnded(match.getEnded());
@@ -78,5 +79,22 @@ public class MatchConverter {
 
     public static List<MatchInfoDto> toListInfoDto(List<MatchEntity> matches) {
         return matches.stream().map(MatchConverter::toInfoDto).collect(Collectors.toList());
+    }
+
+    /**
+     * Builds a single, uniform list of {@link UserDto} for every match participant — humans (from
+     * {@code matchEntity.getPlayers()}) followed by AI players (from {@code matchEntity.getAiPlayers()}) — so
+     * API consumers can display the full lobby/roster without needing to know how each kind of
+     * player is persisted.
+     */
+    private static List<UserDto> toCombinedPlayerDtos(MatchEntity matchEntity, boolean includeTgId) {
+        List<UserDto> combined = new LinkedList<>();
+        if (matchEntity.getPlayers() != null) {
+            matchEntity.getPlayers().forEach(player -> combined.add(UserConverter.toDtoLight(player, includeTgId)));
+        }
+        if (matchEntity.getAiPlayers() != null) {
+            matchEntity.getAiPlayers().forEach(aiPlayer -> combined.add(AIPlayerConverter.toDtoLight(aiPlayer)));
+        }
+        return combined;
     }
 }
