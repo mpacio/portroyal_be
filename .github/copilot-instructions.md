@@ -14,6 +14,13 @@ Maven **multi-module** project (root `pom.xml` is a `pom`-packaged aggregator):
 `portroyal_be/pom.xml`; the library must be built/installed before the API (root
 `mvn clean install` handles ordering automatically).
 
+## Commit policy
+
+COPILOT IS NEVER ALLOWED TO GIT COMMIT WITHOUT ASKING BEFORE. Any git commit, amend, squash,
+rebase, or branch creation that writes repository history must be explicitly approved by the user
+before execution. Do not create commits as part of routine work, testing, or cleanup unless the user
+has clearly asked for it.
+
 ## Golden rule: rules live only in `portroyal_lib`
 
 **Never implement or duplicate game-rule logic inside `portroyal_be`.** The API only:
