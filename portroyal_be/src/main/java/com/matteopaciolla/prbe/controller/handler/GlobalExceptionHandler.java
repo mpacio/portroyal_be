@@ -2,6 +2,7 @@ package com.matteopaciolla.prbe.controller.handler;
 
 import com.matteopaciolla.prbe.dto.response.ErrorResponse;
 import com.matteopaciolla.prbe.exceptions.*;
+import com.matteopaciolla.prbe.exceptions.common.ResourceNotFoundException;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
@@ -28,6 +29,8 @@ import java.util.stream.Collectors;
 @ControllerAdvice
 @ResponseBody
 public class GlobalExceptionHandler {
+
+    // -------------------------------- Spring Exceptions ---------------------------------
 
     @ExceptionHandler(HttpRequestMethodNotSupportedException.class)
     @ResponseStatus(HttpStatus.METHOD_NOT_ALLOWED)
@@ -146,6 +149,19 @@ public class GlobalExceptionHandler {
         ), HttpStatus.INTERNAL_SERVER_ERROR);
     }
 
+    // -------------------------------- Custom Exceptions ---------------------------------
+
+    @ExceptionHandler(ResourceNotFoundException.class)
+    @ResponseStatus(HttpStatus.NOT_FOUND)
+    public ResponseEntity<ErrorResponse> handleResourceNotFoundException(ResourceNotFoundException e) {
+        log.debug("Captured ResourceNotFoundException: {}", e.getMessage());
+        return new ResponseEntity<>(new ErrorResponse(
+                HttpStatus.NOT_FOUND.value(),
+                HttpStatus.NOT_FOUND.getReasonPhrase(),
+                e.getMessage()
+        ), HttpStatus.NOT_FOUND);
+    }
+
     @ExceptionHandler(BaseClientCausedException.class)
     @ResponseStatus(HttpStatus.BAD_REQUEST)
     public ResponseEntity<ErrorResponse> handleBaseClientCausedException(BaseClientCausedException e) {
@@ -164,6 +180,8 @@ public class GlobalExceptionHandler {
         }
         return new ResponseEntity<>(res, HttpStatus.BAD_REQUEST);
     }
+
+    // -------------------------------- General Exception Handler ---------------------------------
 
     @ExceptionHandler(Exception.class)
     @ResponseStatus(HttpStatus.INTERNAL_SERVER_ERROR)
