@@ -144,19 +144,19 @@ expedition indices, contract indices, and current state.
 
 ## 5. Register and identify players
 
-| Method and path | Purpose |
-|---|---|
-| `POST /public/register` | Create a standard account; public. |
-| `GET /public/newEmailConfirmation?email=...` | Request email confirmation; public. |
-| `GET /public/confirmEmail?token=...` | Confirm an email token; public browser flow. |
+| Method and path                                           | Purpose                                                                                                        |
+|-----------------------------------------------------------|----------------------------------------------------------------------------------------------------------------|
+| `POST /public/register`                                   | Create a standard account; public.                                                                             |
+| `GET /public/newEmailConfirmation?email=...`              | Request email confirmation; public.                                                                            |
+| `GET /public/confirmEmail?token=...`                      | Confirm an email token; public browser flow.                                                                   |
 | `GET /public/newTgUnifyEmailOtp?email=...&telegramId=...` | Request the email OTP to link a Telegram identity; public. The email must be confirmed and not already linked. |
-| `POST /user/register/telegram` | Create a Telegram-linked player; requires `BOT` authentication. |
-| `POST /user/unify` | Link the Telegram ID to the email account using the OTP; requires `BOT` authentication. |
-| `GET /user/me` | Get the authenticated account. |
-| `GET /user/retrieve?username=...` | Look up a user by username, Telegram ID, or email. |
-| `PUT /user/update?username=...` | Update user profile; requires `ADMIN` or `BOT` authorization. |
-| `POST /user/changePsw` | Change the authenticated user's password. |
-| `DELETE /user/delete?username=...` | Delete a user; requires `ADMIN` authorization. |
+| `POST /user/register/telegram`                            | Create a Telegram-linked player; requires `BOT` authentication.                                                |
+| `POST /user/unify`                                        | Link the Telegram ID to the email account using the OTP; requires `BOT` authentication.                        |
+| `GET /user/me`                                            | Get the authenticated account.                                                                                 |
+| `GET /user/retrieve?username=...`                         | Look up a user by username, Telegram ID, or email.                                                             |
+| `PUT /user/update?username=...`                           | Update user profile; requires `ADMIN` or `BOT` authorization.                                                  |
+| `POST /user/changePsw`                                    | Change the authenticated user's password.                                                                      |
+| `DELETE /user/delete?username=...`                        | Delete a user; requires `ADMIN` authorization.                                                                 |
 
 Standard registration body:
 
@@ -193,18 +193,18 @@ not an optional identity hint for a bot request.
 
 ## 6. Create and manage a match
 
-| Method and path | Purpose |
-|---|---|
-| `POST /match/host` | Host a match. Optional JSON body identifies a known configuration by `id` and `name`; omitting it selects default configuration ID 1. |
-| `PUT /match/join?keyCode=...` | Join an open match before it starts. |
-| `POST /match/ai-player` | Host adds an AI before the match starts. Body requires `difficulty` (`EASY`, `MEDIUM`, or `HARD`) and may include `name`. |
-| `DELETE /match/ai-player?aiPlayerUsername=...` | Host removes an AI before the match starts. |
-| `PUT /match/start` | Host starts the match; requires at least two total players. |
-| `PUT /match/close` | Close an unstarted match the caller participates in. |
-| `GET /match/status` | Get the caller's current match, if any. |
-| `GET /match/retrieve?keyCode=...` | Get the match snapshot. |
-| `GET /match/retrieve?keyCode=...&moveNumber=N` | If `N` equals the current move count, returns "No new moves"; otherwise returns the snapshot. |
-| `GET /match/retrieve-all` | List matches; supports `username`, `ended`, `pageNumber`, `pageSize`, `sortField`, and `sortDirection`. |
+| Method and path                                | Purpose                                                                                                                               |
+|------------------------------------------------|---------------------------------------------------------------------------------------------------------------------------------------|
+| `POST /match/host`                             | Host a match. Optional JSON body identifies a known configuration by `id` and `name`; omitting it selects default configuration ID 1. |
+| `PUT /match/join?keyCode=...`                  | Join an open match before it starts.                                                                                                  |
+| `POST /match/ai-player`                        | Host adds an AI before the match starts. Body requires `difficulty` (`EASY`, `MEDIUM`, or `HARD`) and may include `name`.             |
+| `DELETE /match/ai-player?aiPlayerUsername=...` | Host removes an AI before the match starts.                                                                                           |
+| `PUT /match/start`                             | Host starts the match; requires at least two total players.                                                                           |
+| `PUT /match/close`                             | Close an unstarted match the caller participates in.                                                                                  |
+| `GET /match/status`                            | Get the caller's current match, if any.                                                                                               |
+| `GET /match/retrieve?keyCode=...`              | Get the match snapshot.                                                                                                               |
+| `GET /match/retrieve?keyCode=...&moveNumber=N` | If `N` equals the current move count, returns "No new moves"; otherwise returns the snapshot.                                         |
+| `GET /match/retrieve-all`                      | List matches; supports `username`, `ended`, `pageNumber`, `pageSize`, `sortField`, and `sortDirection`.                               |
 
 Typical sequence:
 
@@ -232,16 +232,18 @@ All moves use `POST /game/move`. Only the current running player can move. The r
 field is case-insensitive; the other fields are optional and default to `-1` or an empty list when
 omitted.
 
-| Move | `parameterIndex` | `pickPlayerIndex` | `expeditionEmployeesList` |
-|---|---|---|---|
-| `DISCOVER` | Not used | Not used | Not used |
-| `REPEL`, `ACCEPT`, `FINISH_DISCOVER` | Not used | Not used | Not used |
-| `TRADE` | Index of a ship in the harbor | Cargo-ship bonus recipient; otherwise `-1` | Not used |
-| `TRADE_RENOUNCE` | Index of a ship in the harbor | Cargo-ship bonus recipient; otherwise `-1` | Not used |
-| `HIRE` | Index of an employee in the harbor | Not used | Not used |
-| `END_TURN` | Not used | Not used | Not used |
-| `COMMIT_EXPEDITION` | Index in the current expedition list | Not used | Employee types to consume, if needed |
-| `SIGN_CONTRACT` | Index on the current contracts board | Not used | Not used |
+| Move                | Action performed                                                                    | `parameterIndex`      | `pickPlayerIndex`                          | `expeditionEmployeesList`            |
+|---------------------|-------------------------------------------------------------------------------------|-----------------------|--------------------------------------------|--------------------------------------|
+| `DISCOVER`          | Reveal the next card from the deck.                                                 | Not used              | Not used                                   | Not used                             |
+| `REPEL`             | Discard the revealed ship when your power is high enough to repel it.               | Not used              | Not used                                   | Not used                             |
+| `ACCEPT`            | Accept the revealed ship into the harbor; accepting a repeated color causes a bust. | Not used              | Not used                                   | Not used                             |
+| `FINISH_DISCOVER`   | Stop discovering and move to the trade/hire phase.                                  | Not used              | Not used                                   | Not used                             |
+| `TRADE`             | Trade the selected ship for its coins.                                              | Harbor ship index     | Cargo-ship bonus recipient; otherwise `-1` | Not used                             |
+| `TRADE_RENOUNCE`    | Discard the selected ship without its normal trade proceeds.                        | Harbor ship index     | Cargo-ship bonus recipient; otherwise `-1` | Not used                             |
+| `HIRE`              | Hire the selected employee.                                                         | Harbor employee index | Not used                                   | Not used                             |
+| `END_TURN`          | End your turn or skip your remaining harbor actions.                                | Not used              | Not used                                   | Not used                             |
+| `COMMIT_EXPEDITION` | Claim the selected expedition by discarding the required employees.                 | Expedition list index | Not used                                   | Employee types to consume, if needed |
+| `SIGN_CONTRACT`     | Sign the eligible manual contract at this index.                                    | Contracts board index | Not used                                   | Not used                             |
 
 For `TRADE` / `TRADE_RENOUNCE`, the cargo-ship recipient is the zero-based player index shown in
 the match snapshot and cannot be the running player. Use `-1` if the selected ship is not a cargo
@@ -278,16 +280,16 @@ submitted move. Retrieve the match again to see the latest state.
 
 ## 8. Card catalog and notifications
 
-| Method and path | Purpose |
-|---|---|
-| `GET /card` | List base-game and JOMC card definitions. |
-| `GET /card/{id}` | Get one card by catalog ID. |
-| `GET /card/contract` | List contract definitions and descriptions. |
-| `GET /card/contract/{id}` | Get one contract by catalog ID. |
-| `POST /sentinel/callback/subscribe` | Subscribe a callback URL for a one-time alert. JSON includes `matchKeyCode`, `url`, and optional `secret`. |
-| `GET /sentinel/long-polling/subscribe?keyCode=...&seconds=120` | Wait for the next alert, delivered once; minimum timeout is 10 seconds. |
-| `GET /sentinel/sse/subscribe?keyCode=...&seconds=3600` | Receive alerts as Server-Sent Events until timeout. |
-| `DELETE /sentinel/subscription?keyCode=...` | Remove the caller's subscription. |
+| Method and path                                                | Purpose                                                                                                    |
+|----------------------------------------------------------------|------------------------------------------------------------------------------------------------------------|
+| `GET /card`                                                    | List base-game and JOMC card definitions.                                                                  |
+| `GET /card/{id}`                                               | Get one card by catalog ID.                                                                                |
+| `GET /card/contract`                                           | List contract definitions and descriptions.                                                                |
+| `GET /card/contract/{id}`                                      | Get one contract by catalog ID.                                                                            |
+| `POST /sentinel/callback/subscribe`                            | Subscribe a callback URL for a one-time alert. JSON includes `matchKeyCode`, `url`, and optional `secret`. |
+| `GET /sentinel/long-polling/subscribe?keyCode=...&seconds=120` | Wait for the next alert, delivered once; minimum timeout is 10 seconds.                                    |
+| `GET /sentinel/sse/subscribe?keyCode=...&seconds=3600`         | Receive alerts as Server-Sent Events until timeout.                                                        |
+| `DELETE /sentinel/subscription?keyCode=...`                    | Remove the caller's subscription.                                                                          |
 
 Callback alerts are database-backed. Long-polling and SSE subscriptions are held by the serving
 API instance, so deployments using multiple instances should use sticky routing for these
