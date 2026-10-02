@@ -278,11 +278,13 @@ selection. Available employee names are `CAPTAIN`, `PRIEST`, `SETTLER`, and `HAN
 `pageNumber` (0-based, default 0), `pageSize` (default 10), `sortField` (default `TIME_INDEX`),
 and `sortDirection` (`ASC` or `DESC`, default `ASC`).
 
-The move response includes the move and generated events. A human move may trigger automatic AI
-turns; the API persists those AI moves as well, but the immediate move response describes the
-submitted move. Retrieve the match again to see the latest state.
+The successful `POST /game/move` response includes the submitted move's `mainEvent` and
+`sideEvents`, when generated. A human move may also trigger automatic AI turns; those AI moves are
+persisted and produce Sentinel notifications, but the immediate response describes only the
+submitted move. `GET /game/move` and `GET /game/moves` return persisted move history and do not
+include `mainEvent` or `sideEvents`. Retrieve the match again to see the latest state.
 
-## 8. Card catalog and notifications
+## 8. Card catalog and Sentinel notifications
 
 | Method and path                                                | Purpose                                                                                                    |
 |----------------------------------------------------------------|------------------------------------------------------------------------------------------------------------|
@@ -290,14 +292,54 @@ submitted move. Retrieve the match again to see the latest state.
 | `GET /card/{id}`                                               | Get one card by catalog ID.                                                                                |
 | `GET /card/contract`                                           | List contract definitions and descriptions.                                                                |
 | `GET /card/contract/{id}`                                      | Get one contract by catalog ID.                                                                            |
-| `POST /sentinel/callback/subscribe`                            | Subscribe a callback URL for a one-time alert. JSON includes `matchKeyCode`, `url`, and optional `secret`. |
-| `GET /sentinel/long-polling/subscribe?keyCode=...&seconds=120` | Wait for the next alert, delivered once; minimum timeout is 10 seconds.                                    |
-| `GET /sentinel/sse/subscribe?keyCode=...&seconds=3600`         | Receive alerts as Server-Sent Events until timeout.                                                        |
-| `DELETE /sentinel/subscription?keyCode=...`                    | Remove the caller's subscription.                                                                          |
+| `POST /sentinel/callback/subscribe`                            | Register a webhook for alerts. JSON includes `matchKeyCode`, `url`, and optional `secret`.                 |
+| `GET /sentinel/long-polling/subscribe?keyCode=...&seconds=120` | Wait for one alert; re-subscribe after receiving it. Minimum timeout is 10 seconds.                        |
+| `GET /sentinel/sse/subscribe?keyCode=...&seconds=3600`         | Receive alerts as Server-Sent Events until the connection closes or times out.                             |
+| `DELETE /sentinel/subscription?keyCode=...`                    | Remove the caller's subscription for this match.                                                           |
 
-Callback alerts are database-backed. Long-polling and SSE subscriptions are held by the serving
-API instance, so deployments using multiple instances should use sticky routing for these
-connections. Clients can always poll `/match/retrieve` for match state.
+**Sentinel is the preferred way for clients to learn about live match updates.** Subscribe once
+instead of repeatedly polling `/match/retrieve` on a timer, then refresh the match snapshot when
+an alert arrives. Alerts are lightweight notifications, not a copy of the match state or a
+move-event feed. Their payload identifies the match and alert type (`keyCode`, numeric `code`, and
+`message`; `description` may also be present). Alerts include lifecycle changes such as a player
+joining or leaving and a match starting or ending, as well as `MOVES_UPDATED` when a player or
+automatic AI turn makes a move. They do not identify a move number or include its `mainEvent` or
+`sideEvents`.
+
+Choose a subscription transport to suit the client:
+
+- **SSE** is a good fit for a live web or app client that can keep an HTTP stream open. It emits an
+  initial `connect` event, then each alert as an `alert` event. Reconnect or subscribe again after
+  the connection ends or reaches its timeout.
+- **Long polling** waits for one alert in the HTTP response, then completes. Issue another
+  subscription after handling the alert; a timeout is returned as a `SUBSCRIPTION_TIMEOUT` alert.
+- **Callback** sends an HTTP POST to the registered URL for each alert. The callback subscription
+  is database-backed and works across API instances without sticky routing.
+
+Long-polling and SSE subscriptions are held by the serving API instance, so deployments using
+multiple instances should use sticky routing for these connections. `DELETE` removes the
+authenticated user's subscription for the specified match.
+
+### Move events and side events
+
+Sentinel alerts and game events serve different purposes: Sentinel wakes the client when something
+changed; the move record explains what happened. In the successful `POST /game/move` response,
+`mainEvent` describes the primary effect of the submitted action, while `sideEvents` lists
+additional effects caused while processing that action. Either may be absent when no corresponding
+event was generated. Each event can include a machine-readable `typeCode`, human-readable
+`typeDesc`, affected `playerUsername`, `involvedCardIds`, and a numeric `value`.
+
+Side events matter because a single action can affect players other than the one who submitted it.
+For example, revealing a tax card can generate `BEING_TAXED` and `PRIZED_FROM_TAX` events; a bust
+can generate `GOT_JESTER_MONEY_EFF`; trading a cargo ship can generate `GOT_CARGO_SHIP_MONEY`;
+and turn or contract processing can generate `GOT_AP_FEE`, `AUTO_SIGNED_CONTRACT`, or
+`TRIGGERED_FINAL_TURN`. Clients should process the full `sideEvents` list, not infer all outcomes
+from the move name or only display the main event.
+
+For a client that submitted the move, use its successful move response to present the detailed
+events. When a Sentinel `MOVES_UPDATED` alert arrives, refresh `/match/retrieve` for authoritative
+current state. The alert and persisted move-history endpoints are not a way to retrieve the
+generated event/side-event payload.
 
 ## 9. Client integration checklist
 
@@ -308,6 +350,7 @@ connections. Clients can always poll `/match/retrieve` for match state.
    resolve all indices.
 4. Submit one atomic move at a time. If the engine rejects a move, refresh the match snapshot and
    follow the current phase.
-5. Poll or subscribe for updates; refresh after any AI turn or notification.
+5. Subscribe with Sentinel for live updates (preferred over periodic polling); refresh the match
+   snapshot after each notification, including updates caused by AI turns.
 6. Read the catalog endpoints to render exact card and contract values instead of hardcoding card
    IDs or effects.
