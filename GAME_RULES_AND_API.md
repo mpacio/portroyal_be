@@ -52,22 +52,24 @@ distinct ship colors in the harbor: `max(1, distinct colors - 2)`, plus one for 
 
 ### Trade, hire, and end turn
 
-The active player can use their trading capacity to take harbor actions:
+Trading capacity is the number of trade and hire actions a player can take. It is consumed only by
+trading a ship or hiring an employee; ending a turn, committing an expedition, and signing a
+contract do not use it.
 
 - **Trade a ship:** Discard it and gain its printed coins. Matching-color Merchants grant additional
   coins. The JOMC cargo ship has an additional coin benefit for another player (or the poorest
   player when that configuration option is enabled).
 - **Hire an employee:** Pay its cost, then add it to your employee display. Each Mademoiselle reduces
   hiring costs by one coin. The active player does not pay the active-player fee.
-- **End turn:** The active player ends their harbor actions. Other players are then offered a
-  harbor action in order, if there is a ship to trade or an employee they can afford. Each player's
-  sub-turn starts with one action; card effects such as a matching Clerk can add capacity. A
-  non-active player pays one coin to the active player when trading or hiring. A player may end
-  their sub-turn without taking an action. After the sub-turns, any cards left in the harbor are
-  discarded and the next active player's turn begins.
+- **End turn:** The active player may end their turn regardless of remaining trading capacity.
+  Other players are then offered a harbor action in order, if there is a ship to trade or an
+  employee they can afford. Each player's sub-turn starts with one trade or hire action; a matching
+  Clerk can add trading capacity. A non-active player pays one coin to the active player when
+  trading or hiring. A player may end their sub-turn without taking an action. After the sub-turns,
+  any cards left in the harbor are discarded and the next active player's turn begins.
 
-The active player can also commit expeditions and sign manual contracts during the trade/hire
-phase. An expedition or contract action does not consume trading capacity.
+The active player can commit expeditions and sign manual contracts during their turn, including
+outside the trade/hire phase. These actions do not consume trading capacity.
 
 ## 3. Cards and scoring
 
@@ -79,16 +81,17 @@ descriptions, types, rewards, and requirements.
 
 - **Sailors and Pirates** add their printed power to the owner's total, which is used to repel ships.
 - **Captains, Priests, and Settlers** are used to commit expeditions. When committed, the selected
-  employees are discarded along with the expedition card.
+  employees are discarded; the expedition card becomes part of the player's expedition collection.
 - **Handymen** can substitute for any missing required expedition employee.
 - **Merchants** provide one extra coin for each Merchant matching the color of a ship the owner
   trades.
 - **Mademoiselles** reduce the owner's employee hiring cost by one coin each.
 - **Jesters** pay one coin each to their owner whenever a bust occurs.
-- **Governors** add one trading capacity each after the active player finishes discovering.
+- **Governors** add one trading capacity each for the active player after discovering. This effect
+  does not apply during a non-active player's Trade/Hire sub-phase.
+- **Admirals:** When a harbor action is taken while the harbor has at least five cards, gain two
+  coins per Admiral.
 - JOMC expansion employees have these effects:
-  - **Admirals:** When a harbor action is taken while the harbor has at least five cards, gain two
-    coins per Admiral.
   - **Deputies:** When a harbor action is taken while the harbor has three or four cards, gain one
     coin per Deputy.
   - **Gunners:** When a harbor action is taken with more than one ship in the harbor, gain one coin
@@ -105,7 +108,8 @@ Each expedition specifies its points, coin reward, and required combination of C
 and Settlers. A player may commit if they can meet all requirements using employees they own;
 Handymen may substitute. When the player owns a Handyman and could satisfy the expedition in more
 than one way, the move must explicitly list which employee types to use. The player receives the
-expedition's points and coins, and the used employees and expedition are removed from play.
+expedition's points and coins, the expedition card joins their expedition collection, and the used
+employees are discarded.
 
 ### Tax cards
 
