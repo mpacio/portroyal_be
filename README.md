@@ -28,6 +28,7 @@ correct order (the library is built/installed before the API, since `portroyal_b
 - [Database](#database)
 - [Build & run](#build--run)
 - [API overview](#api-overview)
+- [Game rules and API guide](GAME_RULES_AND_API.md)
 - [Testing](#testing)
 - [Development notes](#development-notes)
 
@@ -274,6 +275,8 @@ standing up the full API/database stack.
 
 ## API overview
 
+- For an end-to-end description of the rules, move payloads, and match workflow, see the
+  [Game Rules and API Guide](GAME_RULES_AND_API.md).
 - Base path: `/api/v1`
 - Interactive docs: Swagger UI at `/swagger-ui/index.html`, raw OpenAPI spec at `/api-docs`
   (see `springdoc.api-docs.path`).
