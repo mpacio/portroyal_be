@@ -21,9 +21,8 @@ public class Jinx extends AutomaticContractCard {
 
     @Override
     public String getDescription() {
-        return "If you must end your turn as the active player due to drawing a Ship " +
-                "of the same color as another already in the harbor display (going bust), " +
-                "you will automatically sign this Contract.";
+        return "While this Contract is active in the match, if you must end your turn as the active player due to drawing a Ship " +
+                "of the same color as another already in the harbor display (going bust), you automatically sign it.";
     }
 
     @Override

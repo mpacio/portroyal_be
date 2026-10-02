@@ -21,7 +21,7 @@ public class Speculator extends AutomaticContractCard {
 
     @Override
     public String getDescription() {
-        return "When you are the active player and there are 3 Ships of different colors in the harbor display, " +
+        return "While this Contract is active in the match, when you are the active player and there are 3 Ships of different colors in the harbor display, " +
                 "you are considered to have started signing this Contract, reducing by 1 the maximum number of Contracts you may sign. " +
                 "The next time this condition is met while you are the active player, you automatically sign the Contract. " +
                 "Once you start signing this Contract, that commitment remains for the rest of the game, even if you do not complete it by meeting this condition again. " +

@@ -21,7 +21,7 @@ public class PiratesNest extends AutomaticContractCard {
 
             @Override
             public String getDescription() {
-                return "If you have repelled 5 Ships of different colors, you automatically sign this Contract.";
+                return "While this Contract is active in the match, if you have repelled 5 Ships of different colors, you automatically sign it.";
             }
 
             @Override

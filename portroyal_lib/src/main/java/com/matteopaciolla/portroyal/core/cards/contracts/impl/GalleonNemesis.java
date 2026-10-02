@@ -24,8 +24,8 @@ public class GalleonNemesis extends RenouncingContractCard {
 
     @Override
     public String getDescription() {
-        return "If you decline all Coins (renounce) when trading with a black Ship (including matching Merchants bonus), " +
-                "the first time this happens, you are considered to have started signing this Contract, reducing by 1 the maximum number of Contracts you may sign. " +
+        return "While this Contract is active in the match, if you decline all Coins (renounce) when trading with a black Ship (including matching Merchants bonus), " +
+                "the first time you do so, you are considered to have started signing this Contract, reducing by 1 the maximum number of Contracts you may sign. " +
                 "The second time you renounce Coins with a black Ship, you automatically sign the Contract. " +
                 "Once you start signing this Contract, that commitment remains for the rest of the game, even if you do not complete it by renouncing Coins again. " +
                 "Multiple players can start signing this Contract at the same time.";

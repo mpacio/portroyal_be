@@ -21,8 +21,8 @@ public class MajorSpeculator extends AutomaticContractCard {
 
     @Override
     public String getDescription() {
-        return "If you are the active player and there are 4 Ships of different colors in the harbor display, " +
-                "you automatically sign this Contract.";
+        return "While this Contract is active in the match, when you are the active player and there are 4 Ships of different colors in the harbor display, " +
+                "you automatically sign it.";
     }
 
     @Override

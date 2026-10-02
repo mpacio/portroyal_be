@@ -21,7 +21,7 @@ public class TaxInspector extends AutomaticContractCard {
 
     @Override
     public String getDescription() {
-        return "If you have been taxed, you automatically sign this Contract.";
+        return "While this Contract is active in the match, if you have been taxed, you automatically sign it.";
     }
 
     @Override
