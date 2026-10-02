@@ -22,7 +22,7 @@ public class MajorSpeculator extends AutomaticContractCard {
     @Override
     public String getDescription() {
         return "If you are the active player and there are 4 Ships of different colors in the harbor display, " +
-                "you may immediately place one of your markers to complete this Contract.";
+                "you automatically sign this Contract.";
     }
 
     @Override

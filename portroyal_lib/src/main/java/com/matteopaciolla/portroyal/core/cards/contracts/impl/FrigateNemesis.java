@@ -24,12 +24,11 @@ public class FrigateNemesis extends RenouncingContractCard {
 
     @Override
     public String getDescription() {
-        return "If you decline all Coins when trading with a Frigate (including matching Traders), " +
-                "you may immediately place a marker on space [1]. The next time you decline Coins, " +
-                "move your marker to space [2]. The third time you decline Coins, you immediately " +
-                "complete the Contract. Once you place a marker on this Contract, it remains there " +
-                "for the rest of the game, even if it’s not completed. Multiple players can have " +
-                "markers on these spaces.";
+        return "If you decline all Coins (renounce) when trading with a red ship (including matching Merchants bonus), " +
+                "the first time this happens, you are considered to have started signing this Contract, reducing by 1 the maximum number of Contracts you may sign. " +
+                "Each further time you renounce Coins with a red ship, you advance your progress toward signing it; the third time, you automatically sign the Contract. " +
+                "Once you start signing this Contract, that commitment remains for the rest of the game, even if you do not complete it renouncing Coins enough times. " +
+                "Multiple players can start signing this Contract at the same time.";
     }
 
     public static List<String> getPark1PlayersNames(Match match) {

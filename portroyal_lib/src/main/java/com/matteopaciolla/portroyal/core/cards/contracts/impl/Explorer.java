@@ -22,7 +22,7 @@ public class Explorer extends ManualContractCard {
     @Override
     public String getDescription() {
         return "If you have at least 1 Expedition in your personal display, " +
-                "you may immediately place a marker to complete this Contract.";
+                "you may immediately sign this Contract.";
     }
 
     @Override

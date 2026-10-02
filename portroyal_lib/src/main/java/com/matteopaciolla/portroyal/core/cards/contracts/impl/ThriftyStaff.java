@@ -28,9 +28,9 @@ public class ThriftyStaff extends ManualContractCard {
 
     @Override
     public String getDescription() {
-        return "If you have 4 Professions in your personal display costing 3 Coins " +
-                "each (or less in the future…), you may immediately place one of your " +
-                "markers to complete this Contract. (Discounts from Senoritas don’t count.)";
+        return "If you have 4 Employees in your personal display costing 3 Coins " +
+                "each (or less in the future…), you may sign this Contract. " +
+                "(Discounts from Mademoiselle don’t count.)";
     }
 
     @Override

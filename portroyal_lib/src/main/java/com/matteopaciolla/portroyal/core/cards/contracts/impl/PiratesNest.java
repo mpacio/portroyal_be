@@ -21,10 +21,7 @@ public class PiratesNest extends AutomaticContractCard {
 
             @Override
             public String getDescription() {
-                return "Whenever you repel a ship as active player using your Sailors and Pirates, " +
-                        "you may take a repelled Ship of a color you don’t have to place in your display, " +
-                        "otherwise discard it as usual. Once you have all 5 colors of Ships, " +
-                        "immediately discard them and place your marker to complete this Contract.";
+                return "If you have repelled 5 Ships of different colors, you automatically sign this Contract.";
             }
 
             @Override

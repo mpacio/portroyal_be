@@ -25,10 +25,12 @@ public abstract class TwoProfessionsContractCard extends ManualContractCard {
 
     @Override
     public String getDescription() {
-        return "If you have both mentioned Professions in your personal display " +
-                "(in this case, the " + getProfession1Name() + " and the " + getProfession2Name() + "), " +
-                "you may immediately place one of your markers to complete this Contract. " +
-                "The Jack of all Trades does not count for any depicted Professions. " +
+        String requiredProfessions = getProfession1Class().equals(getProfession2Class())
+                ? "two cards of the " + getProfession1Name() + " Employee"
+                : "a " + getProfession1Name() + " and a " + getProfession2Name();
+        return "If your personal display contains " + requiredProfessions + ", " +
+                "you may sign this Contract. " +
+                "The Handyman does not count for any depicted Professions. " +
                 "(Once you complete this Contract you can still use your Settlers, Priests, " +
                 "and Captains for Expeditions.)";
     }

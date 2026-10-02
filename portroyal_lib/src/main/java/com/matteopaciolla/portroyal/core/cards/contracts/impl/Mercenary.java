@@ -21,8 +21,7 @@ public class Mercenary extends ManualContractCard {
 
     @Override
     public String getDescription() {
-        return "If you have at least 3 Cutlasses in your personal display, " +
-                "you may immediately place one of your markers to complete this Contract.";
+        return "If your Power is 3 or more, you may sign this Contract.";
     }
 
     @Override
