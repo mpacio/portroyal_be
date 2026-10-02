@@ -38,7 +38,7 @@ The player can also commit a qualifying expedition or sign an eligible manual co
 active turn, including while the engine is still in the Discover phase.
 
 - **Ship:** A ship enters the harbor unless it repeats a ship color already there. If the active
-  player's total power is at least the ship's power, the player may repel it or accept it. Repelling
+  player's total power is at least the ship's power, the player may repel or accept it. Repelling
   discards the ship and records its color as repelled; accepting a repeated color causes a bust.
 - **Bust:** The newly accepted ship and the entire harbor are discarded, the active player's turn
   ends, and each player's Jester effect pays one coin per Jester. Contract requirements are checked.
@@ -57,10 +57,10 @@ The active player can use their trading capacity to take harbor actions:
 - **Trade a ship:** Discard it and gain its printed coins. Matching-color Merchants grant additional
   coins. The JOMC cargo ship has an additional coin benefit for another player (or the poorest
   player when that configuration option is enabled).
-- **Hire an employee:** Pay its cost, then add it to your employees. Each Mademoiselle reduces
+- **Hire an employee:** Pay its cost, then add it to your employee display. Each Mademoiselle reduces
   hiring costs by one coin. The active player does not pay the active-player fee.
 - **End turn:** The active player ends their harbor actions. Other players are then offered a
-  harbor action in order, if there is a ship to trade or an employee they can afford. Their
+  harbor action in order, if there is a ship to trade or an employee they can afford. Each player's
   sub-turn starts with one action; card effects such as a matching Clerk can add capacity. A
   non-active player pays one coin to the active player when trading or hiring. A player may end
   their sub-turn without taking an action. After the sub-turns, any cards left in the harbor are
@@ -120,7 +120,7 @@ The expansion deals a configured number of contracts onto the board. Each contra
 requirements, available slots, and reward for each slot in the card catalog and current match state.
 Manual contracts may be signed by an eligible player during their turn if they meet the
 requirements, have not signed that contract already, and have not reached the configured contract
-limit. The reward depends on the slot claimed. Automatic contracts are checked at the end of turns
+limit. The reward depends on the slot claimed. Automatic contracts are checked at the end of a turn
 and after a bust; eligible players are signed automatically. Each signed contract adds one point and
 its reward coins.
 
@@ -138,7 +138,7 @@ curl -u alice:password "$BASE/user/me"
 ```
 
 The server returns JSON response wrappers for most operations. Validation failures, illegal moves,
-missing resources, and authentication/authorization failures are reported as HTTP errors. Use the
+missing resources, and authentication or authorization failures are reported as HTTP errors. Use the
 returned match snapshot as the authoritative source for player ordering, phase, harbor indices,
 expedition indices, contract indices, and current state.
 
