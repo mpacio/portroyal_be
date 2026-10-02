@@ -206,6 +206,7 @@ not an optional identity hint for a bot request.
 | `PUT /match/start`                             | Host starts the match; requires at least two total players.                                                                           |
 | `PUT /match/close`                             | Close an unstarted match the caller participates in.                                                                                  |
 | `GET /match/status`                            | Get the caller's current match, if any.                                                                                               |
+| `GET /match/status?moveNumber=N`               | If `N` equals the current move count, returns "No new moves"; otherwise returns the current match snapshot.                           |
 | `GET /match/retrieve?keyCode=...`              | Get the match snapshot.                                                                                                               |
 | `GET /match/retrieve?keyCode=...&moveNumber=N` | If `N` equals the current move count, returns "No new moves"; otherwise returns the snapshot.                                         |
 | `GET /match/retrieve-all`                      | List matches; supports `username`, `ended`, `pageNumber`, `pageSize`, `sortField`, and `sortDirection`.                               |

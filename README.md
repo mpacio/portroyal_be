@@ -310,6 +310,7 @@ Selected endpoints:
 | `POST /match/ai-player`                            | Add an autonomous AI player (`EASY`/`MEDIUM`/`HARD`) to the match you are hosting, before it starts                                     |
 | `DELETE /match/ai-player?aiPlayerUsername=...`     | Remove a previously added AI player from the match you are hosting, before it starts                                                    |
 | `GET /match/status`                                | Get the match currently being played by the caller, if any                                                                              |
+| `GET /match/status?moveNumber=...`                 | If `moveNumber` equals the current move count, returns "No new moves"; otherwise returns the current match                              |
 | `GET /match/retrieve?keyCode=...&moveNumber=...`   | Get full match state; poll with `moveNumber` to cheaply check "any new moves?"                                                          |
 | `POST /game/move`                                  | Play a move (`DISCOVER`, `TRADE`, `HIRE`, `COMMIT_EXPEDITION`, `SIGN_CONTRACT`, `END_TURN`, ...); validated entirely by `portroyal_lib` |
 | `GET /game/moves?keyCode=...`                      | Paged move history of a match                                                                                                           |

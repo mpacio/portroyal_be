@@ -241,7 +241,7 @@ public class MatchController {
 
     @Operation(
             summary = "Get match status",
-            description = "Returns the currently active match for the authenticated user, or an informational message if no match is being played.",
+            description = "Returns the currently active match for the authenticated user, or an informational message if no match is being played. When moveNumber is provided and equals the current move count, the response indicates that no new moves are available.",
             responses = {
                     @ApiResponse(responseCode = "200", description = "Current match status retrieved successfully",
                             content = @Content(mediaType = "application/json", schema = @Schema(implementation = MatchResponse.class)))
@@ -250,14 +250,20 @@ public class MatchController {
     @GetMapping(path = "/status", produces = "application/json")
     public ResponseEntity<MatchResponse> getMatchStatus(
             @Parameter(name = BH, description = "Mandatory only for bot-mediated requests; identifies the real acting user.", required = false, schema = @Schema(type = "string"), in = ParameterIn.HEADER)
-            @RequestHeader(value = BH, required = false) String tgId) {
+            @RequestHeader(value = BH, required = false) String tgId,
+            @Parameter(description = "Last move count known by the client. If equal to the current movesCount, no new moves are available.", example = "14", required = false)
+            @RequestParam(required = false) Integer moveNumber) {
         UserEntity user = getUserEntity(tgId);
         Optional<MatchDto> playingMatch = matchService.getPlayingMatch(user, tgId != null);
         if (playingMatch.isEmpty()) {
             String message = String.format("No match is currently being played by %s", user.getUsername());
             return ResponseEntity.ok(new MatchResponse(message, null));
         } else {
-            return ResponseEntity.ok(new MatchResponse(playingMatch.get()));
+            MatchDto matchDto = playingMatch.get();
+            if (moveNumber != null && moveNumber.equals(matchDto.getMovesCount())) {
+                return ResponseEntity.ok(new MatchResponse("No new moves", null));
+            }
+            return ResponseEntity.ok(new MatchResponse(matchDto));
         }
     }
 
