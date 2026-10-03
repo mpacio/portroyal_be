@@ -120,13 +120,53 @@ tied for the highest positive power. Default configuration values are 12 and 2 r
 
 ### JOMC contracts
 
-The expansion deals a configured number of contracts onto the board. Each contract exposes its own
-requirements, available slots, and reward for each slot in the card catalog and current match state.
-Manual contracts may be signed by an eligible player during their turn if they meet the
-requirements, have not signed that contract already, and have not reached the configured contract
-limit. The reward depends on the slot claimed. Automatic contracts are checked at the end of a turn
-and after a bust; eligible players are signed automatically. Each signed contract adds one point and
-its reward coins.
+The JOMC catalog contains 16 contracts; each match deals the configured number onto the board (4 by
+default), so a match will not necessarily contain every contract below. The live catalog is available
+from `GET /api/v1/card/contract`. Its `rewards` array is ordered by signing slot: the first eligible
+player to sign gets the first value, the next gets the second, and so on. A valid signing adds **one
+point** and the slot's reward in coins. Employees used to meet a contract's requirement are not
+discarded.
+
+**Manual contracts** must be signed by the active player. They can be signed during the active
+player's Discover or Trade/Hire phase, but not during a forced Repel step or another player's
+Trade/Hire sub-turn.
+
+| Contract           | Requirement                                                                                              | Rewards by signing slot (coins) |
+|--------------------|----------------------------------------------------------------------------------------------------------|---------------------------------|
+| Bruja              | Have a Captain and a Mademoiselle.                                                                       | `[3, 2, 1, 0, 0]`               |
+| Explorer           | Have at least one expedition in your display.                                                            | `[2, 1, 0, 0, 0]`               |
+| Luminary           | Have a Priest and a Jester.                                                                              | `[4, 3, 2, 1, 0]`               |
+| Maritime Supremacy | Have a Captain and a Deputy.                                                                             | `[4, 3, 2, 1, 0]`               |
+| Mercenary          | Have power of at least 3.                                                                                | `[3, 2, 1, 0, 0]`               |
+| New Colony         | Have a Settler and a Gunner.                                                                             | `[3, 2, 1, 0, 0]`               |
+| Thrifty Staff      | Have at least four employees whose printed cost is 3 coins or less. Mademoiselle discounts do not count. | `[5, 4, 3, 2, 1]`               |
+| Trade Master       | Have at least two Merchants.                                                                             | `[3, 2, 1, 0, 0]`               |
+| Trade Outpost      | Have a Settler and a Clerk.                                                                              | `[4, 3, 2, 1, 0]`               |
+
+For contracts requiring professions, the Handyman does not substitute for either profession.
+
+**Automatic contracts** cannot be signed with a `SIGN_CONTRACT` move. Requirements are evaluated
+automatically at the end of a turn and after a bust; if the contract has an open slot and the player
+is below the contract limit, the engine signs it for them.
+
+| Contract         | Automatic signing condition                                                                                                  | Rewards by signing slot (coins) |
+|------------------|------------------------------------------------------------------------------------------------------------------------------|---------------------------------|
+| Frigate Nemesis  | Renounce all coins from three red ships, including any matching-Merchant bonus.                                              | `[8, 6, 5, 4, 3]`               |
+| Galleon Nemesis  | Renounce all coins from two black ships, including any matching-Merchant bonus.                                              | `[6, 5, 4, 3, 2]`               |
+| Jinx             | Bust as the active player by accepting a ship whose color is already in the harbor.                                          | `[1, 1, 1, 1, 1]`               |
+| Major Speculator | As the active player, reach four ships of different colors in the harbor.                                                    | `[2, 1, 0, 0, 0]`               |
+| Pirate's Nest    | Repel ships of all five different colors.                                                                                    | `[3, 2, 1, 0, 0]`               |
+| Speculator       | As the active player, reach three ships of different colors in the harbor on two turns; the second qualifying turn signs it. | `[2, 1, 0, 0, 0]`               |
+| Tax Inspector    | Be taxed.                                                                                                                    | `[7, 7, 7, 7, 7]`               |
+
+The Frigate Nemesis, Galleon Nemesis, and Speculator descriptions say that making initial progress
+reduces the player's maximum contract count by one. In the current engine, progress is tracked and
+the contract auto-signs at its stated threshold, but the maximum is not reduced before it is signed.
+
+The board has a configured maximum number of completed contracts per player (3 by default). You
+cannot sign the same board contract twice, sign a full contract, manually sign an automatic contract,
+or exceed that limit. In the match snapshot, use `table.contracts` for the current board order and
+`spots` for its occupied slots; the board index is not the contract's catalog ID.
 
 ## 4. API basics
 
@@ -273,6 +313,20 @@ Example expedition commit:
 
 If a player has a Handyman and there are multiple valid employee selections, send the exact
 selection. Available employee names are `CAPTAIN`, `PRIEST`, `SETTLER`, and `HANDYMAN`.
+
+To sign a manual contract, read the current match snapshot, find the contract in `table.contracts`,
+then send its **zero-based board index** as `parameterIndex`:
+
+```sh
+curl -u alice:password -H "Content-Type: application/json" \
+  -d '{"move":"SIGN_CONTRACT","parameterIndex":1}' "$BASE/game/move"
+```
+
+The index refers to the current match board order, not the contract's catalog `id`. Only the current
+running player can submit the move, and the server checks the contract requirements, open slot,
+duplicate-signing rule, and per-player contract limit. Automatic contracts are signed by the engine
+when their conditions are evaluated; clients should use the match snapshot and move `sideEvents` to
+observe them.
 
 `GET /game/move?keyCode=ABC123&moveNumber=12` retrieves one move.
 `GET /game/moves?keyCode=ABC123` retrieves paged history; optional parameters include
