@@ -2,8 +2,9 @@ package com.matteopaciolla.portroyal.core.cards.contracts.impl;
 
 import com.matteopaciolla.portroyal.core.Player;
 import com.matteopaciolla.portroyal.core.cards.contracts.abst.AutomaticContractCard;
+import com.matteopaciolla.portroyal.core.cards.contracts.abst.ProgressiveContract;
 
-public class Speculator extends AutomaticContractCard {
+public class Speculator extends AutomaticContractCard implements ProgressiveContract {
 
     public Speculator(int id) {
         super(id);
@@ -12,6 +13,11 @@ public class Speculator extends AutomaticContractCard {
     @Override
     public boolean requirementsMet(Player player) {
         return player.getMinorSpeculator() > 1;
+    }
+
+    @Override
+    public boolean hasStartedSigning(Player player) {
+        return player.getMinorSpeculator() > 0;
     }
 
     @Override

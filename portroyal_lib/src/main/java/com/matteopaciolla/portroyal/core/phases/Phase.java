@@ -1,6 +1,7 @@
 package com.matteopaciolla.portroyal.core.phases;
 
 import com.matteopaciolla.portroyal.core.Deck;
+import com.matteopaciolla.portroyal.core.ContractsBoard;
 import com.matteopaciolla.portroyal.core.cards.contracts.abst.ContractCard;
 import com.matteopaciolla.portroyal.core.cards.employees.Handyman;
 import com.matteopaciolla.portroyal.exceptions.userinput.*;
@@ -112,11 +113,11 @@ public abstract class Phase {
         if (contractIndex < 0 || contractIndex >= totalContracts) {
             throw new UserInputException("Invalid contract index");
         }
-        int maxContracts = match.getConfiguration().getMaxContractsCompletablePerPlayer();
-        if (match.getRunningPlayer().getContractsCompleted() >= maxContracts) {
+        ContractsBoard contractsBoard = match.getTable().getContractsBoard();
+        if (!contractsBoard.hasAvailableContractSlot(match.getRunningPlayer())) {
             throw new MaxContractsNumberException("You have reached the maximum number of contracts");
         }
-        ContractCard contract = match.getTable().getContractsBoard().signManualContract(contractIndex, match.getRunningPlayer(), match.getTable());
+        ContractCard contract = contractsBoard.signManualContract(contractIndex, match.getRunningPlayer(), match.getTable());
         match.addNotes(match.getRunningPlayer().getName() + " signed " + contract.getName() + "#" + contract.getId());
         return contract;
     }

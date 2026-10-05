@@ -147,7 +147,7 @@ For contracts requiring professions, the Handyman does not substitute for either
 
 **Automatic contracts** cannot be signed with a `SIGN_CONTRACT` move. Requirements are evaluated
 automatically at the end of a turn and after a bust; if the contract has an open slot and the player
-is below the contract limit, the engine signs it for them.
+has an available contract slot (or a slot reserved for that contract), the engine signs it for them.
 
 | Contract         | Automatic signing condition                                                                                                  | Rewards by signing slot (coins) |
 |------------------|------------------------------------------------------------------------------------------------------------------------------|---------------------------------|
@@ -159,14 +159,16 @@ is below the contract limit, the engine signs it for them.
 | Speculator       | As the active player, reach three ships of different colors in the harbor on two turns; the second qualifying turn signs it. | `[2, 1, 0, 0, 0]`               |
 | Tax Inspector    | Be taxed.                                                                                                                    | `[7, 7, 7, 7, 7]`               |
 
-The Frigate Nemesis, Galleon Nemesis, and Speculator descriptions say that making initial progress
-reduces the player's maximum contract count by one. In the current engine, progress is tracked and
-the contract auto-signs at its stated threshold, but the maximum is not reduced before it is signed.
+Starting progress on Frigate Nemesis, Galleon Nemesis, or Speculator immediately reserves one
+contract slot. That reservation remains even if the player never completes the automatic signing
+condition; when the contract is signed, the reservation becomes a completed contract. Completed
+contracts plus contracts in progress cannot exceed the configured limit.
 
-The board has a configured maximum number of completed contracts per player (3 by default). You
-cannot sign the same board contract twice, sign a full contract, manually sign an automatic contract,
-or exceed that limit. In the match snapshot, use `table.contracts` for the current board order and
-`spots` for its occupied slots; the board index is not the contract's catalog ID.
+The board has a configured maximum number of contract slots per player (3 by default), including
+slots reserved by automatic contracts in progress. You cannot sign the same board contract twice,
+sign a full contract, manually sign an automatic contract, or exceed that limit. In the match
+snapshot, use `table.contracts` for the current board order and `spots` for its occupied slots; the
+board index is not the contract's catalog ID.
 
 ## 4. API basics
 

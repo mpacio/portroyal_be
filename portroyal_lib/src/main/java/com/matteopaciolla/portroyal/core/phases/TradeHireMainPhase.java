@@ -93,6 +93,7 @@ public class TradeHireMainPhase extends Phase {
         match.getTable().discardCard(ship);
         if (renounce) {
             match.getRunningPlayer().renounceShip(ship);
+            match.updateAutomaticContractProgress(match.getRunningPlayer());
             match.addNotes(match.getRunningPlayer().getName()+ " renounced the "
                     + ship.getColor().name() + " " + ship.getClass().getSimpleName() + "#" + ship.getId()
                     + " no money gained");

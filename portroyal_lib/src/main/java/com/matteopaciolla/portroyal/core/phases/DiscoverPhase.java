@@ -44,25 +44,25 @@ public class DiscoverPhase extends Phase{
                 } else {
                     match.getTable().addInHarbor(ship);
                 }
-                break;
+//                break;// isn't necessary because of the return statement at the end of the method
             }
             case EmployeeCard employeeCard -> {
                 match.getTable().addInHarbor(employeeCard);
                 match.addNotes(employeeCard.getClass().getSimpleName() + "#" + employeeCard.getId() + " discovered");
-                break;
+//                break;// isn't necessary because of the return statement at the end of the method
             }
             case TaxCard taxCard -> {
                 match.addNotes(taxCard.getClass().getSimpleName() + "#" + taxCard.getId() + " discovered");
                 TaxEffect.activate(match, taxCard);
                 match.getTable().discardCard(taxCard);
-                break;
+//                break;// isn't necessary because of the return statement at the end of the method
             }
             case Expedition expeditionCard -> {
                 match.getTable().addExpeditionCard(expeditionCard);
                 match.addNotes(expeditionCard.getClass().getSimpleName() + "#" + expeditionCard.getId() + " discovered");
-                break;
+//                break;// isn't necessary because of the return statement at the end of the method
             }
-            case null, default -> {throw new IllegalStateException("Impossible discovering cards");}
+            case null, default -> throw new IllegalStateException("Impossible discovering cards");
         }
         return card;
     }
@@ -83,6 +83,7 @@ public class DiscoverPhase extends Phase{
         match.setCurrentPhase(new TradeHireMainPhase(match));
         setActualTradingCapacity();
         updateSpeculatorData(match.getRunningPlayer(), match.getTable());
+        match.updateAutomaticContractProgress(match.getRunningPlayer());
     }
 
     @Override

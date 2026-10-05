@@ -3,10 +3,11 @@ package com.matteopaciolla.portroyal.core.cards.contracts.impl;
 import com.matteopaciolla.portroyal.core.Match;
 import com.matteopaciolla.portroyal.core.Player;
 import com.matteopaciolla.portroyal.core.cards.contracts.abst.RenouncingContractCard;
+import com.matteopaciolla.portroyal.core.cards.contracts.abst.ProgressiveContract;
 
 import java.util.List;
 
-public class FrigateNemesis extends RenouncingContractCard {
+public class FrigateNemesis extends RenouncingContractCard implements ProgressiveContract {
 
     public FrigateNemesis(int id) {
         super(id);
@@ -15,6 +16,11 @@ public class FrigateNemesis extends RenouncingContractCard {
     @Override
     public boolean requirementsMet(Player player) {
         return player.getRedShipRenounced() > 2;
+    }
+
+    @Override
+    public boolean hasStartedSigning(Player player) {
+        return player.getRedShipRenounced() > 0;
     }
 
     @Override

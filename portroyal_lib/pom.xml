@@ -3,7 +3,9 @@
   <modelVersion>4.0.0</modelVersion>
   <groupId>com.matteopaciolla</groupId>
   <artifactId>portroyal_lib</artifactId>
-  <version>2.0.0</version>
+  <version>2.1.0</version>
+  <name>Port Royal Engine Library</name>
+  <description>All the logic of the digital version of the tabletop game</description>
 
   <properties>
     <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>

@@ -7,6 +7,8 @@
     <groupId>com.matteopaciolla</groupId>
     <artifactId>portroyal_be_full</artifactId>
     <version>1.0.0-SNAPSHOT</version>
+    <name>Port Royal Back End</name>
+    <description>A digital version of the tabletop game (full back end)</description>
 
     <properties>
         <maven.compiler.source>21</maven.compiler.source>

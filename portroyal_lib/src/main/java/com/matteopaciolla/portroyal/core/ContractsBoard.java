@@ -3,7 +3,9 @@ package com.matteopaciolla.portroyal.core;
 import com.matteopaciolla.portroyal.core.cards.contracts.abst.AutomaticContractCard;
 import com.matteopaciolla.portroyal.core.cards.contracts.abst.ContractCard;
 import com.matteopaciolla.portroyal.core.cards.contracts.abst.ManualContractCard;
+import com.matteopaciolla.portroyal.core.cards.contracts.abst.ProgressiveContract;
 import com.matteopaciolla.portroyal.core.enums.EventType;
+import com.matteopaciolla.portroyal.exceptions.userinput.MaxContractsNumberException;
 import com.matteopaciolla.portroyal.exceptions.userinput.UserInputException;
 
 import java.util.*;
@@ -14,7 +16,7 @@ public class ContractsBoard {
 
     private final Map<ContractCard, Queue<Player>> contractSpotsMap = new HashMap<>();
 
-    private final Map<Player, Integer> playerContractsCount = new HashMap<>();
+    private final Map<ContractCard, Set<Player>> contractsInProgressMap = new HashMap<>();
 
     private final int maxContractsPerPlayer;
 
@@ -26,6 +28,7 @@ public class ContractsBoard {
         this.playersCount = playersCount;
         for (ContractCard contract : contracts) {
             contractSpotsMap.put(contract, new LinkedList<>());
+            contractsInProgressMap.put(contract, new HashSet<>());
         }
     }
 
@@ -48,6 +51,45 @@ public class ContractsBoard {
     }
 
     /**
+     * Get the number of contracts in progress for a player
+     * @param player the player to check
+     * @return the number of contracts in progress for the player
+     */
+    public int getContractsInProgressCount(Player player) {
+        return contractsInProgressMap.values().stream()
+                .mapToInt(players -> players.contains(player) ? 1 : 0)
+                .sum();
+    }
+
+    /**
+     * Update the contracts in progress for a player
+     * If the player has started signing a progressive contract, and the contract is not full, and the player has an available contract slot, add the player to the contracts in progress for that contract
+     * @param player the player to update
+     */
+    public void updateAutomaticContractProgress(Player player) {
+        for (int i = 0; i < contracts.length; i++) {
+            ContractCard contract = contracts[i];
+            if (contract instanceof ProgressiveContract progressiveContract
+                    && progressiveContract.hasStartedSigning(player)
+                    && !contractSpotsMap.get(contract).contains(player)
+                    && !contractsInProgressMap.get(contract).contains(player)
+                    && !isFull(i)
+                    && hasAvailableContractSlot(player)) {
+                contractsInProgressMap.get(contract).add(player);
+            }
+        }
+    }
+
+    /**
+     * Check if the player has an available contract slot
+     * @param player the player to check
+     * @return true if the player has an available contract slot, false otherwise
+     */
+    public boolean hasAvailableContractSlot(Player player) {
+        return player.getContractsCompleted() + getContractsInProgressCount(player) < maxContractsPerPlayer;
+    }
+
+    /**
      * Sign a contract for a player
      * Conditions for signing a contract:
      * - the contractIndex is a valid index
@@ -67,8 +109,8 @@ public class ContractsBoard {
             throw new UserInputException("You can't manually sign an automatic contract");
         }
         ManualContractCard manualContract = (ManualContractCard) contract;
-        if (player.getContractsCompleted() >= maxContractsPerPlayer) {
-            throw new UserInputException("You have reached the maximum number of contracts");
+        if (!hasAvailableContractSlot(player)) {
+            throw new MaxContractsNumberException("You have reached the maximum number of contracts");
         }
         if (isFull(contractIndex)) {
             throw new UserInputException("This contract is already full");
@@ -85,7 +127,7 @@ public class ContractsBoard {
 
     /**
      * Sign all the automatic contracts that the player meets the requirements for
-     * Assert that the player has not reached the maximum number of contracts (not checked here)
+     * Uses an available slot or a slot already reserved by progress on that contract.
      *
      * @param player the player that is signing the contracts
      * @param match  the match that is being played
@@ -97,6 +139,7 @@ public class ContractsBoard {
                     && !isFull(i)// the contract is not full
                     && !contractSpotsMap.get(contractCard).contains(player)// the player is not already signed in the contract
                     && contractCard.requirementsMet(player)// the player meets the requirements for the contract
+                    && (contractsInProgressMap.get(contractCard).contains(player) || hasAvailableContractSlot(player))
             ) {
                 ContractSigned contractSigned = signContract(i, player, match.getTable());
                 if (contractSigned.contractCard instanceof AutomaticContractCard) {
@@ -111,6 +154,7 @@ public class ContractsBoard {
         ContractCard contract = contracts[contractIndex];
         Queue<Player> contractQueue = contractSpotsMap.get(contract);
         contractQueue.offer(player);
+        contractsInProgressMap.get(contract).remove(player);
         int index = contractQueue.size() - 1; // the index of the player in the contract's queue
         int reward = contracts[contractIndex].getRewards()[index];
         player.addMoney(table.getMoney(reward));

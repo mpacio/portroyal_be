@@ -300,13 +300,16 @@ public class Match {
         if (!configuration.isJOMC_ExpansionUsed() || table.getContractsBoard() == null) {
             return; // no contracts to evaluate
         }
-        int maxContracts = configuration.getMaxContractsCompletablePerPlayer();
         // check every player starting from the running player
         for (int i = runningPlayerIndex; i < runningPlayerIndex + players.size(); i++) {
             Player player = players.get(i % players.size());
-            if (player.getContractsCompleted() < maxContracts) {
-                table.getContractsBoard().signAutomaticContracts(player, this);
-            }
+            table.getContractsBoard().signAutomaticContracts(player, this);
+        }
+    }
+
+    public void updateAutomaticContractProgress(Player player) {
+        if (configuration.isJOMC_ExpansionUsed() && table.getContractsBoard() != null) {
+            table.getContractsBoard().updateAutomaticContractProgress(player);
         }
     }
 
