@@ -29,6 +29,7 @@ correct order (the library is built/installed before the API, since `portroyal_b
 - [Build & run](#build--run)
 - [API overview](#api-overview)
 - [Game rules and API guide](GAME_RULES_AND_API.md)
+- [Client development guide](CLIENT_DEVELOPMENT_GUIDE.md)
 - [Testing](#testing)
 - [Development notes](#development-notes)
 
