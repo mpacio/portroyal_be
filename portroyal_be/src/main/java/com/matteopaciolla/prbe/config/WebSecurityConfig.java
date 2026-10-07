@@ -46,7 +46,7 @@ public class WebSecurityConfig {
 
                             .requestMatchers(HttpMethod.POST,   Paths.BASE_API_PATH + Paths.USER_PATH + "/unify").hasRole(UserRole.BOT.name())
                             .requestMatchers(HttpMethod.POST,   Paths.BASE_API_PATH + Paths.USER_PATH + "/register/telegram").hasRole(UserRole.BOT.name())
-                            .requestMatchers(HttpMethod.PUT,    Paths.BASE_API_PATH + Paths.USER_PATH + "/**").hasAnyRole(UserRole.ADMIN.name(), UserRole.BOT.name())
+//                            .requestMatchers(HttpMethod.PUT,    Paths.BASE_API_PATH + Paths.USER_PATH + "/**").hasAnyRole(UserRole.ADMIN.name(), UserRole.BOT.name())
                             .requestMatchers(HttpMethod.DELETE, Paths.BASE_API_PATH + Paths.USER_PATH + "/**").hasAnyRole(UserRole.ADMIN.name())// only admin can delete users
 
                             .requestMatchers(Paths.BASE_API_PATH + "/**").authenticated()
