@@ -45,9 +45,9 @@ auth or user-resolution code:
   `AuthenticationUtils.isBotUser()` detects the bot caller; controllers/services then resolve the
   real acting user via `userService.getUserEntityByTelegramId(tgId)` instead of the authenticated
   principal (see `MatchController#getUserEntity`, `GameController#move`).
-- Registration: `POST /public/register` (web/app, username/email/password) vs.
-  `POST /user/register/telegram` (`BOT` role only, Telegram id only).
-- Identity unification: `GET /public/newTgUnifyEmailOtp` + `POST /user/unify` (`BOT` role only,
+- Registration: `POST /api/v1/public/register` (web/app, username/email/password) vs.
+  `POST /api/v1/user/register/telegram` (`BOT` role only, Telegram id only).
+- Identity unification: `GET /api/v1/public/newTgUnifyEmailOtp` + `POST /api/v1/user/unify` (`BOT` role only,
   OTP via `temporary_tokens`) merges a Telegram-only user with an email account into one
   `UserEntity`.
 - Moves/matches are always keyed by the domain `UserEntity`, never by client type or session.
@@ -85,7 +85,7 @@ Every `portroyal_be` instance must remain stateless and disposable:
 
 ## API conventions
 
-- Base path `/api/v1`; Swagger UI at `/swagger-ui/index.html`, OpenAPI JSON at `/api-docs`.
+- Base path `/api/v1`; Swagger UI at `/swagger-ui/index.html`, OpenAPI JSON at `/api/v1/api-docs`.
 - HTTP Basic Auth on essentially every endpoint under `/api/v1/**`.
 - Tags/base paths: `public` (no auth), `user`, `match`, `game` (moves), `card` (read-only catalog),
   `sentinel` (real-time notifications).

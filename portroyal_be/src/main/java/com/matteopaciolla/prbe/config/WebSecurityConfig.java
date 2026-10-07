@@ -37,7 +37,8 @@ public class WebSecurityConfig {
                             .requestMatchers("/css/**").permitAll() //static css files
                             .requestMatchers("/js/**").permitAll() //static js files
                             .requestMatchers("/login").permitAll() //login page
-                            .requestMatchers(Paths.PUBLIC_PATH + "/**").permitAll() //public paths
+                            .requestMatchers(Paths.BASE_API_PATH + Paths.PUBLIC_PATH + "/**").permitAll() //public API paths
+                            .requestMatchers(Paths.PUBLIC_PATH + "/confirmEmail").permitAll() //HTML email confirmation page
 
                             .requestMatchers(HttpMethod.GET,"/swagger-ui/**").permitAll()
                             .requestMatchers(HttpMethod.GET,Paths.BASE_API_PATH + "/api-docs/**").permitAll()
@@ -49,7 +50,6 @@ public class WebSecurityConfig {
                             .requestMatchers(HttpMethod.DELETE, Paths.BASE_API_PATH + Paths.USER_PATH + "/**").hasAnyRole(UserRole.ADMIN.name())// only admin can delete users
 
                             .requestMatchers(Paths.BASE_API_PATH + "/**").authenticated()
-//                            .requestMatchers(HttpMethod.GET,    Paths.BASE_API_PATH + Paths.USER_PATH + "/**").authenticated()
                             .anyRequest().denyAll()
 //                .anyRequest().authenticated()
 //                .anyRequest().permitAll()

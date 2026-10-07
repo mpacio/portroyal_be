@@ -30,7 +30,7 @@ import java.util.List;
 		info = @Info(
 				title = "Port Royal Back End",
 				description = "Port Royal game backend API. The service exposes the game state, match lifecycle, authentication, user management and bot-mediated operations for the Port Royal game. " +
-					"All endpoints under /api/v1 are protected via HTTP Basic Authentication unless explicitly marked as public. " +
+					"JSON API endpoints under /api/v1 use HTTP Basic Authentication unless explicitly marked as public; HTML pages are outside this prefix. " +
 					"Bot integrations must send the mandatory tgId header when acting as the shaslabot technical account.",
 				version = "1.0"
 		),

@@ -6,7 +6,7 @@ client reads the current match snapshot before deciding what to display or submi
 
 For game rules, move details, card behavior, and the full endpoint reference, see
 [`GAME_RULES_AND_API.md`](GAME_RULES_AND_API.md). While developing against a running server, use
-Swagger UI at `/swagger-ui/index.html` or the OpenAPI document at `/api-docs`.
+Swagger UI at `/swagger-ui/index.html` or the OpenAPI document at `/api/v1/api-docs`.
 
 ## 1. API basics
 
@@ -22,14 +22,14 @@ bodies with `Content-Type: application/json`. Most successful API responses use 
 status codes and generally return an object with `status`, `error`, and `message`, with optional
 `errorDetails`, `description`, or `suggestion`.
 
-| Endpoint group | Authentication | Purpose |
-|---|---|---|
-| `/public/**` | None | Standard account registration, email confirmation, and Telegram account-unification OTP |
-| `/user/**` | Basic | User profile and identity operations |
-| `/match/**` | Basic | Create, join, start, close, and retrieve matches |
-| `/game/**` | Basic | Submit moves and read move history |
-| `/card/**` | Basic | Read the card and contract catalogs |
-| `/sentinel/**` | Basic | Subscribe to match notifications |
+| Endpoint group | Authentication | Purpose                                                                              |
+|----------------|----------------|--------------------------------------------------------------------------------------|
+| `/public/**`   | None           | JSON registration/OTP; HTML email confirmation at server-root `/public/confirmEmail` |
+| `/user/**`     | Basic          | User profile and identity operations                                                 |
+| `/match/**`    | Basic          | Create, join, start, close, and retrieve matches                                     |
+| `/game/**`     | Basic          | Submit moves and read move history                                                   |
+| `/card/**`     | Basic          | Read the card and contract catalogs                                                  |
+| `/sentinel/**` | Basic          | Subscribe to match notifications                                                     |
 
 ## 2. Choose an identity model
 
@@ -205,14 +205,14 @@ snapshot after a move or notification to display the latest state.
 
 Useful read endpoints:
 
-| Method and path | Use |
-|---|---|
-| `GET /match/retrieve?keyCode=...` | Read a specific match snapshot |
+| Method and path                                | Use                                                                               |
+|------------------------------------------------|-----------------------------------------------------------------------------------|
+| `GET /match/retrieve?keyCode=...`              | Read a specific match snapshot                                                    |
 | `GET /match/retrieve?keyCode=...&moveNumber=N` | Return `"No new moves"` with no match data when `N` equals the current move count |
-| `GET /match/status` | Read the authenticated player's current match, if any |
-| `GET /match/retrieve-all` | List matches, with optional filters and pagination |
-| `GET /game/move?keyCode=...&moveNumber=N` | Retrieve one persisted move |
-| `GET /game/moves?keyCode=...` | Retrieve paged move history |
+| `GET /match/status`                            | Read the authenticated player's current match, if any                             |
+| `GET /match/retrieve-all`                      | List matches, with optional filters and pagination                                |
+| `GET /game/move?keyCode=...&moveNumber=N`      | Retrieve one persisted move                                                       |
+| `GET /game/moves?keyCode=...`                  | Retrieve paged move history                                                       |
 
 For bot requests to `/match/status`, include `tgId` so the API can resolve which player's match to
 return. The `moveNumber` option is a lightweight unchanged-state check, not a substitute for
@@ -224,11 +224,11 @@ Sentinel notifications tell a client that a match changed; they are not a full s
 move history. When an alert arrives, refresh `/match/retrieve` (or `/match/status`) and render the
 returned state.
 
-| Transport | Endpoint | Behavior |
-|---|---|---|
-| Server-Sent Events (SSE) | `GET /sentinel/sse/subscribe?keyCode=...&seconds=3600` | Open a stream for repeated alerts until it closes or times out |
-| Long polling | `GET /sentinel/long-polling/subscribe?keyCode=...&seconds=120` | Wait for one alert, then subscribe again; minimum timeout is 10 seconds |
-| Webhook callback | `POST /sentinel/callback/subscribe` | Register a URL to receive alerts for a match |
+| Transport                | Endpoint                                                       | Behavior                                                                |
+|--------------------------|----------------------------------------------------------------|-------------------------------------------------------------------------|
+| Server-Sent Events (SSE) | `GET /sentinel/sse/subscribe?keyCode=...&seconds=3600`         | Open a stream for repeated alerts until it closes or times out          |
+| Long polling             | `GET /sentinel/long-polling/subscribe?keyCode=...&seconds=120` | Wait for one alert, then subscribe again; minimum timeout is 10 seconds |
+| Webhook callback         | `POST /sentinel/callback/subscribe`                            | Register a URL to receive alerts for a match                            |
 
 SSE is suitable for web/app clients that can keep a connection open. Long polling works for
 clients that prefer a request/response loop. SSE and long-polling subscriptions are held in the
@@ -268,29 +268,30 @@ should refresh the match snapshot rather than relying on notifications as a dura
 
 ## 7. Endpoint reference
 
-All paths below are relative to `/api/v1`.
+API paths below are relative to `/api/v1`; the HTML email-confirmation page is the exception and
+is served at `/public/confirmEmail` from the server root.
 
-| Method | Path | Notes |
-|---|---|---|
-| `POST` | `/public/register` | Register a standard username/password account; public |
-| `GET` | `/public/newEmailConfirmation?email=...` | Request an email confirmation; public |
-| `GET` | `/public/confirmEmail?token=...` | Confirm an email token; public browser flow |
-| `GET` | `/public/newTgUnifyEmailOtp?email=...` | Request an OTP for identity unification; public |
-| `GET` | `/user/me` | Get the authenticated API account; for bot auth this is the technical bot account |
-| `GET` | `/user/retrieve?username=...` | Look up a user by username, Telegram ID, or email |
-| `POST` | `/user/register/telegram` | Create a Telegram-linked user; requires `BOT` role |
-| `POST` | `/user/unify` | Unify a Telegram identity and email account; requires `BOT` role |
-| `POST` | `/match/host` | Host a match |
-| `PUT` | `/match/join?keyCode=...` | Join a match before it starts |
-| `PUT` | `/match/start` | Start the hosted match |
-| `PUT` | `/match/close` | Close an unstarted match |
-| `POST` / `DELETE` | `/match/ai-player` | Add or remove an AI player before match start |
-| `GET` | `/match/status` | Retrieve the authenticated player's current match |
-| `GET` | `/match/retrieve?keyCode=...` | Retrieve a match by key |
-| `POST` | `/game/move` | Submit one move |
-| `GET` | `/game/move` or `/game/moves` | Read one move or paged move history |
-| `GET` | `/card` or `/card/contract` | Read the card or contract catalog |
-| `GET` / `POST` | `/sentinel/...` | Subscribe to match alerts |
+| Method            | Path                                        | Notes                                                                             |
+|-------------------|---------------------------------------------|-----------------------------------------------------------------------------------|
+| `POST`            | `/public/register`                          | Register a standard username/password account; public                             |
+| `GET`             | `/public/newEmailConfirmation?email=...`    | Request an email confirmation; public                                             |
+| `GET`             | `SERVER_ROOT/public/confirmEmail?token=...` | Confirm an email token; public browser flow                                       |
+| `GET`             | `/public/newTgUnifyEmailOtp?email=...`      | Request an OTP for identity unification; public                                   |
+| `GET`             | `/user/me`                                  | Get the authenticated API account; for bot auth this is the technical bot account |
+| `GET`             | `/user/retrieve?username=...`               | Look up a user by username, Telegram ID, or email                                 |
+| `POST`            | `/user/register/telegram`                   | Create a Telegram-linked user; requires `BOT` role                                |
+| `POST`            | `/user/unify`                               | Unify a Telegram identity and email account; requires `BOT` role                  |
+| `POST`            | `/match/host`                               | Host a match                                                                      |
+| `PUT`             | `/match/join?keyCode=...`                   | Join a match before it starts                                                     |
+| `PUT`             | `/match/start`                              | Start the hosted match                                                            |
+| `PUT`             | `/match/close`                              | Close an unstarted match                                                          |
+| `POST` / `DELETE` | `/match/ai-player`                          | Add or remove an AI player before match start                                     |
+| `GET`             | `/match/status`                             | Retrieve the authenticated player's current match                                 |
+| `GET`             | `/match/retrieve?keyCode=...`               | Retrieve a match by key                                                           |
+| `POST`            | `/game/move`                                | Submit one move                                                                   |
+| `GET`             | `/game/move` or `/game/moves`               | Read one move or paged move history                                               |
+| `GET`             | `/card` or `/card/contract`                 | Read the card or contract catalog                                                 |
+| `GET` / `POST`    | `/sentinel/...`                             | Subscribe to match alerts                                                         |
 
 See the live OpenAPI definition for request and response schemas, and
 [`GAME_RULES_AND_API.md`](GAME_RULES_AND_API.md) for detailed match, move, and notification

@@ -80,12 +80,12 @@ authentication model.
   once, safely drives moves and matches for many different real players**, each still tracked and
   authorized as themselves at the domain level (moves/matches remain associated with the human
   player's `UserEntity`, not with the bot).
-- A player can be registered directly through the bot (`POST /user/register/telegram`, `hasRole(BOT)`)
+- A player can be registered directly through the bot (`POST /api/v1/user/register/telegram`, `hasRole(BOT)`)
   using only their Telegram id, or through a normal web/app registration
-  (`POST /public/register`) using username/email/password.
+  (`POST /api/v1/public/register`) using username/email/password.
 - The two identities can later be **unified**: a Telegram-only user requests a one-time code sent to
-  an email address (`GET /public/newTgUnifyEmailOtp`), then confirms the pairing through the bot
-  (`POST /user/unify`, `hasRole(BOT)`, backed by the OTP/`temporary_tokens` table). After unification,
+  an email address (`GET /api/v1/public/newTgUnifyEmailOtp`), then confirms the pairing through the bot
+  (`POST /api/v1/user/unify`, `hasRole(BOT)`, backed by the OTP/`temporary_tokens` table). After unification,
   the same physical player can keep playing the very same match indifferently from the web front end
   or from Telegram — the API always resolves to the same `UserEntity` regardless of which channel is
   used to reach it.
@@ -189,7 +189,7 @@ Spring `application-*.properties`/`application.yml` override) when running the s
 | `be_app.user.telegram_unification.enabled`     | no       | `true`                                                                                                 | Feature flag for the Telegram/email account unification flow                                                                                                                         |
 | `be_app.user.telegram_unification.max_retries` | no       | `3`                                                                                                    | Max allowed OTP attempts for Telegram unification                                                                                                                                    |
 | `be_app.cache.match.seconds-to-expire`         | no       | `60` (set in `application.properties`; falls back to `300` in code if the property is absent entirely) | TTL, in seconds, of the **per-instance** in-memory `Match` cache described above (`MatchRetainer`). This is purely a local performance cache, safe to tune per instance/environment. |
-| `springdoc.api-docs.path`                      | no       | `/api-docs`                                                                                            | Path where the raw OpenAPI JSON is served                                                                                                                                            |
+| `springdoc.api-docs.path`                      | no       | `/api-docs`                                                                                            | Springdoc mapping suffix; the effective raw OpenAPI URL is `/api/v1/api-docs` because REST controllers receive the API prefix                                                        |
 | `portroyal.lib.version`                        | derived  | from `pom.xml`                                                                                         | Injected automatically at build time from the Maven `prlib.version` property; not meant to be set manually                                                                           |
 
 Logging is configured via [`logback-spring.xml`](portroyal_be/src/main/resources/logback-spring.xml),
@@ -279,7 +279,7 @@ standing up the full API/database stack.
 - For an end-to-end description of the rules, move payloads, and match workflow, see the
   [Game Rules and API Guide](GAME_RULES_AND_API.md).
 - Base path: `/api/v1`
-- Interactive docs: Swagger UI at `/swagger-ui/index.html`, raw OpenAPI spec at `/api-docs`
+- Interactive docs: Swagger UI at `/swagger-ui/index.html`, raw OpenAPI spec at `/api/v1/api-docs`
   (see `springdoc.api-docs.path`).
 - Authentication: HTTP Basic Auth on essentially every endpoint under `/api/v1/**` (see
   [Designed to scale horizontally](#designed-to-scale-horizontally)); roles are `ADMIN`, `USER`,
@@ -289,7 +289,7 @@ standing up the full API/database stack.
 
 | Tag         | Base path          | Purpose                                                                                                     |
 |-------------|--------------------|-------------------------------------------------------------------------------------------------------------|
-| Public      | `/api/v1/public`   | Registration, email confirmation, OTP requests — no authentication required                                 |
+| Public      | `/api/v1/public`   | Public JSON registration/OTP; HTML email confirmation at server-root `/public/confirmEmail`                 |
 | User        | `/api/v1/user`     | Current-user lookup, retrieve/update/delete users, password change, bot registration & Telegram unification |
 | Match       | `/api/v1/match`    | Host/join/start/close a match, list matches, poll match status/state                                        |
 | Move (Game) | `/api/v1/game`     | Play a move, fetch a single move or paged move history                                                      |
@@ -297,6 +297,8 @@ standing up the full API/database stack.
 | Sentinel    | `/api/v1/sentinel` | Real-time match notifications: webhook callback, long polling, Server-Sent Events, unsubscribe              |
 
 Selected endpoints:
+
+Paths in this table are relative to `/api/v1`.
 
 | Method & path                                      | Description                                                                                                                             |
 |----------------------------------------------------|-----------------------------------------------------------------------------------------------------------------------------------------|

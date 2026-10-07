@@ -5,7 +5,7 @@ This guide describes the rules implemented by `portroyal_lib` and how to play a 
 validates and applies each move.
 
 For the exact live API schema, use Swagger UI at `/swagger-ui/index.html` or the OpenAPI document
-at `/api-docs` on a running server.
+at `/api/v1/api-docs` on a running server.
 
 ## 1. Game at a glance
 
@@ -190,11 +190,12 @@ expedition indices, contract indices, and current state.
 
 ## 5. Register and identify players
 
+API paths below are relative to `BASE` (`/api/v1`).
+
 | Method and path                                           | Purpose                                                                                                        |
 |-----------------------------------------------------------|----------------------------------------------------------------------------------------------------------------|
 | `POST /public/register`                                   | Create a standard account; public.                                                                             |
 | `GET /public/newEmailConfirmation?email=...`              | Request email confirmation; public.                                                                            |
-| `GET /public/confirmEmail?token=...`                      | Confirm an email token; public browser flow.                                                                   |
 | `GET /public/newTgUnifyEmailOtp?email=...&telegramId=...` | Request the email OTP to link a Telegram identity; public. The email must be confirmed and not already linked. |
 | `POST /user/register/telegram`                            | Create a Telegram-linked player; requires `BOT` authentication.                                                |
 | `POST /user/unify`                                        | Link the Telegram ID to the email account using the OTP; requires `BOT` authentication.                        |
@@ -203,6 +204,8 @@ expedition indices, contract indices, and current state.
 | `PUT /user/update?username=...`                           | Update user profile; requires `ADMIN` or `BOT` authorization.                                                  |
 | `POST /user/changePsw`                                    | Change the authenticated user's password.                                                                      |
 | `DELETE /user/delete?username=...`                        | Delete a user; requires `ADMIN` authorization.                                                                 |
+
+The HTML email-confirmation page is served separately at `/public/confirmEmail` from the server root.
 
 Standard registration body:
 

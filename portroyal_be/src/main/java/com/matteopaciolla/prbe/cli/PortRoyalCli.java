@@ -115,7 +115,7 @@ public class PortRoyalCli {
             payload.put("telegramId", telegramId);
         }
 
-        ApiClient.Response response = call(session, "POST", "/public/register", payload, null);
+        ApiClient.Response response = call(session, "POST", "/api/v1/public/register", payload, null);
         printResponse(response);
     }
 
