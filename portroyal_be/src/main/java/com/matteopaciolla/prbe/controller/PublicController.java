@@ -39,7 +39,7 @@ public class PublicController {
 
     @Operation(
         summary = "Register a new user",
-        description = "Creates a standard user account that can later confirm its email and play matches through the authenticated API.",
+        description = "Creates a standard user account. Username and email are required; password, first name, and last name may be omitted. Missing names are generated automatically.",
         responses = {
             @ApiResponse(responseCode = "201", description = "User registered successfully",
                 content = @Content(mediaType = "application/json", schema = @Schema(implementation = UserResponse.class),

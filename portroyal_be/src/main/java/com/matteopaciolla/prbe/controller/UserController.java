@@ -164,7 +164,7 @@ public class UserController {
 
     @Operation(
             summary = "Register a telegram player",
-            description = "Creates a Telegram-linked user account. This endpoint is intended for bot-only use and requires the bot identity in the security context.",
+            description = "Creates a Telegram-linked user account. Username and Telegram ID are required; first name and last name may be omitted and will be generated automatically. This endpoint is intended for bot-only use and requires the bot identity in the security context.",
             responses = {
                     @ApiResponse(responseCode = "201", description = "Telegram user registered successfully",
                             content = @Content(mediaType = "application/json", schema = @Schema(implementation = UserResponse.class),
@@ -172,7 +172,7 @@ public class UserController {
             }
     )
     @PostMapping(path = "/register/telegram")
-    public ResponseEntity<UserResponse> registerTelegramPlayer(@RequestBody UserReqDto userReqDto) {
+    public ResponseEntity<UserResponse> registerTelegramPlayer(@Valid @RequestBody UserReqDto userReqDto) {
         UserDto savedUserDto = userService.registerUser(userReqDto, true);
         log.info("User {} registered successfully by bot with id {}", savedUserDto.getUsername(), savedUserDto.getId());
         UserResponse res = new UserResponse(HttpStatus.CREATED.value(), "User registered successfully by the bot", savedUserDto);

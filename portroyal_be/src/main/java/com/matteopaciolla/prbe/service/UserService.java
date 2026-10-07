@@ -1,5 +1,6 @@
 package com.matteopaciolla.prbe.service;
 
+import com.matteopaciolla.prbe.constants.FakeNames;
 import com.matteopaciolla.prbe.constants.Paths;
 import com.matteopaciolla.prbe.constants.enums.UserRole;
 import com.matteopaciolla.prbe.converter.UserConverter;
@@ -23,6 +24,7 @@ import org.springframework.stereotype.Service;
 
 import java.time.LocalDateTime;
 import java.util.*;
+import java.util.concurrent.ThreadLocalRandom;
 
 import static com.matteopaciolla.prbe.util.RandomUtils.*;
 
@@ -48,8 +50,8 @@ public class UserService {
     /**
      * Registers a new user.
      * For the registration to be successful, the user must not already exist in the system.
-     * The userReqDto must contain the username, email, and optionally telegramId.
-     * (The telegramId can be null in case of email registration from the web front end).
+     * Web registration requires username and email; bot registration requires username and telegramId.
+     * Password and names are optional.
      *
      * @param userReqDto the user request DTO
      * @param fromBot    true if the request is from a bot, false otherwise
@@ -63,17 +65,18 @@ public class UserService {
         }
         Optional<UserEntity> existingUser = getUser(userReqDto);
         if (existingUser.isPresent()) {
-            if (existingUser.get().getUsername().equals(userReqDto.getUsername())) {
+            if (Objects.equals(existingUser.get().getUsername(), userReqDto.getUsername())) {
                 log.error("User with username {} already exists", userReqDto.getUsername());
                 throw new UniqueConstraintViolatedException("User with username " + userReqDto.getUsername() + " already exists");
-            } else if (existingUser.get().getEmail().equals(userReqDto.getEmail())) {
+            } else if (userReqDto.getEmail() != null && Objects.equals(existingUser.get().getEmail(), userReqDto.getEmail())) {
                 log.error("User with email {} already exists", userReqDto.getEmail());
                 throw new UniqueConstraintViolatedException("User with email " + userReqDto.getEmail() + " already exists");
-            } else if (existingUser.get().getTelegramId().equals(userReqDto.getTelegramId())) {
+            } else if (userReqDto.getTelegramId() != null && Objects.equals(existingUser.get().getTelegramId(), userReqDto.getTelegramId())) {
                 log.error("User with telegram id {} already exists", userReqDto.getTelegramId());
                 throw new UniqueConstraintViolatedException("User with telegram id " + userReqDto.getTelegramId() + " already exists");
             }
         }
+        populateMissingNames(userReqDto);
         UserEntity savedUser = createUser(userReqDto, List.of(UserRole.USER));
         UserDto userDto = UserConverter.toDto(savedUser);
         if (!fromBot) {
@@ -87,10 +90,6 @@ public class UserService {
         List<String> missingParams = new ArrayList<>();
         if (userReqDto.getUsername() == null || userReqDto.getUsername().isBlank()) {
             missingParams.add("username");
-            valid = false;
-        }
-        if (userReqDto.getPassword() == null || userReqDto.getPassword().isBlank()) {
-            missingParams.add("password");
             valid = false;
         }
         if (userReqDto.getEmail() == null || userReqDto.getEmail().isBlank()) {
@@ -162,6 +161,23 @@ public class UserService {
         String password = userReqDto.getPassword() != null ? userReqDto.getPassword() : getRandomPassword(8);
         user.setPassword(passwordEncoder.encode(password));
         return userRepository.save(user);
+    }
+
+    private void populateMissingNames(UserReqDto userReqDto) {
+        if (isMissing(userReqDto.getFirstName()) || isMissing(userReqDto.getLastName())) {
+            String fakeFirstName = FakeNames.FIRST_NAMES.get(ThreadLocalRandom.current().nextInt(FakeNames.FIRST_NAMES.size()));
+            String fakeLastName = FakeNames.LAST_NAMES.get(ThreadLocalRandom.current().nextInt(FakeNames.LAST_NAMES.size()));
+            if (isMissing(userReqDto.getFirstName())) {
+                userReqDto.setFirstName(fakeFirstName);
+            }
+            if (isMissing(userReqDto.getLastName())) {
+                userReqDto.setLastName(fakeLastName);
+            }
+        }
+    }
+
+    private static boolean isMissing(String value) {
+        return value == null || value.isBlank();
     }
 
     public UserDto updateUser(UserReqDto userDto) {
