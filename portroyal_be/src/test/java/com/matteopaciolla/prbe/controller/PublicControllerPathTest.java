@@ -27,7 +27,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.view;
 
-@WebMvcTest(controllers = {PublicApiController.class, PublicController.class})
+@WebMvcTest(controllers = {PublicController.class, com.matteopaciolla.prbe.controller.pages.PublicController.class})
 @Import({WebConfig.class, WebSecurityConfig.class})
 class PublicControllerPathTest {
 
