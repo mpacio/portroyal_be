@@ -8,10 +8,6 @@ import lombok.Value;
 @Value
 public class CallbackSentinelRequest {
 
-    @Schema(description = "Match key code that the callback is tied to.", example = "ABC123", requiredMode = Schema.RequiredMode.REQUIRED)
-    @NotBlank(message = "matchKeyCode must not be blank")
-    String matchKeyCode;
-
     @Schema(description = "Webhook URL that will receive the alert payload.", example = "https://example.com/callback", requiredMode = Schema.RequiredMode.REQUIRED)
     @NotBlank(message = "url must not be blank")
     String url;

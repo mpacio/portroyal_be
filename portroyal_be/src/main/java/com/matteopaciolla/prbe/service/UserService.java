@@ -180,8 +180,11 @@ public class UserService {
         return value == null || value.isBlank();
     }
 
-    public UserDto updateUser(UserReqDto userDto) {
-        UserEntity user = getExistingUser(userDto);
+    public UserDto updateUser(String username, UserReqDto userDto) {
+        if (userDto.getUsername() != null && !username.equals(userDto.getUsername())) {
+            throw new MandatoryParamException("Path username must match the username in the request body", List.of("username"));
+        }
+        UserEntity user = getExistingUser(username, userDto);
         boolean modified = false;
         if (userDto.getFirstName() != null && !userDto.getFirstName().equals(user.getFirstName())) {
             user.setFirstName(userDto.getFirstName());
@@ -219,30 +222,16 @@ public class UserService {
         );
     }
 
-    private UserEntity getExistingUser(UserReqDto userReqDto) {
-        UserEntity user = null;
-        if (userReqDto.getUsername() != null) {
-            user = userRepository.findByUsername(userReqDto.getUsername()).orElse(null);
-            if (user != null && userReqDto.getEmail() != null && user.getEmail() != null && !user.getEmail().equals(userReqDto.getEmail())) {
-                log.error("User with username {} has different email {}", userReqDto.getUsername(), userReqDto.getEmail());
-                throw new ResourceNotFoundException("User with username " + userReqDto.getUsername() + " has different email " + userReqDto.getEmail());
-            }
-            if (user != null && userReqDto.getTelegramId() != null && user.getTelegramId() != null && !user.getTelegramId().equals(userReqDto.getTelegramId())) {
-                log.error("User with username {} has different telegram id {}", userReqDto.getUsername(), userReqDto.getTelegramId());
-                throw new ResourceNotFoundException("User with username " + userReqDto.getUsername() + " has different telegram id " + userReqDto.getTelegramId());
-            }
-        } else if (userReqDto.getEmail() != null) {
-            user = userRepository.findByEmail(userReqDto.getEmail()).orElse(null);
-            if (user != null && userReqDto.getTelegramId() != null && user.getTelegramId() != null && !user.getTelegramId().equals(userReqDto.getTelegramId())) {
-                log.error("User with email {} has different telegram id {}", userReqDto.getEmail(), userReqDto.getTelegramId());
-                throw new ResourceNotFoundException("User with email " + userReqDto.getEmail() + " has different telegram id " + userReqDto.getTelegramId());
-            }
-        } else if (userReqDto.getTelegramId() != null) {
-            user = userRepository.findByTelegramId(userReqDto.getTelegramId()).orElseThrow(() -> new ResourceNotFoundException("User not found with telegram id " + userReqDto.getTelegramId()));
+    private UserEntity getExistingUser(String username, UserReqDto userReqDto) {
+        UserEntity user = userRepository.findByUsername(username)
+                .orElseThrow(() -> new ResourceNotFoundException("User not found with username " + username));
+        if (userReqDto.getEmail() != null && user.getEmail() != null && !user.getEmail().equals(userReqDto.getEmail())) {
+            log.error("User with username {} has different email {}", username, userReqDto.getEmail());
+            throw new ResourceNotFoundException("User with username " + username + " has different email " + userReqDto.getEmail());
         }
-        if (user == null) {
-            log.error("User not found with email {}, username {} or telegram id {}", userReqDto.getEmail(), userReqDto.getUsername(), userReqDto.getTelegramId());
-            throw new ResourceNotFoundException("User not found. Please provide a valid email and/or username and/or telegram id");
+        if (userReqDto.getTelegramId() != null && user.getTelegramId() != null && !user.getTelegramId().equals(userReqDto.getTelegramId())) {
+            log.error("User with username {} has different telegram id {}", username, userReqDto.getTelegramId());
+            throw new ResourceNotFoundException("User with username " + username + " has different telegram id " + userReqDto.getTelegramId());
         }
         return user;
     }

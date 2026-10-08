@@ -5,6 +5,7 @@ import com.matteopaciolla.portroyal.confs.JOMC_ExpansionDeckDictionary;
 import com.matteopaciolla.portroyal.core.cards.Card;
 import com.matteopaciolla.portroyal.core.cards.contracts.abst.ContractCard;
 import com.matteopaciolla.prbe.constants.Paths;
+import com.matteopaciolla.prbe.exceptions.common.ResourceNotFoundException;
 import com.matteopaciolla.prbe.converter.CardConverter;
 import com.matteopaciolla.prbe.converter.ContractCardConverter;
 import com.matteopaciolla.prbe.dto.CardDto;
@@ -20,7 +21,6 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
-import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.util.ArrayList;
@@ -30,13 +30,12 @@ import java.util.List;
 @SecurityRequirements({@SecurityRequirement(name = "basicAuth")})
 @Slf4j
 @RestController
-@RequestMapping(Paths.CARD_PATH)
 public class CardController {
 
     @Operation(summary = "Get all cards", description = "Get all cards from the game",
             responses = {
                     @ApiResponse(responseCode = "200", description = "List of cards")})
-    @GetMapping(path = "", produces = "application/json")
+    @GetMapping(path = Paths.CARD_PATH, produces = "application/json")
     public ResponseEntity<List<CardDto>> getAllCards() {
         List<Card> cards = new ArrayList<>(BaseDeckDictionary.DECK_LIST);
         cards.addAll(JOMC_ExpansionDeckDictionary.DECK_LIST);
@@ -48,7 +47,7 @@ public class CardController {
     @Operation(summary = "Get all contract cards", description = "Get all contract cards from the game",
             responses = {
                     @ApiResponse(responseCode = "200", description = "List of contract cards")})
-    @GetMapping(path = "/contract", produces = "application/json")
+    @GetMapping(path = Paths.CONTRACT_CARD_PATH, produces = "application/json")
     public ResponseEntity<List<ContractCardDto>> getContractCards() {
         List<ContractCard> contractCards = JOMC_ExpansionDeckDictionary.CONTRACTS_DECK_LIST;
         List<ContractCardDto> contractCardDtos = new ArrayList<>();
@@ -62,14 +61,14 @@ public class CardController {
                             content = @Content(mediaType = "application/json", schema = @Schema(implementation = CardDto.class))),
                     @ApiResponse(responseCode = "404", description = "Card not found",
                             content = @Content(mediaType = "application/json"))})
-    @GetMapping(path = "/{id}", produces = "application/json")
+    @GetMapping(path = Paths.CARD_PATH + "/{id}", produces = "application/json")
     public ResponseEntity<CardDto> getCardById(@PathVariable int id) {
         Card card = BaseDeckDictionary.DECK_MAP.get(id);
         if (card == null) {
             card = JOMC_ExpansionDeckDictionary.DECK_MAP.get(id);
         }
         if (card == null) {
-            return ResponseEntity.notFound().build();
+            throw new ResourceNotFoundException("Card with id " + id + " was not found.");
         }
         return ResponseEntity.ok(CardConverter.toDto(card));
     }
@@ -78,11 +77,11 @@ public class CardController {
             responses = {
                     @ApiResponse(responseCode = "200", description = "Contract card found"),
                     @ApiResponse(responseCode = "404", description = "Contract card not found")})
-    @GetMapping(path = "/contract/{id}", produces = "application/json")
+    @GetMapping(path = Paths.CONTRACT_CARD_PATH + "/{id}", produces = "application/json")
     public ResponseEntity<ContractCardDto> getContractCardById(@PathVariable int id) {
         ContractCard contractCard = JOMC_ExpansionDeckDictionary.CONTRACTS_DECK_MAP.get(id);
         if (contractCard == null) {
-            return ResponseEntity.notFound().build();
+            throw new ResourceNotFoundException("Contract card with id " + id + " was not found.");
         }
         return ResponseEntity.ok(ContractCardConverter.toDto(contractCard));
     }

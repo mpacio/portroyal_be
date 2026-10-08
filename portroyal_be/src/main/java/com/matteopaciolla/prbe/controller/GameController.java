@@ -36,7 +36,7 @@ import static com.matteopaciolla.prbe.util.AuthenticationUtils.isBotUser;
 @SecurityRequirements({@SecurityRequirement(name = "basicAuth")})
 @Slf4j
 @RestController
-@RequestMapping(Paths.GAME_PATH)
+@RequestMapping(Paths.MATCH_PATH)
 public class GameController {
 
     private static final String BH = CommonConstants.BOT_MANDATORY_HEADER;
@@ -63,7 +63,7 @@ public class GameController {
                     @ApiResponse(responseCode = "401", description = "Authentication required")
             }
     )
-    @PostMapping(path = "/move", consumes = "application/json", produces = "application/json")
+    @PostMapping(path = "/current/moves", consumes = "application/json", produces = "application/json")
     public ResponseEntity<MoveResponse> move(
             @RequestHeader(value = BH, required = false) String tgId,
             @Valid @RequestBody MoveReqDto moveReqDto) {
@@ -88,12 +88,12 @@ public class GameController {
                     @ApiResponse(responseCode = "404", description = "Match or move not found")
             }
     )
-    @GetMapping("/move")
+    @GetMapping("/{keyCode}/moves/{moveNumber}")
     public ResponseEntity<MoveResponse> getMove(
             @Parameter(description = "Unique match key code", example = "ABC123", required = true)
-            @RequestParam String keyCode,
+            @PathVariable String keyCode,
             @Parameter(description = "Move number to retrieve", example = "12", required = true)
-            @RequestParam int moveNumber) {
+            @PathVariable int moveNumber) {
         return ResponseEntity.ok(gameService.getMove(keyCode, moveNumber));
     }
 
@@ -106,18 +106,18 @@ public class GameController {
                     @ApiResponse(responseCode = "404", description = "Match not found")
             }
     )
-    @GetMapping("/moves")
+    @GetMapping("/{keyCode}/moves")
     public ResponseEntity<MovesPageResponse> getMoves(
           @Parameter(description = "Unique match key code", example = "ABC123", required = true)
-          @RequestParam String keyCode,
+          @PathVariable String keyCode,
           @Parameter(description = "Zero-based page number", example = "0", required = false)
-          @RequestParam(defaultValue = "0") Integer pageNumber,
+          @RequestParam(name = "page_number", defaultValue = "0") Integer pageNumber,
           @Parameter(description = "Page size", example = "10", required = false)
-          @RequestParam(defaultValue = "10") Integer pageSize,
+          @RequestParam(name = "page_size", defaultValue = "10") Integer pageSize,
           @Parameter(description = "Field used to sort move records", example = "TIME_INDEX", required = false)
-          @RequestParam(defaultValue = "TIME_INDEX") MoveRepository.SortField sortField,
+          @RequestParam(name = "sort_field", defaultValue = "TIME_INDEX") MoveRepository.SortField sortField,
           @Parameter(description = "Sort direction", example = "ASC", required = false)
-          @RequestParam(defaultValue = "ASC") Sort.Direction sortDirection) {
+          @RequestParam(name = "sort_direction", defaultValue = "ASC") Sort.Direction sortDirection) {
         return ResponseEntity.ok(gameService.getMoves(keyCode, pageNumber, pageSize, sortField, sortDirection));
     }
 }

@@ -1,6 +1,7 @@
 package com.matteopaciolla.prbe.service;
 
 import com.matteopaciolla.prbe.constants.FakeNames;
+import com.matteopaciolla.prbe.constants.enums.UserRole;
 import com.matteopaciolla.prbe.dto.UserDto;
 import com.matteopaciolla.prbe.dto.request.UserReqDto;
 import com.matteopaciolla.prbe.exceptions.common.MandatoryParamException;
@@ -23,6 +24,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -123,5 +125,32 @@ class UserServiceTest {
 
         assertThat(savedUser.getValue().getFirstName()).isEqualTo("Alice");
         assertThat(savedUser.getValue().getLastName()).isNotBlank();
+    }
+
+    @Test
+    void updateUser_usesPathUsernameWhenBodyOmitsUsername() {
+        UserEntity alice = new UserEntity("alice42", "encoded-password", java.util.List.of(UserRole.USER));
+        alice.setFirstName("Alice");
+        UserReqDto request = new UserReqDto();
+        request.setFirstName("Alicia");
+        when(userRepository.findByUsername("alice42")).thenReturn(Optional.of(alice));
+        when(userRepository.save(alice)).thenReturn(alice);
+
+        userService.updateUser("alice42", request);
+
+        assertThat(alice.getFirstName()).isEqualTo("Alicia");
+        verify(userRepository).findByUsername("alice42");
+        verify(userRepository).save(alice);
+    }
+
+    @Test
+    void updateUser_rejectsUsernameThatDoesNotMatchPath() {
+        UserReqDto request = new UserReqDto();
+        request.setUsername("bob42");
+
+        assertThatThrownBy(() -> userService.updateUser("alice42", request))
+                .isInstanceOf(MandatoryParamException.class);
+
+        verifyNoInteractions(userRepository);
     }
 }

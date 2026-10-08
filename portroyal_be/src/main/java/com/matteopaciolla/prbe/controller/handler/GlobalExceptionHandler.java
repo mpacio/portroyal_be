@@ -1,8 +1,9 @@
 package com.matteopaciolla.prbe.controller.handler;
 
 import com.matteopaciolla.prbe.dto.response.ErrorResponse;
-import com.matteopaciolla.prbe.exceptions.*;
+import com.matteopaciolla.prbe.exceptions.BaseClientCausedException;
 import com.matteopaciolla.prbe.exceptions.common.ResourceNotFoundException;
+import com.matteopaciolla.prbe.exceptions.common.UniqueConstraintViolatedException;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
@@ -16,13 +17,14 @@ import org.springframework.web.bind.annotation.ControllerAdvice;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.ResponseBody;
 import org.springframework.web.bind.annotation.ResponseStatus;
-import org.springframework.web.context.request.async.AsyncRequestNotUsableException;
 import org.springframework.web.context.request.async.AsyncRequestTimeoutException;
 import org.springframework.web.method.annotation.HandlerMethodValidationException;
 import org.springframework.web.servlet.resource.NoResourceFoundException;
 
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.List;
+import java.util.Objects;
 import java.util.stream.Collectors;
 
 @Slf4j
@@ -30,28 +32,18 @@ import java.util.stream.Collectors;
 @ResponseBody
 public class GlobalExceptionHandler {
 
-    // -------------------------------- Spring Exceptions ---------------------------------
-
     @ExceptionHandler(HttpRequestMethodNotSupportedException.class)
     @ResponseStatus(HttpStatus.METHOD_NOT_ALLOWED)
     public ResponseEntity<ErrorResponse> handleMethodNotAllowedException(HttpRequestMethodNotSupportedException e) {
         log.debug("Captured HttpRequestMethodNotSupportedException: {}", e.getMessage());
-        return new ResponseEntity<>(new ErrorResponse(
-                HttpStatus.METHOD_NOT_ALLOWED.value(),
-                HttpStatus.METHOD_NOT_ALLOWED.getReasonPhrase(),
-                e.getMessage()
-        ), HttpStatus.METHOD_NOT_ALLOWED);
+        return error(HttpStatus.METHOD_NOT_ALLOWED, e.getMessage());
     }
 
     @ExceptionHandler(MissingServletRequestParameterException.class)
     @ResponseStatus(HttpStatus.BAD_REQUEST)
     public ResponseEntity<ErrorResponse> handleMissingParams(MissingServletRequestParameterException e) {
         log.debug("Captured MissingServletRequestParameterException: {}", e.getMessage());
-        return new ResponseEntity<>(new ErrorResponse(
-                HttpStatus.BAD_REQUEST.value(),
-                HttpStatus.BAD_REQUEST.getReasonPhrase(),
-                e.getMessage()
-        ), HttpStatus.BAD_REQUEST);
+        return error(HttpStatus.BAD_REQUEST, e.getMessage());
     }
 
     @ExceptionHandler(MethodArgumentNotValidException.class)
@@ -63,132 +55,114 @@ public class GlobalExceptionHandler {
                 .map(error -> new ErrorResponse.ErrorDetail(error.getField(), error.getDefaultMessage()))
                 .collect(Collectors.toList());
         log.debug("Captured MethodArgumentNotValidException: {}", details);
-        return new ResponseEntity<>(new ErrorResponse(
-                HttpStatus.BAD_REQUEST.value(),
-                HttpStatus.BAD_REQUEST.getReasonPhrase(),
-                "Invalid input",
-                details
-        ), HttpStatus.BAD_REQUEST);
+        return error(HttpStatus.BAD_REQUEST, "Invalid request.", details);
     }
 
     @ExceptionHandler(NoResourceFoundException.class)
     @ResponseStatus(HttpStatus.NOT_FOUND)
     public ResponseEntity<ErrorResponse> handleNoResourceFoundException(NoResourceFoundException e) {
         log.debug("Captured NoResourceFoundException: {}", e.getMessage());
-        return new ResponseEntity<>(new ErrorResponse(
-                HttpStatus.NOT_FOUND.value(),
-                HttpStatus.NOT_FOUND.getReasonPhrase(),
-                e.getMessage()
-        ), HttpStatus.NOT_FOUND);
+        return error(HttpStatus.NOT_FOUND, "Resource not found.");
     }
 
     @ExceptionHandler(HandlerMethodValidationException.class)
     @ResponseStatus(HttpStatus.BAD_REQUEST)
     public ResponseEntity<ErrorResponse> handleHandlerMethodValidationException(HandlerMethodValidationException e) {
         List<ErrorResponse.ErrorDetail> details = e.getAllValidationResults().stream()
-                .map(vr -> {
-                    String key = vr.getMethodParameter().toString();
-                    String value = vr.getResolvableErrors().getFirst().getDefaultMessage();
-                    return new ErrorResponse.ErrorDetail(key, value);
-                })
+                .flatMap(result -> result.getResolvableErrors().stream()
+                        .map(validationError -> new ErrorResponse.ErrorDetail(
+                                Objects.toString(result.getMethodParameter().getParameterName(), "request"),
+                                validationError.getDefaultMessage())))
                 .collect(Collectors.toList());
         log.debug("Captured HandlerMethodValidationException: {}", details);
-        return new ResponseEntity<>(new ErrorResponse(
-                HttpStatus.BAD_REQUEST.value(),
-                HttpStatus.BAD_REQUEST.getReasonPhrase(),
-                "Invalid input",
-                details
-        ), HttpStatus.BAD_REQUEST);
+        return error(HttpStatus.BAD_REQUEST, "Invalid request.", details);
     }
 
     @ExceptionHandler(HttpMediaTypeNotSupportedException.class)
     @ResponseStatus(HttpStatus.UNSUPPORTED_MEDIA_TYPE)
     public ResponseEntity<ErrorResponse> handleHttpMediaTypeNotSupportedException(HttpMediaTypeNotSupportedException e) {
         log.debug("Captured HttpMediaTypeNotSupportedException: {}", e.getMessage());
-        return new ResponseEntity<>(new ErrorResponse(
-                HttpStatus.UNSUPPORTED_MEDIA_TYPE.value(),
-                HttpStatus.UNSUPPORTED_MEDIA_TYPE.getReasonPhrase(),
-                e.getMessage()
-        ), HttpStatus.UNSUPPORTED_MEDIA_TYPE);
+        return error(HttpStatus.UNSUPPORTED_MEDIA_TYPE, "Unsupported content type.");
     }
 
     @ExceptionHandler(HttpMessageNotReadableException.class)
     @ResponseStatus(HttpStatus.BAD_REQUEST)
     public ResponseEntity<ErrorResponse> handleHttpMessageNotReadableException(HttpMessageNotReadableException e) {
         log.debug("Captured HttpMessageNotReadableException: {}", e.getMessage());
-        return new ResponseEntity<>(new ErrorResponse(
-                HttpStatus.BAD_REQUEST.value(),
-                HttpStatus.BAD_REQUEST.getReasonPhrase(),
-                e.getMessage()
-        ), HttpStatus.BAD_REQUEST);
+        return error(HttpStatus.BAD_REQUEST, "Request body is missing or invalid.");
     }
 
     @ExceptionHandler(AsyncRequestTimeoutException.class)
     @ResponseStatus(HttpStatus.REQUEST_TIMEOUT)
     public ResponseEntity<ErrorResponse> handleAsyncRequestTimeoutException(AsyncRequestTimeoutException e) {
         log.debug("Captured AsyncRequestTimeoutException: {}", e.getMessage());
-        return new ResponseEntity<>(new ErrorResponse(
-                HttpStatus.REQUEST_TIMEOUT.value(),
-                HttpStatus.REQUEST_TIMEOUT.getReasonPhrase(),
-                e.getMessage()
-        ), HttpStatus.REQUEST_TIMEOUT);
+        return error(HttpStatus.REQUEST_TIMEOUT, "Request timed out.");
     }
 
     @ExceptionHandler(IOException.class)
     @ResponseStatus(HttpStatus.INTERNAL_SERVER_ERROR)
     public ResponseEntity<ErrorResponse> handleIOException(IOException e) {
-        if (e.getMessage().equals("An established connection was aborted by the software in your host machine")) {
-            log.error("Captured IOException: {}", e.getMessage());
-        } else {
-            log.error("Captured IOException: {}", e.getMessage(), e);
-        }
-        return new ResponseEntity<>(new ErrorResponse(
-                HttpStatus.INTERNAL_SERVER_ERROR.value(),
-                HttpStatus.INTERNAL_SERVER_ERROR.getReasonPhrase(),
-                e.getMessage()
-        ), HttpStatus.INTERNAL_SERVER_ERROR);
+        log.error("Captured IOException: {}", e.getMessage(), e);
+        return error(HttpStatus.INTERNAL_SERVER_ERROR, "The request could not be completed.");
     }
-
-    // -------------------------------- Custom Exceptions ---------------------------------
 
     @ExceptionHandler(ResourceNotFoundException.class)
     @ResponseStatus(HttpStatus.NOT_FOUND)
     public ResponseEntity<ErrorResponse> handleResourceNotFoundException(ResourceNotFoundException e) {
         log.debug("Captured ResourceNotFoundException: {}", e.getMessage());
-        return new ResponseEntity<>(new ErrorResponse(
-                HttpStatus.NOT_FOUND.value(),
-                HttpStatus.NOT_FOUND.getReasonPhrase(),
-                e.getMessage()
-        ), HttpStatus.NOT_FOUND);
+        return error(HttpStatus.NOT_FOUND, e.getMessage(),
+                List.of(new ErrorResponse.ErrorDetail("resource", e.getDescription())));
+    }
+
+    @ExceptionHandler(UniqueConstraintViolatedException.class)
+    @ResponseStatus(HttpStatus.CONFLICT)
+    public ResponseEntity<ErrorResponse> handleUniqueConstraintViolatedException(UniqueConstraintViolatedException e) {
+        log.debug("Captured UniqueConstraintViolatedException: {}", e.getMessage());
+        List<ErrorResponse.ErrorDetail> details = new ArrayList<>();
+        if (e.getDescription() != null) {
+            details.add(new ErrorResponse.ErrorDetail("description", e.getDescription()));
+        }
+        if (e.getSuggestion() != null) {
+            details.add(new ErrorResponse.ErrorDetail("suggestion", e.getSuggestion()));
+        }
+        return error(HttpStatus.CONFLICT, e.getMessage(), details);
     }
 
     @ExceptionHandler(BaseClientCausedException.class)
     @ResponseStatus(HttpStatus.BAD_REQUEST)
     public ResponseEntity<ErrorResponse> handleBaseClientCausedException(BaseClientCausedException e) {
         log.debug("Captured BaseClientCausedException: {}", e.getMessage());
-        ErrorResponse res = new ErrorResponse(
-                HttpStatus.BAD_REQUEST.value(),
-                HttpStatus.BAD_REQUEST.getReasonPhrase(),
-                e.getMessage(),
-                e.getDescription(),
-                e.getSuggestion()
-        );
+        List<ErrorResponse.ErrorDetail> details = new ArrayList<>();
         if (e.getDetails() != null) {
-            res.setErrorDetails(e.getDetails().entrySet().stream()
-                    .map(entry -> new ErrorResponse.ErrorDetail(entry.getKey(), entry.getValue()))
-                    .collect(Collectors.toList()));
+            e.getDetails().forEach((field, message) ->
+                    details.add(new ErrorResponse.ErrorDetail(field, message)));
         }
-        return new ResponseEntity<>(res, HttpStatus.BAD_REQUEST);
+        if (e.getDescription() != null) {
+            details.add(new ErrorResponse.ErrorDetail("description", e.getDescription()));
+        }
+        if (e.getSuggestion() != null) {
+            details.add(new ErrorResponse.ErrorDetail("suggestion", e.getSuggestion()));
+        }
+        return error(HttpStatus.BAD_REQUEST, e.getMessage(), details);
     }
-
-    // -------------------------------- General Exception Handler ---------------------------------
 
     @ExceptionHandler(Exception.class)
     @ResponseStatus(HttpStatus.INTERNAL_SERVER_ERROR)
     public ResponseEntity<ErrorResponse> handleGeneralExceptions(Exception e) {
         log.error("Captured Exception: {}", e.getMessage(), e);
-        return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                .contentType(MediaType.TEXT_PLAIN)
-                .body(new ErrorResponse(HttpStatus.INTERNAL_SERVER_ERROR.value(), "Internal Server Error: " + e.getMessage()));
+        return error(HttpStatus.INTERNAL_SERVER_ERROR, "An unexpected error occurred.");
+    }
+
+    private ResponseEntity<ErrorResponse> error(HttpStatus status, String message) {
+        return error(status, message, null);
+    }
+
+    private ResponseEntity<ErrorResponse> error(
+            HttpStatus status,
+            String message,
+            List<ErrorResponse.ErrorDetail> details) {
+        return ResponseEntity.status(status)
+                .contentType(MediaType.APPLICATION_JSON)
+                .body(new ErrorResponse(status, message, details));
     }
 }

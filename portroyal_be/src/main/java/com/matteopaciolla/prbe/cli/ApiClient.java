@@ -79,7 +79,14 @@ public final class ApiClient {
             return true;
         }
         String lower = path.toLowerCase();
-        return lower.contains("/public/") || lower.contains("/public") || lower.startsWith("/login") || lower.startsWith("/perform_login");
+        int queryStart = lower.indexOf('?');
+        String endpoint = queryStart >= 0 ? lower.substring(0, queryStart) : lower;
+        return endpoint.equals("/api/v1/users")
+                || endpoint.equals("/api/v1/email-confirmations")
+                || endpoint.equals("/api/v1/telegram-account-verifications")
+                || endpoint.equals("/public/confirmemail")
+                || endpoint.startsWith("/login")
+                || endpoint.startsWith("/perform_login");
     }
 
     public static String prettyPrint(String rawBody) {

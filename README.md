@@ -80,12 +80,12 @@ authentication model.
   once, safely drives moves and matches for many different real players**, each still tracked and
   authorized as themselves at the domain level (moves/matches remain associated with the human
   player's `UserEntity`, not with the bot).
-- A player can be registered directly through the bot (`POST /api/v1/user/register/telegram`, `hasRole(BOT)`)
+- A player can be registered directly through the bot (`POST /api/v1/users/telegram`, `hasRole(BOT)`)
   using only their Telegram id, or through a normal web/app registration
-  (`POST /api/v1/public/register`) using username/email/password.
+  (`POST /api/v1/users`) using username/email/password.
 - The two identities can later be **unified**: a Telegram-only user requests a one-time code sent to
-  an email address (`GET /api/v1/public/newTgUnifyEmailOtp`), then confirms the pairing through the bot
-  (`POST /api/v1/user/unify`, `hasRole(BOT)`, backed by the OTP/`temporary_tokens` table). After unification,
+  an email address (`POST /api/v1/telegram-account-verifications`), then confirms the pairing through the bot
+  (`PUT /api/v1/users/telegram-account`, `hasRole(BOT)`, backed by the OTP/`temporary_tokens` table). After unification,
   the same physical player can keep playing the very same match indifferently from the web front end
   or from Telegram — the API always resolves to the same `UserEntity` regardless of which channel is
   used to reach it.
@@ -111,9 +111,9 @@ computed by the backend.
   combines humans (`players`) and AI players (`aiPlayers`) — in that order — to build the library's
   ordered player list and to resolve `moves.active_player_username`/`running_player_username` by
   index.
-- `POST /match/ai-player` (host-only, match not yet started) adds an AI player with a chosen
+- `POST /matches/current/ai-players` (host-only, match not yet started) adds an AI player with a chosen
   `BotDifficulty` (`EASY`/`MEDIUM`/`HARD`) and an optional display name; `DELETE
-  /match/ai-player?aiPlayerUsername=...` removes one before the match starts.
+  `/matches/current/ai-players/{aiPlayerUsername}` removes one before the match starts.
 - Once the match is running, `GameService#autoPlayAiTurns` plays out every consecutive AI player
   turn by calling `Match#calculateNextMoveRecord(BotDifficulty)` (already implemented and tested in
   `portroyal_lib`) and persisting the resulting moves exactly like a human move — no game-rule logic
@@ -153,17 +153,17 @@ This works because of a specific design:
    are written to an `emails_queue` table (`EmailSenderFacade`) rather than sent synchronously from
    request-handling memory, keeping request handling itself stateless.
 
-**Known exception — real-time push notifications.** The `sentinel` long-polling
-(`GET /sentinel/long-polling/subscribe`) and Server-Sent-Events
-(`GET /sentinel/sse/subscribe`) endpoints keep their pending subscriptions
+**Known exception — real-time push notifications.** Match alert long-polling
+(`GET /matches/{keyCode}/alerts`) and Server-Sent-Events
+(`GET /matches/{keyCode}/alerts/stream`) keep their pending subscriptions
 (`SentinelService#matchSubsMap`, holding `DeferredResult`/`SseEmitter` instances) **in local JVM
 memory of the instance that accepted the subscription**. If a move is processed by a *different*
 instance than the one holding a given subscription, that subscription will not be notified
 in-process. Deploying these two endpoints behind a load balancer therefore requires **sticky
 routing/session affinity** for the lifetime of a subscription, or accepting that push notifications
 may be missed when instances change mid-subscription (the client can always fall back to polling
-`GET /match/retrieve?keyCode=...&moveNumber=...`, which is instance-agnostic by design). The
-webhook-style alternative, `POST /sentinel/callback/subscribe`, has no such limitation: it stores the
+`GET /matches/{keyCode}?move_number=...`, which is instance-agnostic by design). The
+webhook-style alternative, `POST /matches/{keyCode}/subscriptions`, has no such limitation: it stores the
 callback URL in the database (`callbacks` table) and is invoked by whichever instance happens to
 process the triggering move, so it works correctly with any load-balancing strategy.
 
@@ -287,40 +287,50 @@ standing up the full API/database stack.
   callers mediate for other users via the `tgId` header) and `AI` (autonomous, per-match AI players
   that never authenticate — see [Autonomous (AI) players](#autonomous-ai-players)).
 
-| Tag         | Base path          | Purpose                                                                                                     |
-|-------------|--------------------|-------------------------------------------------------------------------------------------------------------|
-| Public      | `/api/v1/public`   | Public JSON registration/OTP; HTML email confirmation at server-root `/public/confirmEmail`                 |
-| User        | `/api/v1/user`     | Current-user lookup, retrieve/update/delete users, password change, bot registration & Telegram unification |
-| Match       | `/api/v1/match`    | Host/join/start/close a match, list matches, poll match status/state                                        |
-| Move (Game) | `/api/v1/game`     | Play a move, fetch a single move or paged move history                                                      |
-| Cards       | `/api/v1/card`     | Read-only catalog of cards and contract cards from `portroyal_lib`'s deck dictionaries                      |
-| Sentinel    | `/api/v1/sentinel` | Real-time match notifications: webhook callback, long polling, Server-Sent Events, unsubscribe              |
+| Resource group | Base path                    | Purpose                                                                            |
+|----------------|------------------------------|------------------------------------------------------------------------------------|
+| Users          | `/api/v1/users`              | User profiles, registration, identity resolution, and Telegram account linking     |
+| Matches        | `/api/v1/matches`            | Match lifecycle, players, moves, and notifications                                 |
+| Cards          | `/api/v1/cards`              | Read-only catalog of cards from `portroyal_lib`                                    |
+| Contract cards | `/api/v1/contract-cards`     | Read-only catalog of contract cards                                                |
+| Email          | `/api/v1/email-confirmations`| Public email confirmation requests; HTML confirmation remains `/public/confirmEmail` |
+| Telegram       | `/api/v1/telegram-account-verifications` | Public OTP requests for linking Telegram and email accounts            |
 
 Selected endpoints:
 
 Paths in this table are relative to `/api/v1`.
 
-| Method & path                                      | Description                                                                                                                             |
-|----------------------------------------------------|-----------------------------------------------------------------------------------------------------------------------------------------|
-| `POST /public/register`                            | Register a new user (username/email/password, web/app flow)                                                                             |
-| `POST /user/register/telegram`                     | Register a new user from the bot (Telegram id only) — `BOT` role only                                                                   |
-| `GET /public/newTgUnifyEmailOtp`                   | Request an OTP to unify a Telegram id with an email account                                                                             |
-| `POST /user/unify`                                 | Confirm Telegram/email unification with the OTP — `BOT` role only                                                                       |
-| `GET /user/me`                                     | Get the currently authenticated user                                                                                                    |
-| `POST /match/host`                                 | Host a new match (optionally with a custom configuration)                                                                               |
-| `PUT /match/join?keyCode=...`                      | Join an open, not-yet-started match                                                                                                     |
-| `PUT /match/start`                                 | Start the match you are hosting (requires ≥ 2 players)                                                                                  |
-| `POST /match/ai-player`                            | Add an autonomous AI player (`EASY`/`MEDIUM`/`HARD`) to the match you are hosting, before it starts                                     |
-| `DELETE /match/ai-player?aiPlayerUsername=...`     | Remove a previously added AI player from the match you are hosting, before it starts                                                    |
-| `GET /match/status`                                | Get the match currently being played by the caller, if any                                                                              |
-| `GET /match/status?moveNumber=...`                 | If `moveNumber` equals the current move count, returns "No new moves"; otherwise returns the current match                              |
-| `GET /match/retrieve?keyCode=...&moveNumber=...`   | Get full match state; poll with `moveNumber` to cheaply check "any new moves?"                                                          |
-| `POST /game/move`                                  | Play a move (`DISCOVER`, `TRADE`, `HIRE`, `COMMIT_EXPEDITION`, `SIGN_CONTRACT`, `END_TURN`, ...); validated entirely by `portroyal_lib` |
-| `GET /game/moves?keyCode=...`                      | Paged move history of a match                                                                                                           |
-| `GET /card`, `GET /card/contract`                  | Static card catalog                                                                                                                     |
-| `POST /sentinel/callback/subscribe`                | Register a webhook URL to be called on match alerts (works across any instance)                                                         |
-| `GET /sentinel/long-polling/subscribe?keyCode=...` | Long-poll for the next match alert (requires sticky routing at scale)                                                                   |
-| `GET /sentinel/sse/subscribe?keyCode=...`          | Subscribe to match alerts via Server-Sent Events (requires sticky routing at scale)                                                     |
+| Method & path | Description |
+|---|---|
+| `POST /users` | Public registration with username/email/password |
+| `POST /users/telegram` | Bot-only Telegram player registration |
+| `POST /email-confirmations` | Public email confirmation request; JSON body contains `email` |
+| `POST /telegram-account-verifications` | Public Telegram/email linking OTP request |
+| `PUT /users/telegram-account` | Bot-only Telegram/email account unification |
+| `GET /users/me` | Get the authenticated account |
+| `GET /users/identity?username=...` | Resolve a user by `username`, `telegram_id`, or `email` |
+| `GET /matches` | List matches; supports filtering, pagination, and sorting |
+| `POST /matches` | Host a match (optionally with a custom configuration) |
+| `POST /matches/{keyCode}/players` | Join an open, not-yet-started match |
+| `PATCH /matches/current/status` | Set current match lifecycle status to `STARTED` or `CLOSED` |
+| `GET /matches/current` | Get the match currently being played by the caller |
+| `GET /matches/{keyCode}` | Get match state; optional `move_number` checks whether the state changed |
+| `POST /matches/current/ai-players` | Add an AI player before the match starts |
+| `DELETE /matches/current/ai-players/{aiPlayerUsername}` | Remove an AI player before the match starts |
+| `POST /matches/current/moves` | Play a move validated entirely by `portroyal_lib` |
+| `GET /matches/{keyCode}/moves` | Get paginated match move history |
+| `GET /matches/{keyCode}/moves/{moveNumber}` | Get one persisted move |
+| `GET /cards`, `GET /contract-cards` | Read card catalogs |
+| `POST /matches/{keyCode}/subscriptions` | Register a webhook callback for match alerts |
+| `GET /matches/{keyCode}/alerts` | Long-poll for the next alert |
+| `GET /matches/{keyCode}/alerts/stream` | Subscribe to match alerts via Server-Sent Events |
+| `DELETE /matches/{keyCode}/subscriptions/current` | Remove the caller's notification subscription |
+
+Paths use lowercase plural resource names and kebab-case segments; compound query parameter names
+use underscores (for example, `page_number`, `page_size`, `sort_field`, and `move_number`). JSON
+properties remain camelCase. The replacement routes intentionally have no legacy aliases, even
+though they remain under `/api/v1`; clients must migrate. Errors are JSON objects with `status`,
+`code`, `message`, optional `details`, and `timestamp`. Rate limiting is deferred.
 
 Bot-mediated calls (`MatchController`, `GameController`, `UserController#registerTelegramPlayer`,
 `UserController#unifyTelegramAndEmailAccounts`) require the `tgId` request header, set to the

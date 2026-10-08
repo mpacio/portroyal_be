@@ -75,7 +75,7 @@ public class UserController {
      */
     @Operation(
             summary = "Retrieve a user",
-            description = "Resolve a user by username, telegram id or email. When multiple identifiers are provided, username takes precedence, then telegramId, then email.",
+            description = "Resolve a user by username, telegram_id or email. When multiple identifiers are provided, username takes precedence, then telegram_id, then email.",
             responses = {
                     @ApiResponse(responseCode = "200", description = "User found",
                             content = @Content(mediaType = "application/json", schema = @Schema(implementation = UserResponse.class))),
@@ -83,16 +83,16 @@ public class UserController {
                     @ApiResponse(responseCode = "404", description = "User not found")
             }
     )
-    @GetMapping(path = {"/retrieve", ""})
+    @GetMapping(path = "/identity")
     public ResponseEntity<UserResponse> getUser(
             @Parameter(description = "Username to resolve. Highest priority among identifiers.", example = "alice", required = false)
             @RequestParam(value = "username", required = false) String username,
             @Parameter(description = "Telegram id to resolve. Used when username is absent.", example = "123456789", required = false)
-            @RequestParam(value = "telegramId", required = false) String telegramId,
+            @RequestParam(value = "telegram_id", required = false) String telegramId,
             @Parameter(description = "Email to resolve. Used when username and telegramId are absent.", example = "alice@example.com", required = false)
             @RequestParam(value = "email", required = false) String email) {
         if (username == null && telegramId == null && email == null) {
-            throw new MandatoryParamException("At least one of these parameters must be provided", List.of("username", "telegramId", "email"));
+            throw new MandatoryParamException("At least one of these parameters must be provided", List.of("username", "telegram_id", "email"));
         }
 
         UserDto userDto;
@@ -111,36 +111,36 @@ public class UserController {
             summary = "Delete a user",
             description = "Deletes the specified user. Admins can delete any user; regular users can only delete their own account.",
             responses = {
-                    @ApiResponse(responseCode = "200", description = "User deleted successfully"),
+                    @ApiResponse(responseCode = "204", description = "User deleted successfully"),
                     @ApiResponse(responseCode = "403", description = "Forbidden for the current principal")
             }
     )
     @PreAuthorize("hasAuthority('ROLE_ADMIN') or #username == authentication.name")
-    @DeleteMapping(path = "/delete")
-    public ResponseEntity<VoidResponse> deleteUser(@Parameter(description = "Username to delete", required = true, example = "alice") @RequestParam String username) {
+    @DeleteMapping(path = "/{username}")
+    public ResponseEntity<Void> deleteUser(@Parameter(description = "Username to delete", required = true, example = "alice") @PathVariable String username) {
         userService.deleteUser(username);
         log.info("User {} deleted successfully", username);
-        return ResponseEntity.ok(new VoidResponse("User deleted successfully"));
+        return ResponseEntity.noContent().build();
     }
 
     @Operation(
             summary = "Update a user",
-            description = "Updates the profile data for the specified user. The username in query string identifies the subject; the body contains the new profile values.",
+            description = "Updates the profile data for the specified user. The username path segment identifies the subject; the body contains the new profile values.",
             responses = {
                     @ApiResponse(responseCode = "200", description = "User updated successfully",
                             content = @Content(mediaType = "application/json", schema = @Schema(implementation = UserResponse.class))),
                     @ApiResponse(responseCode = "400", description = "Validation error")
             }
     )
-    @PutMapping(path = "/update")
+    @PatchMapping(path = "/{username}")
     public ResponseEntity<UserResponse> updateUser(
             @Parameter(description = "Username of the user to update", required = true, example = "alice")
-            @RequestParam String username,
-            @RequestBody UserReqDto userDto) {
+            @PathVariable String username,
+            @Valid @RequestBody UserReqDto userDto) {
         if (username == null ||username.isBlank()) {
             throw new MandatoryParamException(List.of("username"));
         }
-        UserDto updatedUser = userService.updateUser(userDto);
+        UserDto updatedUser = userService.updateUser(username, userDto);
         return ResponseEntity.ok(new UserResponse(updatedUser));
     }
 
@@ -152,10 +152,10 @@ public class UserController {
                     @ApiResponse(responseCode = "400", description = "New password is empty or invalid")
             }
     )
-    @PostMapping(path = "/changePsw")
+    @PatchMapping(path = "/me/password")
     public ResponseEntity<VoidResponse> changePassword(@RequestBody ChangePasswordReqDto cpd) {
         if (cpd == null || cpd.getNewPassword() == null || cpd.getNewPassword().isBlank()) {
-            return ResponseEntity.badRequest().body(new VoidResponse("New password cannot be empty"));
+            throw new MandatoryParamException(List.of("newPassword"));
         }
         String username = SecurityContextHolder.getContext().getAuthentication().getName();
         userService.changePassword(username,cpd.getOldPassword(), cpd.getNewPassword());
@@ -171,7 +171,7 @@ public class UserController {
                                     examples = @ExampleObject(value = "{\"status\":201,\"message\":\"User registered successfully by the bot\",\"data\":{\"id\":5,\"username\":\"telegram-user\",\"telegramId\":\"123456789\",\"enabled\":true,\"roles\":[\"USER\"]}}")))
             }
     )
-    @PostMapping(path = "/register/telegram")
+    @PostMapping(path = "/telegram")
     public ResponseEntity<UserResponse> registerTelegramPlayer(@Valid @RequestBody UserReqDto userReqDto) {
         UserDto savedUserDto = userService.registerUser(userReqDto, true);
         log.info("User {} registered successfully by bot with id {}", savedUserDto.getUsername(), savedUserDto.getId());
@@ -188,7 +188,7 @@ public class UserController {
                     @ApiResponse(responseCode = "400", description = "Validation or OTP failure")
             }
     )
-    @PostMapping(path = "/unify")
+    @PutMapping(path = "/telegram-account")
     public ResponseEntity<UserResponse> unifyTelegramAndEmailAccounts(@Valid @RequestBody TgAccountUnificationRequest request) {
         UserDto userDto = userService.unifyTelegramAndEmailAccounts(request.getEmail(), request.getTelegramId(), request.getToken());
         return ResponseEntity.ok(new UserResponse("Telegram and email accounts unified successfully", userDto));

@@ -1,6 +1,8 @@
 package com.matteopaciolla.prbe.config;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.matteopaciolla.prbe.constants.Paths;
+import com.matteopaciolla.prbe.security.ApiSecurityErrorHandler;
 import com.matteopaciolla.prbe.constants.enums.UserRole;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -14,6 +16,7 @@ import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
+import org.springframework.security.web.util.matcher.AntPathRequestMatcher;
 import org.springframework.security.web.session.HttpSessionEventPublisher;
 import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
@@ -27,7 +30,8 @@ import java.util.List;
 public class WebSecurityConfig {
 
     @Bean
-    public SecurityFilterChain defaultSecurityFilterChain(HttpSecurity http) throws Exception {
+    public SecurityFilterChain defaultSecurityFilterChain(HttpSecurity http, ObjectMapper objectMapper) throws Exception {
+        ApiSecurityErrorHandler apiSecurityErrorHandler = new ApiSecurityErrorHandler(objectMapper);
         http
             .cors(Customizer.withDefaults())
             .csrf(AbstractHttpConfigurer::disable)
@@ -37,15 +41,17 @@ public class WebSecurityConfig {
                             .requestMatchers("/css/**").permitAll() //static css files
                             .requestMatchers("/js/**").permitAll() //static js files
                             .requestMatchers("/login").permitAll() //login page
-                            .requestMatchers(Paths.BASE_API_PATH + Paths.PUBLIC_PATH + "/**").permitAll() //public API paths
                             .requestMatchers(Paths.PUBLIC_PATH + "/confirmEmail").permitAll() //HTML email confirmation page
 
                             .requestMatchers(HttpMethod.GET,"/swagger-ui/**").permitAll()
                             .requestMatchers(HttpMethod.GET,Paths.BASE_API_PATH + "/api-docs/**").permitAll()
                             .requestMatchers(HttpMethod.GET,Paths.BASE_API_PATH + "/api-docs.yaml").permitAll()
 
-                            .requestMatchers(HttpMethod.POST,   Paths.BASE_API_PATH + Paths.USER_PATH + "/unify").hasRole(UserRole.BOT.name())
-                            .requestMatchers(HttpMethod.POST,   Paths.BASE_API_PATH + Paths.USER_PATH + "/register/telegram").hasRole(UserRole.BOT.name())
+                            .requestMatchers(HttpMethod.POST, Paths.BASE_API_PATH + Paths.USER_PATH + "/telegram").hasRole(UserRole.BOT.name())
+                            .requestMatchers(HttpMethod.PUT, Paths.BASE_API_PATH + Paths.USER_PATH + "/telegram-account").hasRole(UserRole.BOT.name())
+                            .requestMatchers(HttpMethod.POST, Paths.BASE_API_PATH + Paths.USER_PATH).permitAll()
+                            .requestMatchers(HttpMethod.POST, Paths.BASE_API_PATH + Paths.EMAIL_CONFIRMATION_PATH).permitAll()
+                            .requestMatchers(HttpMethod.POST, Paths.BASE_API_PATH + Paths.TELEGRAM_ACCOUNT_VERIFICATION_PATH).permitAll()
 //                            .requestMatchers(HttpMethod.PUT,    Paths.BASE_API_PATH + Paths.USER_PATH + "/**").hasAnyRole(UserRole.ADMIN.name(), UserRole.BOT.name())
                             .requestMatchers(HttpMethod.DELETE, Paths.BASE_API_PATH + Paths.USER_PATH + "/**").hasAnyRole(UserRole.ADMIN.name())// only admin can delete users
 
@@ -65,6 +71,11 @@ public class WebSecurityConfig {
                     .permitAll() // Allow everyone to see the login page
             )
             .logout(logout -> logout.logoutSuccessUrl("/login?logout=true").invalidateHttpSession(true).permitAll())
+            .exceptionHandling(exceptionHandling -> exceptionHandling
+                    .defaultAuthenticationEntryPointFor(apiSecurityErrorHandler,
+                            new AntPathRequestMatcher(Paths.BASE_API_PATH + "/**"))
+                    .defaultAccessDeniedHandlerFor(apiSecurityErrorHandler,
+                            new AntPathRequestMatcher(Paths.BASE_API_PATH + "/**")))
             .httpBasic(Customizer.withDefaults())
             .sessionManagement(sessionManagement -> sessionManagement.sessionCreationPolicy(SessionCreationPolicy.IF_REQUIRED)
                 .maximumSessions(1)

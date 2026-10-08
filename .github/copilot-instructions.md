@@ -45,11 +45,11 @@ auth or user-resolution code:
   `AuthenticationUtils.isBotUser()` detects the bot caller; controllers/services then resolve the
   real acting user via `userService.getUserEntityByTelegramId(tgId)` instead of the authenticated
   principal (see `MatchController#getUserEntity`, `GameController#move`).
-- Registration: `POST /api/v1/public/register` (web/app, username/email/password) vs.
-  `POST /api/v1/user/register/telegram` (`BOT` role only, Telegram id only).
-- Identity unification: `GET /api/v1/public/newTgUnifyEmailOtp` + `POST /api/v1/user/unify` (`BOT` role only,
-  OTP via `temporary_tokens`) merges a Telegram-only user with an email account into one
-  `UserEntity`.
+- Registration: `POST /api/v1/users` (web/app, username/email/password) vs.
+  `POST /api/v1/users/telegram` (`BOT` role only, Telegram id only).
+- Identity unification: `POST /api/v1/telegram-account-verifications` + `PUT
+  /api/v1/users/telegram-account` (`BOT` role only, OTP via `temporary_tokens`) merges a
+  Telegram-only user with an email account into one `UserEntity`.
 - Moves/matches are always keyed by the domain `UserEntity`, never by client type or session.
 
 ## Statelessness / horizontal scaling
@@ -68,7 +68,7 @@ Every `portroyal_be` instance must remain stateless and disposable:
   `emails_queue` / `EmailSenderFacade`).
 - **Known exception:** `sentinel` long-polling and SSE endpoints hold subscriptions
   (`SentinelService#matchSubsMap`) in local JVM memory — these need sticky routing at scale. The
-  webhook alternative (`POST /sentinel/callback/subscribe`, backed by the `callbacks` table) has no
+  webhook alternative (`POST /matches/{keyCode}/subscriptions`, backed by the `callbacks` table) has no
   such limitation. Prefer the webhook/DB-backed pattern for any new cross-instance notification
   feature; if extending long-polling/SSE, keep in mind their sticky-session requirement.
 
@@ -87,10 +87,29 @@ Every `portroyal_be` instance must remain stateless and disposable:
 
 - Base path `/api/v1`; Swagger UI at `/swagger-ui/index.html`, OpenAPI JSON at `/api/v1/api-docs`.
 - HTTP Basic Auth on essentially every endpoint under `/api/v1/**`.
-- Tags/base paths: `public` (no auth), `user`, `match`, `game` (moves), `card` (read-only catalog),
-  `sentinel` (real-time notifications).
-- Bot-mediated endpoints (`MatchController`, `GameController`, `UserController#registerTelegramPlayer`,
-  `UserController#unifyTelegramAndEmailAccounts`) require the `tgId` header.
+- Use lowercase, plural resource names and kebab-case path segments. Use HTTP methods to express
+  the operation; avoid verb-named path segments and keep nesting shallow. Do not restore replaced
+  route aliases: the current `/api/v1` routes are intentionally canonical even though the change
+  breaks old clients.
+- Keep JSON property names in camelCase. Use underscore-separated names for compound query
+  parameters (for example, `move_number`, `page_number`, `page_size`, `sort_field`,
+  `sort_direction`, `telegram_id`). Keep query parameters for list filtering, sorting, and paging.
+- REST groups are resources rather than controller prefixes: `/users`, `/matches`, `/cards`,
+  `/contract-cards`, `/email-confirmations`, and `/telegram-account-verifications`. Moves and
+  notifications are nested under `/matches/{keyCode}`.
+- Use suitable success and error HTTP status codes. REST errors, including API authentication and
+  authorization failures, use JSON with `status`, machine-readable `code`, human-readable
+  `message`, optional `details`, and `timestamp`; do not return internal exception messages in 5xx
+  responses.
+- Public JSON endpoints are `POST /api/v1/users`, `POST /api/v1/email-confirmations`, and
+  `POST /api/v1/telegram-account-verifications`. The HTML email confirmation page remains at
+  `/public/confirmEmail` outside the JSON API.
+- Bot-only registration and unification endpoints are `POST /api/v1/users/telegram` and
+  `PUT /api/v1/users/telegram-account`. Bot-mediated match and move endpoints (`MatchController`,
+  `GameController`) require the `tgId` header where they resolve the acting human; always preserve
+  resolution through `userService.getUserEntityByTelegramId(tgId)`.
+- Rate limiting is not currently implemented. Do not add per-instance-only limits to this
+  horizontally scaled service; introduce it only with an explicit, shared/distributed strategy.
 
 ## Build & test
 
