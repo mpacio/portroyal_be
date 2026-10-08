@@ -47,7 +47,7 @@ public class CardController {
     @Operation(summary = "Get all contract cards", description = "Get all contract cards from the game",
             responses = {
                     @ApiResponse(responseCode = "200", description = "List of contract cards")})
-    @GetMapping(path = Paths.CONTRACT_CARD_PATH, produces = "application/json")
+    @GetMapping(path = Paths.CONTRACT_CARDS_PATH, produces = "application/json")
     public ResponseEntity<List<ContractCardDto>> getContractCards() {
         List<ContractCard> contractCards = JOMC_ExpansionDeckDictionary.CONTRACTS_DECK_LIST;
         List<ContractCardDto> contractCardDtos = new ArrayList<>();
@@ -77,7 +77,7 @@ public class CardController {
             responses = {
                     @ApiResponse(responseCode = "200", description = "Contract card found"),
                     @ApiResponse(responseCode = "404", description = "Contract card not found")})
-    @GetMapping(path = Paths.CONTRACT_CARD_PATH + "/{id}", produces = "application/json")
+    @GetMapping(path = Paths.CONTRACT_CARDS_PATH + "/{id}", produces = "application/json")
     public ResponseEntity<ContractCardDto> getContractCardById(@PathVariable int id) {
         ContractCard contractCard = JOMC_ExpansionDeckDictionary.CONTRACTS_DECK_MAP.get(id);
         if (contractCard == null) {

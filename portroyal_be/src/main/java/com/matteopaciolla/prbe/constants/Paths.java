@@ -9,6 +9,6 @@ public class Paths {
     public static final String TELEGRAM_ACCOUNT_VERIFICATION_PATH = "/telegram-account-verifications";
     public static final String MATCH_PATH = "/matches";
     public static final String CARD_PATH = "/cards";
-    public static final String CONTRACT_CARD_PATH = "/contract-cards";
+    public static final String CONTRACT_CARDS_PATH = CARD_PATH + "/contracts";
     public static final String PUBLIC_PATH = "/public";
 }

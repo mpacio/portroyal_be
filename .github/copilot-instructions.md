@@ -94,8 +94,8 @@ Every `portroyal_be` instance must remain stateless and disposable:
 - Keep JSON property names in camelCase. Use underscore-separated names for compound query
   parameters (for example, `move_number`, `page_number`, `page_size`, `sort_field`,
   `sort_direction`, `telegram_id`). Keep query parameters for list filtering, sorting, and paging.
-- REST groups are resources rather than controller prefixes: `/users`, `/matches`, `/cards`,
-  `/contract-cards`, `/email-confirmations`, and `/telegram-account-verifications`. Moves and
+- REST groups are resources rather than controller prefixes: `/users`, `/matches`, `/cards`
+  (including `/cards/contracts`), `/email-confirmations`, and `/telegram-account-verifications`. Moves and
   notifications are nested under `/matches/{keyCode}`.
 - Use suitable success and error HTTP status codes. REST errors, including API authentication and
   authorization failures, use JSON with `status`, machine-readable `code`, human-readable

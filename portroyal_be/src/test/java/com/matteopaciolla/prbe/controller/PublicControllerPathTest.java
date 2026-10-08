@@ -93,7 +93,8 @@ class PublicControllerPathTest {
                         "/api/v1/matches/current/status",
                         "/api/v1/matches/current/moves",
                         "/api/v1/cards",
-                        "/api/v1/contract-cards",
+                        "/api/v1/cards/contracts",
+                        "/api/v1/cards/contracts/{id}",
                         "/api/v1/matches/{keyCode}/alerts",
                         "/public/confirmEmail")
                 .doesNotContain("/api/v1/public/register",

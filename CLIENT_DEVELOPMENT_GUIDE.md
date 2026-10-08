@@ -28,7 +28,7 @@ use HTTP status codes and the JSON shape `status`, `code`, `message`, optional `
 | `POST /email-confirmations`, `POST /telegram-account-verifications` | None | Request account OTP emails |
 | `/users/**` | Basic, except public registration | User profile and identity operations |
 | `/matches/**` | Basic | Matches, moves, players, and notifications |
-| `/cards/**`, `/contract-cards/**` | Basic | Read the card and contract catalogs |
+| `/cards/**` | Basic | Read the card and contract catalogs |
 
 The resource paths below replace the former `/user`, `/match`, `/game`, `/card`, `/sentinel`, and
 `/public` JSON route prefixes. There are no compatibility aliases; the canonical paths stay under
@@ -264,7 +264,7 @@ should refresh the match snapshot rather than relying on notifications as a dura
 - Handle `401` by requesting or refreshing the user's credentials. A `403` indicates the
   authenticated role is not permitted to perform the operation.
 - Keep Basic credentials and bot secrets out of URLs, client logs, analytics, and error reports.
-- Use `GET /cards` and `GET /contract-cards` to load card and contract definitions rather than
+- Use `GET /cards` and `GET /cards/contracts` to load card and contract definitions rather than
   hardcoding catalog content.
 - Encode query parameter values such as match keys, usernames, and Telegram IDs.
 - Do not treat timeout, lost connection, or a client retry as proof a move failed. Read the match
@@ -296,7 +296,7 @@ is served at `/public/confirmEmail` from the server root.
 | `POST` / `DELETE` | `/matches/current/ai-players[/{username}]` | Add or remove an AI player before match start |
 | `POST` | `/matches/current/moves` | Submit one move |
 | `GET` | `/matches/{keyCode}/moves[/{moveNumber}]` | Read paged history or one move |
-| `GET` | `/cards`, `/contract-cards` | Read the card catalogs |
+| `GET` | `/cards`, `/cards/contracts` | Read the card catalogs |
 | `GET` / `POST` / `DELETE` | `/matches/{keyCode}/alerts` and `/subscriptions` | Subscribe to or remove match alerts |
 
 The compound query parameters for match and move lists are `page_number`, `page_size`, `sort_field`,

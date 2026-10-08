@@ -292,7 +292,7 @@ standing up the full API/database stack.
 | Users          | `/api/v1/users`              | User profiles, registration, identity resolution, and Telegram account linking     |
 | Matches        | `/api/v1/matches`            | Match lifecycle, players, moves, and notifications                                 |
 | Cards          | `/api/v1/cards`              | Read-only catalog of cards from `portroyal_lib`                                    |
-| Contract cards | `/api/v1/contract-cards`     | Read-only catalog of contract cards                                                |
+| Contract cards | `/api/v1/cards/contracts`    | Read-only catalog of contract cards                                                |
 | Email          | `/api/v1/email-confirmations`| Public email confirmation requests; HTML confirmation remains `/public/confirmEmail` |
 | Telegram       | `/api/v1/telegram-account-verifications` | Public OTP requests for linking Telegram and email accounts            |
 
@@ -320,7 +320,7 @@ Paths in this table are relative to `/api/v1`.
 | `POST /matches/current/moves` | Play a move validated entirely by `portroyal_lib` |
 | `GET /matches/{keyCode}/moves` | Get paginated match move history |
 | `GET /matches/{keyCode}/moves/{moveNumber}` | Get one persisted move |
-| `GET /cards`, `GET /contract-cards` | Read card catalogs |
+| `GET /cards`, `GET /cards/contracts` | Read card catalogs |
 | `POST /matches/{keyCode}/subscriptions` | Register a webhook callback for match alerts |
 | `GET /matches/{keyCode}/alerts` | Long-poll for the next alert |
 | `GET /matches/{keyCode}/alerts/stream` | Subscribe to match alerts via Server-Sent Events |

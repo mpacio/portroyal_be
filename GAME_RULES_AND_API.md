@@ -74,7 +74,7 @@ outside the trade/hire phase. These actions do not consume trading capacity.
 ## 3. Cards and scoring
 
 The card catalog is the source of truth for card IDs, points, costs, colors, power, and expedition
-requirements. Fetch it with `GET /api/v1/cards`; use `GET /api/v1/contract-cards` for contract
+requirements. Fetch it with `GET /api/v1/cards`; use `GET /api/v1/cards/contracts` for contract
 descriptions, types, rewards, and requirements.
 
 ### Employees
@@ -122,7 +122,7 @@ tied for the highest positive power. Default configuration values are 12 and 2 r
 
 The JOMC catalog contains 16 contracts; each match deals the configured number onto the board (4 by
 default), so a match will not necessarily contain every contract below. The live catalog is available
-from `GET /api/v1/contract-cards`. Its `rewards` array is ordered by signing slot: the first eligible
+from `GET /api/v1/cards/contracts`. Its `rewards` array is ordered by signing slot: the first eligible
 player to sign gets the first value, the next gets the second, and so on. A valid signing adds **one
 point** and the slot's reward in coins. Employees used to meet a contract's requirement are not
 discarded.
@@ -351,8 +351,8 @@ include `mainEvent` or `sideEvents`. Retrieve the match again to see the latest 
 |---|---|
 | `GET /cards` | List base-game and JOMC card definitions. |
 | `GET /cards/{id}` | Get one card by catalog ID. |
-| `GET /contract-cards` | List contract definitions and descriptions. |
-| `GET /contract-cards/{id}` | Get one contract by catalog ID. |
+| `GET /cards/contracts` | List contract definitions and descriptions. |
+| `GET /cards/contracts/{id}` | Get one contract by catalog ID. |
 | `POST /matches/{keyCode}/subscriptions` | Register a webhook; JSON contains `url` and optional `secret`. |
 | `GET /matches/{keyCode}/alerts?seconds=120` | Wait for one alert; re-subscribe after receiving it. Minimum timeout is 10 seconds. |
 | `GET /matches/{keyCode}/alerts/stream?seconds=3600` | Receive Server-Sent Events until the connection closes or times out. |
