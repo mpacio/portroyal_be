@@ -32,6 +32,8 @@ import java.util.stream.Collectors;
 @ResponseBody
 public class GlobalExceptionHandler {
 
+    // -------------------------------- Spring Exceptions ---------------------------------
+
     @ExceptionHandler(HttpRequestMethodNotSupportedException.class)
     @ResponseStatus(HttpStatus.METHOD_NOT_ALLOWED)
     public ResponseEntity<ErrorResponse> handleMethodNotAllowedException(HttpRequestMethodNotSupportedException e) {
@@ -106,6 +108,8 @@ public class GlobalExceptionHandler {
         return error(HttpStatus.INTERNAL_SERVER_ERROR, "The request could not be completed.");
     }
 
+    // -------------------------------- Custom Exceptions ---------------------------------
+
     @ExceptionHandler(ResourceNotFoundException.class)
     @ResponseStatus(HttpStatus.NOT_FOUND)
     public ResponseEntity<ErrorResponse> handleResourceNotFoundException(ResourceNotFoundException e) {
@@ -145,6 +149,8 @@ public class GlobalExceptionHandler {
         }
         return error(HttpStatus.BAD_REQUEST, e.getMessage(), details);
     }
+
+    // -------------------------------- General Exception Handler ---------------------------------
 
     @ExceptionHandler(Exception.class)
     @ResponseStatus(HttpStatus.INTERNAL_SERVER_ERROR)
