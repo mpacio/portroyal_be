@@ -74,7 +74,7 @@ outside the trade/hire phase. These actions do not consume trading capacity.
 ## 3. Cards and scoring
 
 The card catalog is the source of truth for card IDs, points, costs, colors, power, and expedition
-requirements. Fetch it with `GET /api/v1/card`; use `GET /api/v1/card/contract` for contract
+requirements. Fetch it with `GET /api/v1/cards`; use `GET /api/v1/cards/contracts` for contract
 descriptions, types, rewards, and requirements.
 
 ### Employees
@@ -122,7 +122,7 @@ tied for the highest positive power. Default configuration values are 12 and 2 r
 
 The JOMC catalog contains 16 contracts; each match deals the configured number onto the board (4 by
 default), so a match will not necessarily contain every contract below. The live catalog is available
-from `GET /api/v1/card/contract`. Its `rewards` array is ordered by signing slot: the first eligible
+from `GET /api/v1/cards/contracts`. Its `rewards` array is ordered by signing slot: the first eligible
 player to sign gets the first value, the next gets the second, and so on. A valid signing adds **one
 point** and the slot's reward in coins. Employees used to meet a contract's requirement are not
 discarded.
@@ -180,30 +180,31 @@ human player's Telegram ID. AI players are match participants, not API identitie
 Example authenticated request:
 
 ```sh
-curl -u alice:password "$BASE/user/me"
+curl -u alice:password "$BASE/users/me"
 ```
 
-The server returns JSON response wrappers for most operations. Validation failures, illegal moves,
-missing resources, and authentication or authorization failures are reported as HTTP errors. Use the
-returned match snapshot as the authoritative source for player ordering, phase, harbor indices,
-expedition indices, contract indices, and current state.
+JSON fields use `camelCase`; multiword query parameters use underscores. The server returns JSON
+response wrappers for most operations. Errors use the matching HTTP status and a consistent JSON
+envelope containing `status`, `error`, `errorCode`, `message`, `errorContext`, `errorLinks`, and
+`timestamp`. Use the returned match snapshot as the authoritative source for player ordering, phase,
+harbor indices, expedition indices, contract indices, and current state.
 
 ## 5. Register and identify players
 
 API paths below are relative to `BASE` (`/api/v1`).
 
-| Method and path                                           | Purpose                                                                                                        |
-|-----------------------------------------------------------|----------------------------------------------------------------------------------------------------------------|
-| `POST /public/register`                                   | Create a standard account; public.                                                                             |
-| `GET /public/newEmailConfirmation?email=...`              | Request email confirmation; public.                                                                            |
-| `GET /public/newTgUnifyEmailOtp?email=...&telegramId=...` | Request the email OTP to link a Telegram identity; public. The email must be confirmed and not already linked. |
-| `POST /user/register/telegram`                            | Create a Telegram-linked player; requires `BOT` authentication.                                                |
-| `POST /user/unify`                                        | Link the Telegram ID to the email account using the OTP; requires `BOT` authentication.                        |
-| `GET /user/me`                                            | Get the authenticated account.                                                                                 |
-| `GET /user/retrieve?username=...`                         | Look up a user by username, Telegram ID, or email.                                                             |
-| `PUT /user/update?username=...`                           | Update user profile; requires `ADMIN` or `BOT` authorization.                                                  |
-| `POST /user/changePsw`                                    | Change the authenticated user's password.                                                                      |
-| `DELETE /user/delete?username=...`                        | Delete a user; requires `ADMIN` authorization.                                                                 |
+| Method and path                                                                   | Purpose                                                                                                        |
+|-----------------------------------------------------------------------------------|----------------------------------------------------------------------------------------------------------------|
+| `POST /public/users`                                                              | Create a standard account; public.                                                                             |
+| `POST /public/email-confirmations`                                                | Request email confirmation with an `email` JSON field; public.                                                 |
+| `POST /public/telegram-unification-requests`                                      | Request the email OTP using `email` and optional `telegramId` JSON fields; public.                             |
+| `POST /users/telegram-accounts`                                                   | Create a Telegram-linked player; requires `BOT` authentication.                                                |
+| `POST /users/identity-unifications`                                               | Link the Telegram ID to the email account using the OTP; requires `BOT` authentication.                        |
+| `GET /users/me`                                                                  | Get the authenticated account.                                                                                 |
+| `GET /users?username=...` or `/users?telegram_id=...` or `/users?email=...`       | Look up a user by username, Telegram ID, or email.                                                             |
+| `PATCH /users/{username}`                                                       | Partially update profile fields.                                                                               |
+| `PATCH /users/me/password`                                                       | Change the authenticated user's password.                                                                      |
+| `DELETE /users/{username}`                                                      | Delete a user; requires `ADMIN` authorization.                                                                 |
 
 The HTML email-confirmation page is served separately at `/public/confirmEmail` from the server root.
 
@@ -242,35 +243,35 @@ not an optional identity hint for a bot request.
 
 ## 6. Create and manage a match
 
-| Method and path                                | Purpose                                                                                                                               |
-|------------------------------------------------|---------------------------------------------------------------------------------------------------------------------------------------|
-| `POST /match/host`                             | Host a match. Optional JSON body identifies a known configuration by `id` and `name`; omitting it selects default configuration ID 1. |
-| `PUT /match/join?keyCode=...`                  | Join an open match before it starts.                                                                                                  |
-| `POST /match/ai-player`                        | Host adds an AI before the match starts. Body requires `difficulty` (`EASY`, `MEDIUM`, or `HARD`) and may include `name`.             |
-| `DELETE /match/ai-player?aiPlayerUsername=...` | Host removes an AI before the match starts.                                                                                           |
-| `PUT /match/start`                             | Host starts the match; requires at least two total players.                                                                           |
-| `PUT /match/close`                             | Close an unstarted match the caller participates in.                                                                                  |
-| `GET /match/status`                            | Get the caller's current match, if any.                                                                                               |
-| `GET /match/status?moveNumber=N`               | If `N` equals the current move count, returns "No new moves"; otherwise returns the current match snapshot.                           |
-| `GET /match/retrieve?keyCode=...`              | Get the match snapshot.                                                                                                               |
-| `GET /match/retrieve?keyCode=...&moveNumber=N` | If `N` equals the current move count, returns "No new moves"; otherwise returns the snapshot.                                         |
-| `GET /match/retrieve-all`                      | List matches; supports `username`, `ended`, `pageNumber`, `pageSize`, `sortField`, and `sortDirection`.                               |
+| Method and path                                                        | Purpose                                                                                                                               |
+|------------------------------------------------------------------------|---------------------------------------------------------------------------------------------------------------------------------------|
+| `POST /matches`                                                        | Create a match. Optional JSON body identifies a known configuration by `id` and `name`; omitting it selects default configuration ID 1. |
+| `POST /matches/{match-key}/players`                                    | Join an open match before it starts.                                                                                                  |
+| `POST /matches/current/ai-players`                                     | Host adds an AI before the match starts. Body requires `difficulty` (`EASY`, `MEDIUM`, or `HARD`) and may include `name`.             |
+| `DELETE /matches/current/ai-players/{ai-player-username}`              | Host removes an AI before the match starts.                                                                                           |
+| `POST /matches/current/start`                                          | Host starts the match; requires at least two total players.                                                                           |
+| `DELETE /matches/current`                                              | Close an unstarted match the caller participates in.                                                                                  |
+| `GET /matches/current`                                                 | Get the caller's current match, if any.                                                                                               |
+| `GET /matches/current?move_number=N`                                   | If `N` equals the current move count, returns "No new moves"; otherwise returns the current match snapshot.                           |
+| `GET /matches/{match-key}`                                             | Get the match snapshot.                                                                                                               |
+| `GET /matches/{match-key}?move_number=N`                               | If `N` equals the current move count, returns "No new moves"; otherwise returns the snapshot.                                         |
+| `GET /matches`                                                         | List matches; supports `username`, `ended`, `page_number`, `page_size`, `sort_field`, and `sort_direction`.                           |
 
 Typical sequence:
 
 ```sh
 # Host (save the keyCode returned in the response)
 curl -u alice:password -H "Content-Type: application/json" \
-  -d '{"id":1,"name":"default"}' "$BASE/match/host"
+  -d '{"id":1,"name":"default"}' "$BASE/matches"
 
 # Another player joins with that keyCode
-curl -u bob:password -X PUT "$BASE/match/join?keyCode=ABC123"
+curl -u bob:password -X POST "$BASE/matches/ABC123/players"
 
 # Host starts
-curl -u alice:password -X PUT "$BASE/match/start"
+curl -u alice:password -X POST "$BASE/matches/current/start"
 
 # Read state before choosing a move
-curl -u alice:password "$BASE/match/retrieve?keyCode=ABC123"
+curl -u alice:password "$BASE/matches/ABC123"
 ```
 
 The host is automatically a player. A player cannot join multiple open matches. Human and AI
@@ -278,7 +279,7 @@ players share a maximum capacity of five. The match composition is locked once s
 
 ## 7. Submit game moves
 
-All moves use `POST /game/move`. Only the current running player can move. The required `move`
+All moves use `POST /matches/current/moves`. Only the current running player can move. The required `move`
 field is case-insensitive; the other fields are optional and default to `-1` or an empty list when
 omitted.
 
@@ -303,7 +304,7 @@ Example discover:
 
 ```sh
 curl -u alice:password -H "Content-Type: application/json" \
-  -d '{"move":"DISCOVER"}' "$BASE/game/move"
+  -d '{"move":"DISCOVER"}' "$BASE/matches/current/moves"
 ```
 
 Example expedition commit:
@@ -324,7 +325,7 @@ then send its **zero-based board index** as `parameterIndex`:
 
 ```sh
 curl -u alice:password -H "Content-Type: application/json" \
-  -d '{"move":"SIGN_CONTRACT","parameterIndex":1}' "$BASE/game/move"
+  -d '{"move":"SIGN_CONTRACT","parameterIndex":1}' "$BASE/matches/current/moves"
 ```
 
 The index refers to the current match board order, not the contract's catalog `id`. Only the current
@@ -333,32 +334,32 @@ duplicate-signing rule, and per-player contract limit. Automatic contracts are s
 when their conditions are evaluated; clients should use the match snapshot and move `sideEvents` to
 observe them.
 
-`GET /game/move?keyCode=ABC123&moveNumber=12` retrieves one move.
-`GET /game/moves?keyCode=ABC123` retrieves paged history; optional parameters include
-`pageNumber` (0-based, default 0), `pageSize` (default 10), `sortField` (default `TIME_INDEX`),
-and `sortDirection` (`ASC` or `DESC`, default `ASC`).
+`GET /matches/ABC123/moves/12` retrieves one move.
+`GET /matches/ABC123/moves` retrieves paged history; optional parameters include
+`page_number` (0-based, default 0), `page_size` (default 10), `sort_field` (default `TIME_INDEX`),
+and `sort_direction` (`ASC` or `DESC`, default `ASC`).
 
-The successful `POST /game/move` response includes the submitted move's `mainEvent` and
+The successful `POST /matches/current/moves` response uses HTTP 201 and includes the submitted move's `mainEvent` and
 `sideEvents`, when generated. A human move may also trigger automatic AI turns; those AI moves are
 persisted and produce Sentinel notifications, but the immediate response describes only the
-submitted move. `GET /game/move` and `GET /game/moves` return persisted move history and do not
+submitted move. `GET /matches/{match-key}/moves/{move-number}` and `GET /matches/{match-key}/moves` return persisted move history and do not
 include `mainEvent` or `sideEvents`. Retrieve the match again to see the latest state.
 
 ## 8. Card catalog and Sentinel notifications
 
 | Method and path                                                | Purpose                                                                                                    |
 |----------------------------------------------------------------|------------------------------------------------------------------------------------------------------------|
-| `GET /card`                                                    | List base-game and JOMC card definitions.                                                                  |
-| `GET /card/{id}`                                               | Get one card by catalog ID.                                                                                |
-| `GET /card/contract`                                           | List contract definitions and descriptions.                                                                |
-| `GET /card/contract/{id}`                                      | Get one contract by catalog ID.                                                                            |
-| `POST /sentinel/callback/subscribe`                            | Register a webhook for alerts. JSON includes `matchKeyCode`, `url`, and optional `secret`.                 |
-| `GET /sentinel/long-polling/subscribe?keyCode=...&seconds=120` | Wait for one alert; re-subscribe after receiving it. Minimum timeout is 10 seconds.                        |
-| `GET /sentinel/sse/subscribe?keyCode=...&seconds=3600`         | Receive alerts as Server-Sent Events until the connection closes or times out.                             |
-| `DELETE /sentinel/subscription?keyCode=...`                    | Remove the caller's subscription for this match.                                                           |
+| `GET /cards`                                                          | List base-game and JOMC card definitions.                                                                  |
+| `GET /cards/{id}`                                                     | Get one card by catalog ID.                                                                                |
+| `GET /cards/contracts`                                                | List contract definitions and descriptions.                                                                |
+| `GET /cards/contracts/{id}`                                           | Get one contract by catalog ID.                                                                            |
+| `POST /sentinel/subscriptions/callbacks`                              | Register a webhook for alerts. JSON includes `matchKeyCode`, `url`, and optional `secret`.                 |
+| `GET /sentinel/subscriptions/long-polling?match_key=...&seconds=120`  | Wait for one alert; re-subscribe after receiving it. Minimum timeout is 10 seconds.                        |
+| `GET /sentinel/subscriptions/sse?match_key=...&seconds=3600`         | Receive alerts as Server-Sent Events until the connection closes or times out.                             |
+| `DELETE /sentinel/subscriptions/{match-key}`                         | Remove the caller's subscription for this match.                                                           |
 
 **Sentinel is the preferred way for clients to learn about live match updates.** Subscribe once
-instead of repeatedly polling `/match/retrieve` on a timer, then refresh the match snapshot when
+instead of repeatedly polling `/matches/{match-key}` on a timer, then refresh the match snapshot when
 an alert arrives. Alerts are lightweight notifications, not a copy of the match state or a
 move-event feed. Their payload identifies the match and alert type (`keyCode`, numeric `code`, and
 `message`; `description` may also be present). Alerts include lifecycle changes such as a player
@@ -383,7 +384,7 @@ authenticated user's subscription for the specified match.
 ### Move events and side events
 
 Sentinel alerts and game events serve different purposes: Sentinel wakes the client when something
-changed; the move record explains what happened. In the successful `POST /game/move` response,
+changed; the move record explains what happened. In the successful `POST /matches/current/moves` response,
 `mainEvent` describes the primary effect of the submitted action, while `sideEvents` lists
 additional effects caused while processing that action. Either may be absent when no corresponding
 event was generated. Each event can include a machine-readable `typeCode`, human-readable
@@ -397,7 +398,7 @@ and turn or contract processing can generate `GOT_AP_FEE`, `AUTO_SIGNED_CONTRACT
 from the move name or only display the main event.
 
 For a client that submitted the move, use its successful move response to present the detailed
-events. When a Sentinel `MOVES_UPDATED` alert arrives, refresh `/match/retrieve` for authoritative
+events. When a Sentinel `MOVES_UPDATED` alert arrives, refresh `/matches/{match-key}` for authoritative
 current state. The alert and persisted move-history endpoints are not a way to retrieve the
 generated event/side-event payload.
 

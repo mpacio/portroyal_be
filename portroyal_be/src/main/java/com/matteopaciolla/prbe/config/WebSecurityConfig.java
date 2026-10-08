@@ -1,10 +1,14 @@
 package com.matteopaciolla.prbe.config;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.matteopaciolla.prbe.constants.Paths;
 import com.matteopaciolla.prbe.constants.enums.UserRole;
+import com.matteopaciolla.prbe.dto.response.ErrorResponse;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpMethod;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.security.config.Customizer;
 import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
@@ -27,7 +31,7 @@ import java.util.List;
 public class WebSecurityConfig {
 
     @Bean
-    public SecurityFilterChain defaultSecurityFilterChain(HttpSecurity http) throws Exception {
+    public SecurityFilterChain defaultSecurityFilterChain(HttpSecurity http, ObjectMapper objectMapper) throws Exception {
         http
             .cors(Customizer.withDefaults())
             .csrf(AbstractHttpConfigurer::disable)
@@ -44,8 +48,8 @@ public class WebSecurityConfig {
                             .requestMatchers(HttpMethod.GET,Paths.BASE_API_PATH + "/api-docs/**").permitAll()
                             .requestMatchers(HttpMethod.GET,Paths.BASE_API_PATH + "/api-docs.yaml").permitAll()
 
-                            .requestMatchers(HttpMethod.POST,   Paths.BASE_API_PATH + Paths.USER_PATH + "/unify").hasRole(UserRole.BOT.name())
-                            .requestMatchers(HttpMethod.POST,   Paths.BASE_API_PATH + Paths.USER_PATH + "/register/telegram").hasRole(UserRole.BOT.name())
+                            .requestMatchers(HttpMethod.POST,   Paths.BASE_API_PATH + Paths.USER_PATH + "/identity-unifications").hasRole(UserRole.BOT.name())
+                            .requestMatchers(HttpMethod.POST,   Paths.BASE_API_PATH + Paths.USER_PATH + "/telegram-accounts").hasRole(UserRole.BOT.name())
 //                            .requestMatchers(HttpMethod.PUT,    Paths.BASE_API_PATH + Paths.USER_PATH + "/**").hasAnyRole(UserRole.ADMIN.name(), UserRole.BOT.name())
                             .requestMatchers(HttpMethod.DELETE, Paths.BASE_API_PATH + Paths.USER_PATH + "/**").hasAnyRole(UserRole.ADMIN.name())// only admin can delete users
 
@@ -53,6 +57,25 @@ public class WebSecurityConfig {
                             .anyRequest().denyAll()
 //                .anyRequest().authenticated()
 //                .anyRequest().permitAll()
+            )
+            .exceptionHandling(exceptionHandling -> exceptionHandling
+                    .authenticationEntryPoint((request, response, exception) -> {
+                        response.setStatus(HttpStatus.UNAUTHORIZED.value());
+                        response.setContentType(MediaType.APPLICATION_JSON_VALUE);
+                        response.setHeader("WWW-Authenticate", "Basic realm=\"PortRoyal\"");
+                        objectMapper.writeValue(response.getOutputStream(), new ErrorResponse(
+                                HttpStatus.UNAUTHORIZED.value(),
+                                HttpStatus.UNAUTHORIZED.getReasonPhrase(),
+                                "Authentication is required."));
+                    })
+                    .accessDeniedHandler((request, response, exception) -> {
+                        response.setStatus(HttpStatus.FORBIDDEN.value());
+                        response.setContentType(MediaType.APPLICATION_JSON_VALUE);
+                        objectMapper.writeValue(response.getOutputStream(), new ErrorResponse(
+                                HttpStatus.FORBIDDEN.value(),
+                                HttpStatus.FORBIDDEN.getReasonPhrase(),
+                                "You are not permitted to perform this operation."));
+                    })
             )
 //            .formLogin(Customizer.withDefaults())
             .formLogin(form -> form

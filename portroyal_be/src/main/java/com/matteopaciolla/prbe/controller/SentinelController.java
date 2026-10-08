@@ -23,7 +23,7 @@ import org.springframework.web.bind.annotation.*;
 import org.springframework.web.context.request.async.DeferredResult;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
-@Tag(name = "Sentinel", description = "Notification subscription APIs")
+@Tag(name = "Sentinel", description = "Notification subscription resources.")
 @SecurityRequirements({@SecurityRequirement(name = "basicAuth")})
 @Slf4j
 @RestController
@@ -42,8 +42,8 @@ The callback will be sent to the URL specified in the request.
 The callback will be sent when a new alert is available.
 The alert will be sent in the request body.
 The alert will be sent only once.
-The alerts refer to any match, that's why the matchKeyCode is required.""")
-    @PostMapping(path = "/callback/subscribe", consumes = MediaType.APPLICATION_JSON_VALUE, produces = MediaType.APPLICATION_JSON_VALUE)
+The alerts refer to any match, so matchKeyCode is required in the camelCase JSON request body.""")
+    @PostMapping(path = "/subscriptions/callbacks", consumes = MediaType.APPLICATION_JSON_VALUE, produces = MediaType.APPLICATION_JSON_VALUE)
     public ResponseEntity<VoidResponse> addCallbackSentinel(
             @io.swagger.v3.oas.annotations.parameters.RequestBody(description = "Callback request body", required = true,
                     content = @io.swagger.v3.oas.annotations.media.Content(
@@ -59,12 +59,12 @@ The alerts refer to any match, that's why the matchKeyCode is required.""")
 Subscribe to a long polling notification.
 The alert will be sent in the response body.
 The alert will be sent only once.
-The alerts refer to any match, that's why the matchKeyCode is required.
+The alerts refer to any match, so the match_key query parameter is required.
 The alert will be sent only if the alert is available before the timeout.""")
-    @GetMapping(path = "/long-polling/subscribe", produces = MediaType.APPLICATION_JSON_VALUE)
+    @GetMapping(path = "/subscriptions/long-polling", produces = MediaType.APPLICATION_JSON_VALUE)
     public DeferredResult<AlertDto> addLongPollingSentinel(
-            @Valid @NotBlank(message = "keyCode must not be blank") @RequestParam String keyCode,
-            @Valid @Min(value = 10, message = "seconds must be greater or equal to 10") @RequestParam(defaultValue = "120") int seconds) {
+            @Valid @NotBlank(message = "match_key must not be blank") @RequestParam(name = "match_key") String keyCode,
+            @Valid @Min(value = 10, message = "seconds must be greater or equal to 10") @RequestParam(name = "seconds", defaultValue = "120") int seconds) {
         String username = SecurityContextHolder.getContext().getAuthentication().getName();
         UserEntity user = userService.getUserEntityByUsername(username);
         return sentinelService.addLongPollingSentinel(user, keyCode, seconds);
@@ -74,15 +74,15 @@ The alert will be sent only if the alert is available before the timeout.""")
 Subscribe to a Server-Sent Events notification.
 The alert will be sent in the response body.
 The alert will be sent every time a new alert is available.
-The alerts refer to any match, that's why the matchKeyCode is required.
+The alerts refer to any match, so the match_key query parameter is required.
 The alert will be sent only if the alert is available before the timeout.""",
             responses = {
                     @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "SSE subscribed",
                             content = @io.swagger.v3.oas.annotations.media.Content(mediaType = "text/event-stream",
                     schema = @io.swagger.v3.oas.annotations.media.Schema(implementation = AlertDto.class))),})
-    @GetMapping(path = "/sse/subscribe", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
+    @GetMapping(path = "/subscriptions/sse", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
     public SseEmitter addSSESentinel(
-            @Valid @NotBlank(message = "keyCode must not be blank") @RequestParam(value = "keyCode") String keyCode,
+            @Valid @NotBlank(message = "match_key must not be blank") @RequestParam(value = "match_key") String keyCode,
             @Valid @Min(value = 1, message = "seconds must be greater or equal to 1") @RequestParam(value = "seconds", defaultValue = "3600") int seconds) {
         String username = SecurityContextHolder.getContext().getAuthentication().getName();
         UserEntity user = userService.getUserEntityByUsername(username);
@@ -93,9 +93,9 @@ The alert will be sent only if the alert is available before the timeout.""",
 Remove a subscription.
 The subscription will be removed from the user's subscriptions.
 The subscription will not be available anymore.""")
-    @DeleteMapping(path = "/subscription", produces = MediaType.APPLICATION_JSON_VALUE)
+    @DeleteMapping(path = "/subscriptions/{match-key}", produces = MediaType.APPLICATION_JSON_VALUE)
     public ResponseEntity<VoidResponse> removeSentinelSubscription(
-            @Valid @NotBlank(message = "keyCode must not be blank") @RequestParam(value = "keyCode") String keyCode) {
+            @Valid @NotBlank(message = "match_key must not be blank") @PathVariable("match-key") String keyCode) {
         String username = SecurityContextHolder.getContext().getAuthentication().getName();
         UserEntity user = userService.getUserEntityByUsername(username);
         sentinelService.removeSentinelSubscription(user.getId(), keyCode);

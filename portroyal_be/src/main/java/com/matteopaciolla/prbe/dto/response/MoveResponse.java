@@ -19,5 +19,8 @@ public class MoveResponse extends BaseResponse<MoveDto> {
     public MoveResponse(String message, MoveDto move) {
         super(HttpStatus.OK.value(), message, move);
     }
-}
 
+    public MoveResponse(int status, String message, MoveDto move) {
+        super(status, message, move);
+    }
+}

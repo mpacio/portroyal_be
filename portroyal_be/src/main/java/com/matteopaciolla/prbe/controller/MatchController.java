@@ -29,6 +29,7 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Sort;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
@@ -37,7 +38,7 @@ import java.util.Optional;
 import static com.matteopaciolla.prbe.util.AuthenticationUtils.getUserName;
 import static com.matteopaciolla.prbe.util.AuthenticationUtils.isBotUser;
 
-@Tag(name = "Match", description = "Matches operations")
+@Tag(name = "Matches", description = "Match lifecycle and match-player resources.")
 @SecurityRequirements({@SecurityRequirement(name = "basicAuth")})
 @Slf4j
 @RestController
@@ -53,28 +54,29 @@ public class MatchController {
 
 
     @Operation(
-            summary = "Get matches",
-            description = "Lists matches filtered by the player's username and/or ended status, with pagination and sorting support.",
+            summary = "List matches",
+            description = "Lists matches filtered by the player's username and/or ended status, with pagination and sorting support. Multiword query parameter names use underscores.",
             responses = {
                     @ApiResponse(responseCode = "200", description = "Matches retrieved successfully",
                             content = @Content(mediaType = "application/json", schema = @Schema(implementation = MatchInfosPageResponse.class))),
-                    @ApiResponse(responseCode = "401", description = "Authentication required")
+                    @ApiResponse(responseCode = "401", description = "Authentication required",
+                            content = @Content(mediaType = "application/json", schema = @Schema(implementation = ErrorResponse.class)))
             }
     )
-    @GetMapping(path = "/retrieve-all", produces = "application/json")
+    @GetMapping(produces = "application/json")
     public ResponseEntity<MatchInfosPageResponse> getAllMatches(
-            @Parameter(description = "Filter by ended or active matches. If omitted, all match states are returned.", example = "false", required = false)
-            @RequestParam(required = false) Boolean ended,
-            @Parameter(description = "Zero-based page number", example = "0", required = false)
-            @RequestParam(defaultValue = "0") Integer pageNumber,
-            @Parameter(description = "Page size", example = "10", required = false)
-            @RequestParam(defaultValue = "10") Integer pageSize,
-            @Parameter(description = "Field used to sort matches", example = "CREATED_AT", required = false)
-            @RequestParam(defaultValue = "CREATED_AT") MatchRepository.SortField sortField,
-            @Parameter(description = "Sort order direction", example = "DESC", required = false)
-            @RequestParam(defaultValue = "DESC") Sort.Direction sortDirection,
-            @Parameter(description = "Optional username filter used to retrieve matches for a specific player", example = "alice", required = false)
-            @RequestParam(required = false) String username) {
+            @Parameter(name = "ended", description = "Filter by ended or active matches. If omitted, all match states are returned.", example = "false", required = false)
+            @RequestParam(name = "ended", required = false) Boolean ended,
+            @Parameter(name = "page_number", description = "Zero-based page number", example = "0", required = false)
+            @RequestParam(name = "page_number", defaultValue = "0") Integer pageNumber,
+            @Parameter(name = "page_size", description = "Page size", example = "10", required = false)
+            @RequestParam(name = "page_size", defaultValue = "10") Integer pageSize,
+            @Parameter(name = "sort_field", description = "Field used to sort matches", example = "CREATED_AT", required = false)
+            @RequestParam(name = "sort_field", defaultValue = "CREATED_AT") MatchRepository.SortField sortField,
+            @Parameter(name = "sort_direction", description = "Sort order direction", example = "DESC", required = false)
+            @RequestParam(name = "sort_direction", defaultValue = "DESC") Sort.Direction sortDirection,
+            @Parameter(name = "username", description = "Optional username filter used to retrieve matches for a specific player", example = "alice", required = false)
+            @RequestParam(name = "username", required = false) String username) {
         MatchInfosPageResponse matchDtoList = matchService.getMatchesByPlayer(
                 username, ended, pageNumber, pageSize, sortField, sortDirection);
         return ResponseEntity.ok(matchDtoList);
@@ -82,19 +84,20 @@ public class MatchController {
 
     @Operation(
             summary = "Get a match",
-            description = "Returns the full current match snapshot by keyCode. When moveNumber is provided and equals the current move count, the response indicates that no new moves are available.",
+            description = "Returns the full current match snapshot by key. When move_number equals the current move count, no new moves are available.",
             responses = {
                     @ApiResponse(responseCode = "200", description = "Match retrieved successfully or no new moves available",
                             content = @Content(mediaType = "application/json", schema = @Schema(implementation = MatchResponse.class))),
-                    @ApiResponse(responseCode = "404", description = "Match not found")
+                    @ApiResponse(responseCode = "404", description = "Match not found",
+                            content = @Content(mediaType = "application/json", schema = @Schema(implementation = ErrorResponse.class)))
             }
     )
-    @GetMapping(path = "/retrieve", produces = "application/json")
+    @GetMapping(path = "/{match-key}", produces = "application/json")
     public ResponseEntity<MatchResponse> getMatch(
-            @Parameter(description = "Unique match key code", example = "ABC123", required = true)
-            @RequestParam String keyCode,
-            @Parameter(description = "Last move count known by the client. If equal to the current movesCount, no new moves are available.", example = "14", required = false)
-            @RequestParam(required = false) Integer moveNumber) {
+            @Parameter(name = "match-key", description = "Unique match key code", example = "ABC123", required = true)
+            @PathVariable("match-key") String keyCode,
+            @Parameter(name = "move_number", description = "Last move count known by the client. If equal to the current movesCount, no new moves are available.", example = "14", required = false)
+            @RequestParam(name = "move_number", required = false) Integer moveNumber) {
         MatchDto matchDto = matchService.getMatch(keyCode, isBotUser());
         if (moveNumber != null && moveNumber.equals(matchDto.getMovesCount())) {
             return ResponseEntity.ok(new MatchResponse("No new moves", null));
@@ -104,28 +107,30 @@ public class MatchController {
 
     @Operation(
             summary = "Join a match",
-            description = "Joins an existing non-started match by keyCode. If called by a bot, the tgId header identifies the user represented by the bot.",
+            description = "Creates a player membership in an existing non-started match. If called by a bot, the tgId header identifies the user represented by the bot.",
             responses = {
-                    @ApiResponse(responseCode = "200", description = "Match joined successfully"),
-                    @ApiResponse(responseCode = "400", description = "Match cannot be joined in the current state")
+                    @ApiResponse(responseCode = "201", description = "Player joined successfully"),
+                    @ApiResponse(responseCode = "400", description = "Match cannot be joined in the current state",
+                            content = @Content(mediaType = "application/json", schema = @Schema(implementation = ErrorResponse.class)))
             }
     )
-    @PutMapping(path = "/join", produces = "application/json")
+    @PostMapping(path = "/{match-key}/players", produces = "application/json")
     public ResponseEntity<VoidResponse> joinMatch(
-            @Parameter(description = "Unique match key code", example = "ABC123", required = true)
-            @RequestParam String keyCode,
+            @Parameter(name = "match-key", description = "Unique match key code", example = "ABC123", required = true)
+            @PathVariable("match-key") String keyCode,
             @Parameter(name = BH, description = "Mandatory only for bot-mediated requests; identifies the real acting user.", required = false, schema = @Schema(type = "string"), in = ParameterIn.HEADER)
             @RequestHeader(value = BH, required = false) String tgId) {
         UserEntity user = getUserEntity(tgId);
         matchService.joinMatch(keyCode, user);
         log.info("User {} joined the match with keyCode = {}", user.getUsername(), keyCode);
         sentinelService.sendUpdate(keyCode, user.getUsername(), SentinelAlertMessage.PLAYER_JOINED);
-        return ResponseEntity.ok(new VoidResponse("Match joined successfully"));
+        return ResponseEntity.status(HttpStatus.CREATED)
+                .body(new VoidResponse(HttpStatus.CREATED.value(), "Player joined successfully"));
     }
 
     @Operation(
-            summary = "Host a match",
-            description = "Hosts a new match for the authenticated user, optionally using a specific game configuration. For bot users, tgId identifies the real acting user.",
+            summary = "Create a match",
+            description = "Creates a match for the authenticated user, optionally using a specific game configuration. For bot users, tgId identifies the real acting user.",
             parameters = {
                     @Parameter(name = BH, description = "Mandatory only for bot-mediated requests; identifies the real acting user.", required = false, schema = @Schema(type = "string"), in = ParameterIn.HEADER)
             },
@@ -133,12 +138,13 @@ public class MatchController {
                     content = @Content(mediaType = "application/json", schema = @Schema(implementation = MatchConfigReqDto.class),
                             examples = @ExampleObject(value = "{\"id\":1, \"name\":\"default\"}"))),
             responses = {
-                    @ApiResponse(responseCode = "200", description = "Match hosted successfully",
+                    @ApiResponse(responseCode = "201", description = "Match created successfully",
                             content = @Content(mediaType = "application/json", schema = @Schema(implementation = MatchInfoResponse.class))),
-                    @ApiResponse(responseCode = "409", description = "A match is already hosted by this user")
+                    @ApiResponse(responseCode = "409", description = "A match is already hosted by this user",
+                            content = @Content(mediaType = "application/json", schema = @Schema(implementation = ErrorResponse.class)))
             }
     )
-    @PostMapping(path = "/host", produces = "application/json")
+    @PostMapping(produces = "application/json")
     public ResponseEntity<MatchInfoResponse> hostMatch(
             @RequestHeader(value = BH, required = false) String tgId,
             @RequestBody(required = false) MatchConfigReqDto matchConfigReqDto) {
@@ -149,18 +155,20 @@ public class MatchController {
         }
         MatchInfoDto matchInfoDto = matchService.hostMatch(user, matchConfigReqDto);
         log.info("User {} hosted a match with keyCode = {}", user.getUsername(), matchInfoDto.getKeyCode());
-        return ResponseEntity.ok(new MatchInfoResponse(matchInfoDto));
+        return ResponseEntity.status(HttpStatus.CREATED).body(new MatchInfoResponse(
+                HttpStatus.CREATED.value(), "Match created successfully", matchInfoDto));
     }
 
     @Operation(
-            summary = "Close a match",
+            summary = "Close the current match",
             description = "Closes the match currently hosted by the user or the match in which the user is participating, if still not started. This does not require the match to be started.",
             responses = {
                     @ApiResponse(responseCode = "200", description = "Match closed successfully"),
-                    @ApiResponse(responseCode = "400", description = "Close operation not allowed in the current match state")
+                    @ApiResponse(responseCode = "400", description = "Close operation not allowed in the current match state",
+                            content = @Content(mediaType = "application/json", schema = @Schema(implementation = ErrorResponse.class)))
             }
     )
-    @PutMapping(path = "/close", produces = "application/json")
+    @DeleteMapping(path = "/current", produces = "application/json")
     public ResponseEntity<VoidResponse> closeMatch(
             @Parameter(name = BH, description = "Mandatory only for bot-mediated requests; identifies the real acting user.", required = false, schema = @Schema(type = "string"), in = ParameterIn.HEADER)
             @RequestHeader(value = BH, required = false) String tgId) {
@@ -172,15 +180,16 @@ public class MatchController {
     }
 
     @Operation(
-            summary = "Start a match",
+            summary = "Start the current match",
             description = "Starts the match hosted by the authenticated user. Once started, the game becomes active and players can insert moves.",
             responses = {
                     @ApiResponse(responseCode = "200", description = "Match started successfully",
                             content = @Content(mediaType = "application/json", schema = @Schema(implementation = MatchResponse.class))),
-                    @ApiResponse(responseCode = "400", description = "Match cannot be started in the current state")
+                    @ApiResponse(responseCode = "400", description = "Match cannot be started in the current state",
+                            content = @Content(mediaType = "application/json", schema = @Schema(implementation = ErrorResponse.class)))
             }
     )
-    @PutMapping(path = "/start", produces = "application/json")
+    @PostMapping(path = "/current/start", produces = "application/json")
     public ResponseEntity<MatchResponse> startMatch(
             @Parameter(name = BH, description = "Mandatory only for bot-mediated requests; identifies the real acting user.", required = false, schema = @Schema(type = "string"), in = ParameterIn.HEADER)
             @RequestHeader(value = BH, required = false) String tgId) {
@@ -198,12 +207,13 @@ public class MatchController {
                     @Parameter(name = BH, description = "Mandatory only for bot-mediated requests; identifies the real acting user.", required = false, schema = @Schema(type = "string"), in = ParameterIn.HEADER)
             },
             responses = {
-                    @ApiResponse(responseCode = "200", description = "AI player added successfully",
+                    @ApiResponse(responseCode = "201", description = "AI player added successfully",
                             content = @Content(mediaType = "application/json", schema = @Schema(implementation = MatchInfoResponse.class))),
-                    @ApiResponse(responseCode = "400", description = "Match is already started, full, or not hosted by the authenticated user")
+                    @ApiResponse(responseCode = "400", description = "Match is already started, full, or not hosted by the authenticated user",
+                            content = @Content(mediaType = "application/json", schema = @Schema(implementation = ErrorResponse.class)))
             }
     )
-    @PostMapping(path = "/ai-player", produces = "application/json")
+    @PostMapping(path = "/current/ai-players", produces = "application/json")
     public ResponseEntity<MatchInfoResponse> addAiPlayer(
             @Parameter(name = BH, description = "Mandatory only for bot-mediated requests; identifies the real acting user.", required = false, schema = @Schema(type = "string"), in = ParameterIn.HEADER)
             @RequestHeader(value = BH, required = false) String tgId,
@@ -212,7 +222,8 @@ public class MatchController {
         MatchInfoDto matchInfoDto = matchService.addAiPlayer(host, addAiPlayerReqDto);
         log.info("Host {} added an AI player to the match with keyCode = {}", host.getUsername(), matchInfoDto.getKeyCode());
         sentinelService.sendUpdate(matchInfoDto.getKeyCode(), host.getUsername(), SentinelAlertMessage.PLAYER_JOINED);
-        return ResponseEntity.ok(new MatchInfoResponse(matchInfoDto));
+        return ResponseEntity.status(HttpStatus.CREATED).body(new MatchInfoResponse(
+                HttpStatus.CREATED.value(), "AI player added successfully", matchInfoDto));
     }
 
     @Operation(
@@ -223,15 +234,16 @@ public class MatchController {
             },
             responses = {
                     @ApiResponse(responseCode = "200", description = "AI player removed successfully"),
-                    @ApiResponse(responseCode = "400", description = "Match is already started, not hosted by the authenticated user, or the given username is not an AI player in this match")
+                    @ApiResponse(responseCode = "400", description = "Match is already started, not hosted by the authenticated user, or the given username is not an AI player in this match",
+                            content = @Content(mediaType = "application/json", schema = @Schema(implementation = ErrorResponse.class)))
             }
     )
-    @DeleteMapping(path = "/ai-player", produces = "application/json")
+    @DeleteMapping(path = "/current/ai-players/{ai-player-username}", produces = "application/json")
     public ResponseEntity<VoidResponse> removeAiPlayer(
             @Parameter(name = BH, description = "Mandatory only for bot-mediated requests; identifies the real acting user.", required = false, schema = @Schema(type = "string"), in = ParameterIn.HEADER)
             @RequestHeader(value = BH, required = false) String tgId,
-            @Parameter(description = "Username of the AI player to remove", example = "ABC123-ai-1", required = true)
-            @RequestParam String aiPlayerUsername) {
+            @Parameter(name = "ai-player-username", description = "Username of the AI player to remove", example = "ABC123-ai-1", required = true)
+            @PathVariable("ai-player-username") String aiPlayerUsername) {
         UserEntity host = getUserEntity(tgId);
         String keyCode = matchService.removeAiPlayer(host, aiPlayerUsername);
         log.info("Host {} removed AI player {} from the match with keyCode = {}", host.getUsername(), aiPlayerUsername, keyCode);
@@ -241,18 +253,18 @@ public class MatchController {
 
     @Operation(
             summary = "Get match status",
-            description = "Returns the currently active match for the authenticated user, or an informational message if no match is being played. When moveNumber is provided and equals the current move count, the response indicates that no new moves are available.",
+            description = "Returns the current match for the authenticated user, or an informational message if no match is being played. When move_number equals the current move count, no new moves are available.",
             responses = {
                     @ApiResponse(responseCode = "200", description = "Current match status retrieved successfully",
                             content = @Content(mediaType = "application/json", schema = @Schema(implementation = MatchResponse.class)))
             }
     )
-    @GetMapping(path = "/status", produces = "application/json")
+    @GetMapping(path = "/current", produces = "application/json")
     public ResponseEntity<MatchResponse> getMatchStatus(
             @Parameter(name = BH, description = "Mandatory only for bot-mediated requests; identifies the real acting user.", required = false, schema = @Schema(type = "string"), in = ParameterIn.HEADER)
             @RequestHeader(value = BH, required = false) String tgId,
-            @Parameter(description = "Last move count known by the client. If equal to the current movesCount, no new moves are available.", example = "14", required = false)
-            @RequestParam(required = false) Integer moveNumber) {
+            @Parameter(name = "move_number", description = "Last move count known by the client. If equal to the current movesCount, no new moves are available.", example = "14", required = false)
+            @RequestParam(name = "move_number", required = false) Integer moveNumber) {
         UserEntity user = getUserEntity(tgId);
         Optional<MatchDto> playingMatch = matchService.getPlayingMatch(user, tgId != null);
         if (playingMatch.isEmpty()) {

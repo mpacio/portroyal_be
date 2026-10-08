@@ -10,6 +10,7 @@ import com.matteopaciolla.prbe.exceptions.common.MandatoryParamException;
 import com.matteopaciolla.prbe.exceptions.common.ResourceNotFoundException;
 import com.matteopaciolla.prbe.exceptions.common.UniqueConstraintViolatedException;
 import com.matteopaciolla.prbe.exceptions.user.EmailAlreadyConfirmedException;
+import com.matteopaciolla.prbe.exceptions.user.InvalidCurrentPasswordException;
 import com.matteopaciolla.prbe.exceptions.user.TelegramAccountAlreadyUnifiedException;
 import com.matteopaciolla.prbe.facade.EmailSenderFacade;
 import com.matteopaciolla.prbe.model.entity.UserEntity;
@@ -254,7 +255,7 @@ public class UserService {
             userRepository.save(user);
         } else {
             log.error("Invalid old password");
-            throw new ResourceNotFoundException("Invalid old password");
+            throw new InvalidCurrentPasswordException();
         }
     }
 

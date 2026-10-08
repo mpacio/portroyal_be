@@ -50,13 +50,13 @@ class PublicControllerPathTest {
                 .collect(Collectors.toSet());
 
         assertThat(paths)
-                .contains("/api/v1/public/register",
+                .contains("/api/v1/public/users",
+                        "/api/v1/public/email-confirmations",
+                        "/api/v1/public/telegram-unification-requests",
+                        "/public/confirmEmail")
+                .doesNotContain("/api/v1/public/register",
                         "/api/v1/public/newEmailConfirmation",
                         "/api/v1/public/newTgUnifyEmailOtp",
-                        "/public/confirmEmail")
-                .doesNotContain("/public/register",
-                        "/public/newEmailConfirmation",
-                        "/public/newTgUnifyEmailOtp",
                         "/api/v1/public/confirmEmail");
     }
 
@@ -65,15 +65,15 @@ class PublicControllerPathTest {
         when(userService.registerUser(any(UserReqDto.class), eq(false))).thenReturn(new UserDto());
         String payload = "{\"username\":\"alice42\"}";
 
-        mockMvc.perform(post("/api/v1/public/register")
+        mockMvc.perform(post("/api/v1/public/users")
                         .contentType(APPLICATION_JSON)
                         .content(payload))
                 .andExpect(status().isCreated());
 
-        mockMvc.perform(post("/public/register")
+        mockMvc.perform(post("/api/v1/public/register")
                         .contentType(APPLICATION_JSON)
                         .content(payload))
-                .andExpect(status().isUnauthorized());
+                .andExpect(status().isNotFound());
     }
 
     @Test

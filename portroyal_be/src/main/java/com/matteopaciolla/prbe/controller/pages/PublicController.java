@@ -17,7 +17,7 @@ import java.util.Map;
 import java.util.ResourceBundle;
 
 @Slf4j
-@Controller
+@Controller("publicEmailConfirmationController")
 @RequestMapping(Paths.PUBLIC_PATH)
 public class PublicController {
 

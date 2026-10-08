@@ -83,7 +83,7 @@ public class PortRoyalCli {
     }
 
     private static void showCurrentUser(Session session, Scanner scanner) {
-        ApiClient.Response response = call(session, "GET", "/api/v1/user/me", null, null);
+        ApiClient.Response response = call(session, "GET", "/api/v1/users/me", null, null);
         printResponse(response);
     }
 
@@ -115,12 +115,12 @@ public class PortRoyalCli {
             payload.put("telegramId", telegramId);
         }
 
-        ApiClient.Response response = call(session, "POST", "/api/v1/public/register", payload, null);
+        ApiClient.Response response = call(session, "POST", "/api/v1/public/users", payload, null);
         printResponse(response);
     }
 
     private static void listMatches(Session session, Scanner scanner) {
-        String path = "/api/v1/match/retrieve-all";
+        String path = "/api/v1/matches";
         System.out.print("Filter by username? [blank = all]: ");
         String username = scanner.nextLine().trim();
         if (!username.isBlank()) {
@@ -148,7 +148,7 @@ public class PortRoyalCli {
                 return;
             }
         }
-        ApiClient.Response response = call(session, "POST", "/api/v1/match/host", config, session.tgId == null ? null : Map.of("tgId", session.tgId));
+        ApiClient.Response response = call(session, "POST", "/api/v1/matches", config, session.tgId == null ? null : Map.of("tgId", session.tgId));
         printResponse(response);
     }
 
@@ -159,8 +159,8 @@ public class PortRoyalCli {
             System.out.println("Key code cannot be blank.");
             return;
         }
-        String path = "/api/v1/match/join?keyCode=" + urlEncode(keyCode);
-        ApiClient.Response response = call(session, "PUT", path, null, session.tgId == null ? null : Map.of("tgId", session.tgId));
+        String path = "/api/v1/matches/" + urlEncode(keyCode) + "/players";
+        ApiClient.Response response = call(session, "POST", path, null, session.tgId == null ? null : Map.of("tgId", session.tgId));
         printResponse(response);
     }
 
@@ -179,7 +179,7 @@ public class PortRoyalCli {
         if (!name.isBlank()) {
             payload.put("name", name);
         }
-        ApiClient.Response response = call(session, "POST", "/api/v1/match/ai-player", payload, session.tgId == null ? null : Map.of("tgId", session.tgId));
+        ApiClient.Response response = call(session, "POST", "/api/v1/matches/current/ai-players", payload, session.tgId == null ? null : Map.of("tgId", session.tgId));
         printResponse(response);
     }
 
@@ -190,13 +190,13 @@ public class PortRoyalCli {
             System.out.println("AI player username cannot be blank.");
             return;
         }
-        String path = "/api/v1/match/ai-player?aiPlayerUsername=" + urlEncode(aiPlayerUsername);
+        String path = "/api/v1/matches/current/ai-players/" + urlEncode(aiPlayerUsername);
         ApiClient.Response response = call(session, "DELETE", path, null, session.tgId == null ? null : Map.of("tgId", session.tgId));
         printResponse(response);
     }
 
     private static void startMatch(Session session, Scanner scanner) {
-        ApiClient.Response response = call(session, "PUT", "/api/v1/match/start", null, session.tgId == null ? null : Map.of("tgId", session.tgId));
+        ApiClient.Response response = call(session, "POST", "/api/v1/matches/current/start", null, session.tgId == null ? null : Map.of("tgId", session.tgId));
         printResponse(response);
     }
 
@@ -207,7 +207,7 @@ public class PortRoyalCli {
             System.out.println("Key code cannot be blank.");
             return;
         }
-        ApiClient.Response response = call(session, "GET", "/api/v1/match/retrieve?keyCode=" + urlEncode(keyCode), null, null);
+        ApiClient.Response response = call(session, "GET", "/api/v1/matches/" + urlEncode(keyCode), null, null);
         printResponse(response);
     }
 
@@ -216,7 +216,8 @@ public class PortRoyalCli {
         String keyCode = scanner.nextLine().trim();
         if (keyCode.isBlank()) {
             System.out.println("Fetching current match status...");
-            ApiClient.Response current = call(session, "GET", "/api/v1/match/status", null, null);
+            ApiClient.Response current = call(session, "GET", "/api/v1/matches/current", null,
+                    session.tgId == null ? null : Map.of("tgId", session.tgId));
             printResponse(current);
             try {
                 JsonNode root = MAPPER.readTree(current.body());
@@ -237,7 +238,7 @@ public class PortRoyalCli {
         }
 
         while (true) {
-            ApiClient.Response response = call(session, "GET", "/api/v1/match/retrieve?keyCode=" + urlEncode(keyCode), null, null);
+            ApiClient.Response response = call(session, "GET", "/api/v1/matches/" + urlEncode(keyCode), null, null);
             try {
                 JsonNode root = MAPPER.readTree(response.body());
                 JsonNode match = root.get("data");
@@ -291,7 +292,7 @@ public class PortRoyalCli {
                     payload.put("expeditionEmployeesList", Collections.emptyList());
                 }
 
-                ApiClient.Response moveResponse = call(session, "POST", "/api/v1/game/move", payload, session.tgId == null ? null : Map.of("tgId", session.tgId));
+                ApiClient.Response moveResponse = call(session, "POST", "/api/v1/matches/current/moves", payload, session.tgId == null ? null : Map.of("tgId", session.tgId));
                 printResponse(moveResponse);
                 if (moveResponse.statusCode() >= 400) {
                     continue;
@@ -314,10 +315,10 @@ public class PortRoyalCli {
         if (method.isBlank()) {
             method = "GET";
         }
-        System.out.print("Path, e.g. /api/v1/card or /api/v1/match/retrieve?keyCode=ABC123: ");
+        System.out.print("Path, e.g. /api/v1/cards or /api/v1/matches/ABC123: ");
         String path = scanner.nextLine().trim();
         if (path.isBlank()) {
-            path = "/api/v1/user/me";
+            path = "/api/v1/users/me";
         }
         System.out.print("JSON body (optional; leave blank for none): ");
         String rawBody = scanner.nextLine();

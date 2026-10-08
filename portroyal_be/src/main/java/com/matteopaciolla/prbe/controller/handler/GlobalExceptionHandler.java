@@ -3,6 +3,7 @@ package com.matteopaciolla.prbe.controller.handler;
 import com.matteopaciolla.prbe.dto.response.ErrorResponse;
 import com.matteopaciolla.prbe.exceptions.*;
 import com.matteopaciolla.prbe.exceptions.common.ResourceNotFoundException;
+import com.matteopaciolla.prbe.exceptions.match.MultipleHostingDemandException;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
@@ -162,6 +163,19 @@ public class GlobalExceptionHandler {
         ), HttpStatus.NOT_FOUND);
     }
 
+    @ExceptionHandler(MultipleHostingDemandException.class)
+    @ResponseStatus(HttpStatus.CONFLICT)
+    public ResponseEntity<ErrorResponse> handleMultipleHostingDemandException(MultipleHostingDemandException e) {
+        log.debug("Captured MultipleHostingDemandException: {}", e.getMessage());
+        return new ResponseEntity<>(new ErrorResponse(
+                HttpStatus.CONFLICT.value(),
+                HttpStatus.CONFLICT.getReasonPhrase(),
+                e.getMessage(),
+                e.getDescription(),
+                e.getSuggestion()
+        ), HttpStatus.CONFLICT);
+    }
+
     @ExceptionHandler(BaseClientCausedException.class)
     @ResponseStatus(HttpStatus.BAD_REQUEST)
     public ResponseEntity<ErrorResponse> handleBaseClientCausedException(BaseClientCausedException e) {
@@ -188,7 +202,9 @@ public class GlobalExceptionHandler {
     public ResponseEntity<ErrorResponse> handleGeneralExceptions(Exception e) {
         log.error("Captured Exception: {}", e.getMessage(), e);
         return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                .contentType(MediaType.TEXT_PLAIN)
-                .body(new ErrorResponse(HttpStatus.INTERNAL_SERVER_ERROR.value(), "Internal Server Error: " + e.getMessage()));
+                .contentType(MediaType.APPLICATION_JSON)
+                .body(new ErrorResponse(HttpStatus.INTERNAL_SERVER_ERROR.value(),
+                        HttpStatus.INTERNAL_SERVER_ERROR.getReasonPhrase(),
+                        "An unexpected error occurred."));
     }
 }

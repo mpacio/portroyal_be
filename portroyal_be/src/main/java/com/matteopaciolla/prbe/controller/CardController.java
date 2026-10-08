@@ -9,6 +9,8 @@ import com.matteopaciolla.prbe.converter.CardConverter;
 import com.matteopaciolla.prbe.converter.ContractCardConverter;
 import com.matteopaciolla.prbe.dto.CardDto;
 import com.matteopaciolla.prbe.dto.ContractCardDto;
+import com.matteopaciolla.prbe.dto.response.ErrorResponse;
+import com.matteopaciolla.prbe.exceptions.common.ResourceNotFoundException;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.media.Schema;
@@ -26,17 +28,17 @@ import org.springframework.web.bind.annotation.RestController;
 import java.util.ArrayList;
 import java.util.List;
 
-@Tag(name = "Cards", description = "Card operations")
+@Tag(name = "Cards", description = "Read-only card catalog resources.")
 @SecurityRequirements({@SecurityRequirement(name = "basicAuth")})
 @Slf4j
 @RestController
 @RequestMapping(Paths.CARD_PATH)
 public class CardController {
 
-    @Operation(summary = "Get all cards", description = "Get all cards from the game",
+    @Operation(summary = "List cards", description = "Returns all cards from the game catalog.",
             responses = {
                     @ApiResponse(responseCode = "200", description = "List of cards")})
-    @GetMapping(path = "", produces = "application/json")
+    @GetMapping(produces = "application/json")
     public ResponseEntity<List<CardDto>> getAllCards() {
         List<Card> cards = new ArrayList<>(BaseDeckDictionary.DECK_LIST);
         cards.addAll(JOMC_ExpansionDeckDictionary.DECK_LIST);
@@ -45,10 +47,10 @@ public class CardController {
         return ResponseEntity.ok(cardDtos);
     }
 
-    @Operation(summary = "Get all contract cards", description = "Get all contract cards from the game",
+    @Operation(summary = "List contract cards", description = "Returns all contract cards from the game catalog.",
             responses = {
                     @ApiResponse(responseCode = "200", description = "List of contract cards")})
-    @GetMapping(path = "/contract", produces = "application/json")
+    @GetMapping(path = "/contracts", produces = "application/json")
     public ResponseEntity<List<ContractCardDto>> getContractCards() {
         List<ContractCard> contractCards = JOMC_ExpansionDeckDictionary.CONTRACTS_DECK_LIST;
         List<ContractCardDto> contractCardDtos = new ArrayList<>();
@@ -56,12 +58,12 @@ public class CardController {
         return ResponseEntity.ok(contractCardDtos);
     }
 
-    @Operation(summary = "Get card by id", description = "Get card by id from the game",
+    @Operation(summary = "Get a card", description = "Returns a card by its catalog identifier.",
             responses = {
                     @ApiResponse(responseCode = "200", description = "Card found",
                             content = @Content(mediaType = "application/json", schema = @Schema(implementation = CardDto.class))),
                     @ApiResponse(responseCode = "404", description = "Card not found",
-                            content = @Content(mediaType = "application/json"))})
+                            content = @Content(mediaType = "application/json", schema = @Schema(implementation = ErrorResponse.class)))})
     @GetMapping(path = "/{id}", produces = "application/json")
     public ResponseEntity<CardDto> getCardById(@PathVariable int id) {
         Card card = BaseDeckDictionary.DECK_MAP.get(id);
@@ -69,20 +71,21 @@ public class CardController {
             card = JOMC_ExpansionDeckDictionary.DECK_MAP.get(id);
         }
         if (card == null) {
-            return ResponseEntity.notFound().build();
+            throw new ResourceNotFoundException("Card not found: " + id);
         }
         return ResponseEntity.ok(CardConverter.toDto(card));
     }
 
-    @Operation(summary = "Get contract card by id", description = "Get contract card by id from the game",
+    @Operation(summary = "Get a contract card", description = "Returns a contract card by its catalog identifier.",
             responses = {
                     @ApiResponse(responseCode = "200", description = "Contract card found"),
-                    @ApiResponse(responseCode = "404", description = "Contract card not found")})
-    @GetMapping(path = "/contract/{id}", produces = "application/json")
+                    @ApiResponse(responseCode = "404", description = "Contract card not found",
+                            content = @Content(mediaType = "application/json", schema = @Schema(implementation = ErrorResponse.class)))})
+    @GetMapping(path = "/contracts/{id}", produces = "application/json")
     public ResponseEntity<ContractCardDto> getContractCardById(@PathVariable int id) {
         ContractCard contractCard = JOMC_ExpansionDeckDictionary.CONTRACTS_DECK_MAP.get(id);
         if (contractCard == null) {
-            return ResponseEntity.notFound().build();
+            throw new ResourceNotFoundException("Contract card not found: " + id);
         }
         return ResponseEntity.ok(ContractCardConverter.toDto(contractCard));
     }

@@ -17,7 +17,7 @@ public class MatchConfigConverter {
         matchConfigReqDto.setTaxedMoney(configuration.getTaxedMoney());
         matchConfigReqDto.setTaxRate(configuration.getTaxRate());
         matchConfigReqDto.setBigExpeditionMinimumPlayersNumber(configuration.getBigExpeditionMinimumPlayersNumber());
-        matchConfigReqDto.setJOMC_ExpansionUsed(configuration.isJOMC_ExpansionUsed());
+        matchConfigReqDto.setJomcExpansionUsed(configuration.isJOMC_ExpansionUsed());
         matchConfigReqDto.setCargoCoinToPoorestPlayer(configuration.isCargoCoinToPoorestPlayer());
         matchConfigReqDto.setContractsCardNumber(configuration.getContractsCardNumber());
         matchConfigReqDto.setMaxContractsCompletablePerPlayer(configuration.getMaxContractsCompletablePerPlayer());
@@ -31,7 +31,7 @@ public class MatchConfigConverter {
                 .taxedMoney(matchConfigReqDto.getTaxedMoney())
                 .taxRate(matchConfigReqDto.getTaxRate())
                 .bigExpeditionMinimumPlayersNumber(matchConfigReqDto.getBigExpeditionMinimumPlayersNumber())
-                .JOMC_ExpansionUsed(matchConfigReqDto.getJOMC_ExpansionUsed())
+                .JOMC_ExpansionUsed(matchConfigReqDto.getJomcExpansionUsed())
                 .cargoCoinToPoorestPlayer(matchConfigReqDto.getCargoCoinToPoorestPlayer())
                 .contractsCardNumber(matchConfigReqDto.getContractsCardNumber())
                 .maxContractsCompletablePerPlayer(matchConfigReqDto.getMaxContractsCompletablePerPlayer())
@@ -65,7 +65,7 @@ public class MatchConfigConverter {
                     matchConfigReqDto.setBigExpeditionMinimumPlayersNumber(Integer.parseInt(property.getPropValue()));
                     break;
                 case "JOMC_ExpansionUsed":
-                    matchConfigReqDto.setJOMC_ExpansionUsed(Boolean.parseBoolean(property.getPropValue()));
+                    matchConfigReqDto.setJomcExpansionUsed(Boolean.parseBoolean(property.getPropValue()));
                     break;
                 case "cargoCoinToPoorestPlayer":
                     matchConfigReqDto.setCargoCoinToPoorestPlayer(Boolean.parseBoolean(property.getPropValue()));
@@ -90,7 +90,7 @@ public class MatchConfigConverter {
                 new ConfigPropertyEntity(configId, name, "taxedMoney", String.valueOf(matchConfigReqDto.getTaxedMoney())),
                 new ConfigPropertyEntity(configId, name, "taxRate", String.valueOf(matchConfigReqDto.getTaxRate())),
                 new ConfigPropertyEntity(configId, name, "bigExpeditionMinimumPlayersNumber", String.valueOf(matchConfigReqDto.getBigExpeditionMinimumPlayersNumber())),
-                new ConfigPropertyEntity(configId, name, "JOMC_ExpansionUsed", String.valueOf(matchConfigReqDto.getJOMC_ExpansionUsed())),
+                new ConfigPropertyEntity(configId, name, "JOMC_ExpansionUsed", String.valueOf(matchConfigReqDto.getJomcExpansionUsed())),
                 new ConfigPropertyEntity(configId, name, "cargoCoinToPoorestPlayer", String.valueOf(matchConfigReqDto.getCargoCoinToPoorestPlayer())),
                 new ConfigPropertyEntity(configId, name, "contractsCardNumber", String.valueOf(matchConfigReqDto.getContractsCardNumber())),
                 new ConfigPropertyEntity(configId, name, "maxContractsCompletablePerPlayer", String.valueOf(matchConfigReqDto.getMaxContractsCompletablePerPlayer()))

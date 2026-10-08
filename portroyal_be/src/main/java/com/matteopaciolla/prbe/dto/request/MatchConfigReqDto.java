@@ -29,7 +29,7 @@ public class MatchConfigReqDto {
     private Integer bigExpeditionMinimumPlayersNumber;
 
     @Schema(description = "Whether \"Just One More Contract\" expansion deck is enabled.", example = "false")
-    private Boolean JOMC_ExpansionUsed;
+    private Boolean jomcExpansionUsed;
 
     @Schema(description = "Whether extra cargo coins are automatically redistributed to the poorest player.", example = "true")
     private Boolean cargoCoinToPoorestPlayer;

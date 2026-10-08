@@ -9,4 +9,8 @@ public class VoidResponse extends BaseResponse<Void> {
     public VoidResponse(String message) {
         super(message, null);
     }
+
+    public VoidResponse(int status, String message) {
+        super(status, message, null);
+    }
 }

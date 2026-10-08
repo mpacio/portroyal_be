@@ -41,13 +41,15 @@ auth or user-resolution code:
 
 - Roles: `UserRole.USER`, `ADMIN`, `BOT`. A Telegram Bot authenticates as **one single technical
   account** (seeded as `shaslabot`), not one account per Telegram user.
-- Bot-mediated requests carry a mandatory `tgId` header (`CommonConstants.BOT_MANDATORY_HEADER`).
-  `AuthenticationUtils.isBotUser()` detects the bot caller; controllers/services then resolve the
-  real acting user via `userService.getUserEntityByTelegramId(tgId)` instead of the authenticated
-  principal (see `MatchController#getUserEntity`, `GameController#move`).
-- Registration: `POST /api/v1/public/register` (web/app, username/email/password) vs.
-  `POST /api/v1/user/register/telegram` (`BOT` role only, Telegram id only).
-- Identity unification: `GET /api/v1/public/newTgUnifyEmailOtp` + `POST /api/v1/user/unify` (`BOT` role only,
+- Match/game requests that act for a Telegram user carry a mandatory `tgId` header
+  (`CommonConstants.BOT_MANDATORY_HEADER`). `AuthenticationUtils.isBotUser()` detects the bot
+  caller; controllers/services then resolve the real acting user via
+  `userService.getUserEntityByTelegramId(tgId)` instead of the authenticated principal (see
+  `MatchController#getUserEntity`, `GameController#move`). Match reads by explicit key do not need
+  `tgId`.
+- Registration: `POST /api/v1/public/users` (web/app, username/email/password) vs.
+  `POST /api/v1/users/telegram-accounts` (`BOT` role only, Telegram ID only).
+- Identity unification: `POST /api/v1/public/telegram-unification-requests` + `POST /api/v1/users/identity-unifications` (`BOT` role only,
   OTP via `temporary_tokens`) merges a Telegram-only user with an email account into one
   `UserEntity`.
 - Moves/matches are always keyed by the domain `UserEntity`, never by client type or session.
@@ -68,7 +70,7 @@ Every `portroyal_be` instance must remain stateless and disposable:
   `emails_queue` / `EmailSenderFacade`).
 - **Known exception:** `sentinel` long-polling and SSE endpoints hold subscriptions
   (`SentinelService#matchSubsMap`) in local JVM memory — these need sticky routing at scale. The
-  webhook alternative (`POST /sentinel/callback/subscribe`, backed by the `callbacks` table) has no
+  webhook alternative (`POST /sentinel/subscriptions/callbacks`, backed by the `callbacks` table) has no
   such limitation. Prefer the webhook/DB-backed pattern for any new cross-instance notification
   feature; if extending long-polling/SSE, keep in mind their sticky-session requirement.
 
@@ -87,10 +89,19 @@ Every `portroyal_be` instance must remain stateless and disposable:
 
 - Base path `/api/v1`; Swagger UI at `/swagger-ui/index.html`, OpenAPI JSON at `/api/v1/api-docs`.
 - HTTP Basic Auth on essentially every endpoint under `/api/v1/**`.
-- Tags/base paths: `public` (no auth), `user`, `match`, `game` (moves), `card` (read-only catalog),
-  `sentinel` (real-time notifications).
-- Bot-mediated endpoints (`MatchController`, `GameController`, `UserController#registerTelegramPlayer`,
-  `UserController#unifyTelegramAndEmailAccounts`) require the `tgId` header.
+- Resource base paths: `public` (no auth), `users`, `matches` (including nested moves), `cards`
+  (read-only catalog), and `sentinel` (real-time notifications).
+- Use HTTP methods according to resource intent (`GET` reads, `POST` creates/actions, `PATCH` partial
+  updates, `DELETE` removes resources). Creation responses use `201`; accepted queued OTP requests
+  use `202`. Error responses are JSON with `status`, `error`, `errorCode`, `message`, `errorContext`,
+  `errorLinks`, and `timestamp`, and the HTTP status line must match `status`.
+- JSON request/response properties use camelCase. Multiword query parameters use underscores
+  (for example, `move_number`, `page_size`, and `telegram_id`); path words are lowercase and
+  hyphen-separated. The bot identity header remains exactly `tgId` and is not a query parameter.
+- Match/game actions that resolve a real acting user require `tgId`; Telegram account registration
+  and identity unification are instead restricted to the `BOT` role and take identity data in their
+  JSON request bodies. Keep the route authorization matchers in `WebSecurityConfig` aligned with
+  `/users/telegram-accounts` and `/users/identity-unifications`.
 
 ## Build & test
 

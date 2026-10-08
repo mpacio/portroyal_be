@@ -23,6 +23,8 @@ import java.util.List;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -46,7 +48,6 @@ class MatchControllerTest {
                 new UsernamePasswordAuthenticationToken(
                         "alice", "password", List.of(new SimpleGrantedAuthority(UserRole.USER.toString()))));
         user = new UserEntity("alice", "encoded", List.of(UserRole.USER));
-        when(userService.getUserEntityByUsername("alice")).thenReturn(user);
     }
 
     @AfterEach
@@ -56,6 +57,7 @@ class MatchControllerTest {
 
     @Test
     void getMatchStatus_whenMoveNumberMatchesCurrentCount_returnsNoNewMoves() {
+        when(userService.getUserEntityByUsername("alice")).thenReturn(user);
         MatchDto matchDto = new MatchDto();
         matchDto.setMovesCount(5);
         when(matchService.getPlayingMatch(user, false)).thenReturn(Optional.of(matchDto));
@@ -68,6 +70,7 @@ class MatchControllerTest {
 
     @Test
     void getMatchStatus_whenMoveNumberDiffers_returnsCurrentMatch() {
+        when(userService.getUserEntityByUsername("alice")).thenReturn(user);
         MatchDto matchDto = new MatchDto();
         matchDto.setMovesCount(5);
         when(matchService.getPlayingMatch(user, false)).thenReturn(Optional.of(matchDto));
@@ -75,5 +78,33 @@ class MatchControllerTest {
         ResponseEntity<MatchResponse> response = matchController.getMatchStatus(null, 4);
 
         assertThat(response.getBody().getData()).isSameAs(matchDto);
+    }
+
+    @Test
+    void getMatchStatus_whenBotAuthenticated_resolvesPlayerFromTelegramId() {
+        SecurityContextHolder.getContext().setAuthentication(
+                new UsernamePasswordAuthenticationToken(
+                        "shaslabot", "password", List.of(new SimpleGrantedAuthority(UserRole.BOT.toString()))));
+        when(userService.getUserEntityByTelegramId("123456789")).thenReturn(user);
+        when(matchService.getPlayingMatch(user, true)).thenReturn(Optional.empty());
+
+        matchController.getMatchStatus("123456789", null);
+
+        verify(userService).getUserEntityByTelegramId("123456789");
+        verify(matchService).getPlayingMatch(user, true);
+    }
+
+    @Test
+    void joinMatch_whenBotAuthenticated_resolvesActingUserFromTelegramId() {
+        SecurityContextHolder.getContext().setAuthentication(
+                new UsernamePasswordAuthenticationToken(
+                        "shaslabot", "password", List.of(new SimpleGrantedAuthority(UserRole.BOT.toString()))));
+        when(userService.getUserEntityByTelegramId("123456789")).thenReturn(user);
+
+        matchController.joinMatch("ABC123", "123456789");
+
+        verify(userService).getUserEntityByTelegramId("123456789");
+        verify(userService, never()).getUserEntityByUsername("shaslabot");
+        verify(matchService).joinMatch("ABC123", user);
     }
 }

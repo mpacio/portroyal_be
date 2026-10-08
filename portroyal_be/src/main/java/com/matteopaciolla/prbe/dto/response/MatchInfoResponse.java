@@ -11,4 +11,8 @@ public class MatchInfoResponse extends BaseResponse<MatchInfoDto> {
     public MatchInfoResponse(String message, MatchInfoDto data) {
         super(message, data);
     }
+
+    public MatchInfoResponse(int status, String message, MatchInfoDto data) {
+        super(status, message, data);
+    }
 }
