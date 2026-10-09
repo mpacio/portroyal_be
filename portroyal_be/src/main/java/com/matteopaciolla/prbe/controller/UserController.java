@@ -125,14 +125,14 @@ public class UserController {
 
     @Operation(
             summary = "Update a user",
-            description = "Updates the profile data for the specified user. The username in query string identifies the subject; the body contains the new profile values.",
+            description = "Partially updates the profile data for the specified user. The username in query string identifies the subject; include only the profile values to change in the body.",
             responses = {
                     @ApiResponse(responseCode = "200", description = "User updated successfully",
                             content = @Content(mediaType = "application/json", schema = @Schema(implementation = UserResponse.class))),
                     @ApiResponse(responseCode = "400", description = "Validation error")
             }
     )
-    @PutMapping(path = "/update")
+    @PatchMapping(path = "/update")
     public ResponseEntity<UserResponse> updateUser(
             @Parameter(description = "Username of the user to update", required = true, example = "alice")
             @RequestParam String username,

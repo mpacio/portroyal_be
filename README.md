@@ -307,9 +307,11 @@ Paths in this table are relative to `/api/v1`.
 | `GET /public/newTgUnifyEmailOtp`                   | Request an OTP to unify a Telegram id with an email account                                                                             |
 | `POST /user/unify`                                 | Confirm Telegram/email unification with the OTP — `BOT` role only                                                                       |
 | `GET /user/me`                                     | Get the currently authenticated user                                                                                                    |
+| `PATCH /user/update?username=...`                  | Partially update a user profile                                                                                                          |
 | `POST /match/host`                                 | Host a new match (optionally with a custom configuration)                                                                               |
-| `PUT /match/join?keyCode=...`                      | Join an open, not-yet-started match                                                                                                     |
-| `PUT /match/start`                                 | Start the match you are hosting (requires ≥ 2 players)                                                                                  |
+| `POST /match/join?keyCode=...`                     | Join an open, not-yet-started match                                                                                                     |
+| `POST /match/start`                                | Start the match you are hosting (requires ≥ 2 players)                                                                                  |
+| `POST /match/close`                                | Close an unstarted match the caller participates in                                                                                     |
 | `POST /match/ai-player`                            | Add an autonomous AI player (`EASY`/`MEDIUM`/`HARD`) to the match you are hosting, before it starts                                     |
 | `DELETE /match/ai-player?aiPlayerUsername=...`     | Remove a previously added AI player from the match you are hosting, before it starts                                                    |
 | `GET /match/status`                                | Get the match currently being played by the caller, if any                                                                              |

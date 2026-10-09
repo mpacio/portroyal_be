@@ -160,7 +160,7 @@ public class PortRoyalCli {
             return;
         }
         String path = "/api/v1/match/join?keyCode=" + urlEncode(keyCode);
-        ApiClient.Response response = call(session, "PUT", path, null, session.tgId == null ? null : Map.of("tgId", session.tgId));
+        ApiClient.Response response = call(session, "POST", path, null, session.tgId == null ? null : Map.of("tgId", session.tgId));
         printResponse(response);
     }
 
@@ -196,7 +196,7 @@ public class PortRoyalCli {
     }
 
     private static void startMatch(Session session, Scanner scanner) {
-        ApiClient.Response response = call(session, "PUT", "/api/v1/match/start", null, session.tgId == null ? null : Map.of("tgId", session.tgId));
+        ApiClient.Response response = call(session, "POST", "/api/v1/match/start", null, session.tgId == null ? null : Map.of("tgId", session.tgId));
         printResponse(response);
     }
 

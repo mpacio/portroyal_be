@@ -57,6 +57,16 @@ curl -u alice42:your-password \
   "https://api.example.com/api/v1/user/me"
 ```
 
+Profile changes use `PATCH /user/update?username=...`. Include the username in the JSON body and
+send only fields to change; omitted fields remain unchanged:
+
+```sh
+curl -u alice42:your-password -X PATCH \
+  -H "Content-Type: application/json" \
+  -d '{"username":"alice42","firstName":"Alice"}' \
+  "https://api.example.com/api/v1/user/update?username=alice42"
+```
+
 For a browser-based client, call the API over HTTPS and do not persist passwords or encoded Basic
 credentials in `localStorage`. A backend-for-frontend (BFF) can keep credentials out of browser
 JavaScript entirely. If the browser calls this API directly, keep credentials in memory where
@@ -153,10 +163,10 @@ curl -u alice42:your-password -H "Content-Type: application/json" \
   -d '{"id":1,"name":"default"}' "$BASE/match/host"
 
 # A second player joins using the keyCode returned by the host request.
-curl -u bob42:your-password -X PUT "$BASE/match/join?keyCode=ABC123"
+curl -u bob42:your-password -X POST "$BASE/match/join?keyCode=ABC123"
 
 # The host starts the match.
-curl -u alice42:your-password -X PUT "$BASE/match/start"
+curl -u alice42:your-password -X POST "$BASE/match/start"
 
 # Read the authoritative current state.
 curl -u alice42:your-password "$BASE/match/retrieve?keyCode=ABC123"
@@ -282,9 +292,9 @@ is served at `/public/confirmEmail` from the server root.
 | `POST`            | `/user/register/telegram`                   | Create a Telegram-linked user; requires `BOT` role                                |
 | `POST`            | `/user/unify`                               | Unify a Telegram identity and email account; requires `BOT` role                  |
 | `POST`            | `/match/host`                               | Host a match                                                                      |
-| `PUT`             | `/match/join?keyCode=...`                   | Join a match before it starts                                                     |
-| `PUT`             | `/match/start`                              | Start the hosted match                                                            |
-| `PUT`             | `/match/close`                              | Close an unstarted match                                                          |
+| `POST`            | `/match/join?keyCode=...`                   | Join a match before it starts                                                     |
+| `POST`            | `/match/start`                              | Start the hosted match                                                            |
+| `POST`            | `/match/close`                              | Close an unstarted match                                                          |
 | `POST` / `DELETE` | `/match/ai-player`                          | Add or remove an AI player before match start                                     |
 | `GET`             | `/match/status`                             | Retrieve the authenticated player's current match                                 |
 | `GET`             | `/match/retrieve?keyCode=...`               | Retrieve a match by key                                                           |

@@ -110,7 +110,7 @@ public class MatchController {
                     @ApiResponse(responseCode = "400", description = "Match cannot be joined in the current state")
             }
     )
-    @PutMapping(path = "/join", produces = "application/json")
+    @PostMapping(path = "/join", produces = "application/json")
     public ResponseEntity<VoidResponse> joinMatch(
             @Parameter(description = "Unique match key code", example = "ABC123", required = true)
             @RequestParam String keyCode,
@@ -160,7 +160,7 @@ public class MatchController {
                     @ApiResponse(responseCode = "400", description = "Close operation not allowed in the current match state")
             }
     )
-    @PutMapping(path = "/close", produces = "application/json")
+    @PostMapping(path = "/close", produces = "application/json")
     public ResponseEntity<VoidResponse> closeMatch(
             @Parameter(name = BH, description = "Mandatory only for bot-mediated requests; identifies the real acting user.", required = false, schema = @Schema(type = "string"), in = ParameterIn.HEADER)
             @RequestHeader(value = BH, required = false) String tgId) {
@@ -180,7 +180,7 @@ public class MatchController {
                     @ApiResponse(responseCode = "400", description = "Match cannot be started in the current state")
             }
     )
-    @PutMapping(path = "/start", produces = "application/json")
+    @PostMapping(path = "/start", produces = "application/json")
     public ResponseEntity<MatchResponse> startMatch(
             @Parameter(name = BH, description = "Mandatory only for bot-mediated requests; identifies the real acting user.", required = false, schema = @Schema(type = "string"), in = ParameterIn.HEADER)
             @RequestHeader(value = BH, required = false) String tgId) {

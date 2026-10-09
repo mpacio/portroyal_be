@@ -201,7 +201,7 @@ API paths below are relative to `BASE` (`/api/v1`).
 | `POST /user/unify`                                        | Link the Telegram ID to the email account using the OTP; requires `BOT` authentication.                        |
 | `GET /user/me`                                            | Get the authenticated account.                                                                                 |
 | `GET /user/retrieve?username=...`                         | Look up a user by username, Telegram ID, or email.                                                             |
-| `PUT /user/update?username=...`                           | Update user profile; requires `ADMIN` or `BOT` authorization.                                                  |
+| `PATCH /user/update?username=...`                         | Partially update user profile; requires `ADMIN` or `BOT` authorization.                                        |
 | `POST /user/changePsw`                                    | Change the authenticated user's password.                                                                      |
 | `DELETE /user/delete?username=...`                        | Delete a user; requires `ADMIN` authorization.                                                                 |
 
@@ -245,11 +245,11 @@ not an optional identity hint for a bot request.
 | Method and path                                | Purpose                                                                                                                               |
 |------------------------------------------------|---------------------------------------------------------------------------------------------------------------------------------------|
 | `POST /match/host`                             | Host a match. Optional JSON body identifies a known configuration by `id` and `name`; omitting it selects default configuration ID 1. |
-| `PUT /match/join?keyCode=...`                  | Join an open match before it starts.                                                                                                  |
+| `POST /match/join?keyCode=...`                 | Join an open match before it starts.                                                                                                  |
 | `POST /match/ai-player`                        | Host adds an AI before the match starts. Body requires `difficulty` (`EASY`, `MEDIUM`, or `HARD`) and may include `name`.             |
 | `DELETE /match/ai-player?aiPlayerUsername=...` | Host removes an AI before the match starts.                                                                                           |
-| `PUT /match/start`                             | Host starts the match; requires at least two total players.                                                                           |
-| `PUT /match/close`                             | Close an unstarted match the caller participates in.                                                                                  |
+| `POST /match/start`                            | Host starts the match; requires at least two total players.                                                                           |
+| `POST /match/close`                            | Close an unstarted match the caller participates in.                                                                                  |
 | `GET /match/status`                            | Get the caller's current match, if any.                                                                                               |
 | `GET /match/status?moveNumber=N`               | If `N` equals the current move count, returns "No new moves"; otherwise returns the current match snapshot.                           |
 | `GET /match/retrieve?keyCode=...`              | Get the match snapshot.                                                                                                               |
@@ -264,10 +264,10 @@ curl -u alice:password -H "Content-Type: application/json" \
   -d '{"id":1,"name":"default"}' "$BASE/match/host"
 
 # Another player joins with that keyCode
-curl -u bob:password -X PUT "$BASE/match/join?keyCode=ABC123"
+curl -u bob:password -X POST "$BASE/match/join?keyCode=ABC123"
 
 # Host starts
-curl -u alice:password -X PUT "$BASE/match/start"
+curl -u alice:password -X POST "$BASE/match/start"
 
 # Read state before choosing a move
 curl -u alice:password "$BASE/match/retrieve?keyCode=ABC123"
