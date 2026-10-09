@@ -1,4 +1,4 @@
-package com.matteopaciolla.prbe.controller.pages;
+package com.matteopaciolla.prbe.controller;
 
 import com.matteopaciolla.prbe.constants.Paths;
 import com.matteopaciolla.prbe.dto.UserDto;
@@ -19,7 +19,7 @@ import java.util.ResourceBundle;
 @Slf4j
 @Controller
 @RequestMapping(Paths.PUBLIC_PATH)
-public class PublicController {
+public class PublicPagesController {
 
     @Autowired
     private UserService userService;
