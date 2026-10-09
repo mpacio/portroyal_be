@@ -1,5 +1,6 @@
 package com.matteopaciolla.prbe.config;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.matteopaciolla.prbe.constants.Paths;
 import com.matteopaciolla.prbe.converter.ErrorResponseMessageConverter;
 import org.springframework.context.annotation.Configuration;
@@ -16,6 +17,12 @@ import java.util.List;
 @Configuration
 public class WebConfig implements WebMvcConfigurer {
 
+    private final ObjectMapper objectMapper;
+
+    public WebConfig(ObjectMapper objectMapper) {
+        this.objectMapper = objectMapper;
+    }
+
     @Override
     public void addCorsMappings(CorsRegistry registry) {
         registry.addMapping("/**");
@@ -29,6 +36,6 @@ public class WebConfig implements WebMvcConfigurer {
 
     @Override
     public void extendMessageConverters(List<HttpMessageConverter<?>> converters) {
-        converters.add(new ErrorResponseMessageConverter());
+        converters.add(new ErrorResponseMessageConverter(objectMapper));
     }
 }

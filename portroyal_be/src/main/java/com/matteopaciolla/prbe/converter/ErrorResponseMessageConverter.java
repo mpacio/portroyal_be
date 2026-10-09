@@ -1,5 +1,6 @@
 package com.matteopaciolla.prbe.converter;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.matteopaciolla.prbe.dto.response.ErrorResponse;
 import org.springframework.http.HttpInputMessage;
 import org.springframework.http.HttpOutputMessage;
@@ -12,6 +13,12 @@ import java.util.Collections;
 import java.util.List;
 
 public class ErrorResponseMessageConverter implements HttpMessageConverter<ErrorResponse> {
+
+    private final ObjectMapper objectMapper;
+
+    public ErrorResponseMessageConverter(ObjectMapper objectMapper) {
+        this.objectMapper = objectMapper;
+    }
 
     @Override
     public boolean canRead(Class<?> clazz, MediaType mediaType) {
@@ -35,6 +42,7 @@ public class ErrorResponseMessageConverter implements HttpMessageConverter<Error
 
     @Override
     public void write(ErrorResponse errorResponse, MediaType contentType, HttpOutputMessage outputMessage) throws IOException, HttpMessageNotWritableException {
-        outputMessage.getBody().write(errorResponse.toString().getBytes());
+        outputMessage.getBody().write(("data:" + objectMapper.writeValueAsString(errorResponse) + "\n\n")
+                .getBytes(java.nio.charset.StandardCharsets.UTF_8));
     }
 }
