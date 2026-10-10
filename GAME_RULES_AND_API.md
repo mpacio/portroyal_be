@@ -196,11 +196,11 @@ API paths below are relative to `BASE` (`/api/v1`).
 |-----------------------------------------------------------|----------------------------------------------------------------------------------------------------------------|
 | `POST /public/register`                                   | Create a standard account; public.                                                                             |
 | `GET /public/new-email-confirmation?email=...`                 | Request email confirmation; public.                                                                            |
-| `GET /public/new-tg-unify-email-otp?email=...&telegramId=...` | Request the email OTP to link a Telegram identity; public. The email must be confirmed and not already linked. |
+| `GET /public/new-tg-unify-email-otp?email=...&telegram_id=...` | Request the email OTP to link a Telegram identity; public. The email must be confirmed and not already linked. |
 | `POST /user/register/telegram`                            | Create a Telegram-linked player; requires `BOT` authentication.                                                |
 | `POST /user/unify`                                        | Link the Telegram ID to the email account using the OTP; requires `BOT` authentication.                        |
 | `GET /user/me`                                            | Get the authenticated account.                                                                                 |
-| `GET /user/retrieve?username=...`                         | Look up a user by username, Telegram ID, or email.                                                             |
+| `GET /user/retrieve?username=...`                         | Look up a user by username, Telegram ID, or email; use `telegram_id` when identifying by Telegram ID.          |
 | `PATCH /user/update?username=...`                         | Partially update user profile; requires `ADMIN` or `BOT` authorization.                                        |
 | `POST /user/change-psw`                                    | Change the authenticated user's password.                                                                      |
 | `DELETE /user/delete?username=...`                        | Delete a user; requires `ADMIN` authorization.                                                                 |
@@ -245,16 +245,16 @@ not an optional identity hint for a bot request.
 | Method and path                                | Purpose                                                                                                                               |
 |------------------------------------------------|---------------------------------------------------------------------------------------------------------------------------------------|
 | `POST /match/host`                             | Host a match. Optional JSON body identifies a known configuration by `id` and `name`; omitting it selects default configuration ID 1. |
-| `POST /match/join?keyCode=...`                 | Join an open match before it starts.                                                                                                  |
+| `POST /match/join?key_code=...`                 | Join an open match before it starts.                                                                                                  |
 | `POST /match/ai-player`                        | Host adds an AI before the match starts. Body requires `difficulty` (`EASY`, `MEDIUM`, or `HARD`) and may include `name`.             |
-| `DELETE /match/ai-player?aiPlayerUsername=...` | Host removes an AI before the match starts.                                                                                           |
+| `DELETE /match/ai-player?ai_player_username=...` | Host removes an AI before the match starts.                                                                                           |
 | `POST /match/start`                            | Host starts the match; requires at least two total players.                                                                           |
 | `POST /match/close`                            | Close an unstarted match the caller participates in.                                                                                  |
 | `GET /match/status`                            | Get the caller's current match, if any.                                                                                               |
-| `GET /match/status?moveNumber=N`               | If `N` equals the current move count, returns "No new moves"; otherwise returns the current match snapshot.                           |
-| `GET /match/retrieve?keyCode=...`              | Get the match snapshot.                                                                                                               |
-| `GET /match/retrieve?keyCode=...&moveNumber=N` | If `N` equals the current move count, returns "No new moves"; otherwise returns the snapshot.                                         |
-| `GET /match/retrieve-all`                      | List matches; supports `username`, `ended`, `pageNumber`, `pageSize`, `sortField`, and `sortDirection`.                               |
+| `GET /match/status?move_number=N`               | If `N` equals the current move count, returns "No new moves"; otherwise returns the current match snapshot.                           |
+| `GET /match/retrieve?key_code=...`              | Get the match snapshot.                                                                                                               |
+| `GET /match/retrieve?key_code=...&move_number=N` | If `N` equals the current move count, returns "No new moves"; otherwise returns the snapshot.                                         |
+| `GET /match/retrieve-all`                      | List matches; supports `username`, `ended`, `page_number`, `page_size`, `sort_field`, and `sort_direction`.                           |
 
 Typical sequence:
 
@@ -264,13 +264,13 @@ curl -u alice:password -H "Content-Type: application/json" \
   -d '{"id":1,"name":"default"}' "$BASE/match/host"
 
 # Another player joins with that keyCode
-curl -u bob:password -X POST "$BASE/match/join?keyCode=ABC123"
+curl -u bob:password -X POST "$BASE/match/join?key_code=ABC123"
 
 # Host starts
 curl -u alice:password -X POST "$BASE/match/start"
 
 # Read state before choosing a move
-curl -u alice:password "$BASE/match/retrieve?keyCode=ABC123"
+curl -u alice:password "$BASE/match/retrieve?key_code=ABC123"
 ```
 
 The host is automatically a player. A player cannot join multiple open matches. Human and AI
@@ -333,10 +333,10 @@ duplicate-signing rule, and per-player contract limit. Automatic contracts are s
 when their conditions are evaluated; clients should use the match snapshot and move `sideEvents` to
 observe them.
 
-`GET /game/move?keyCode=ABC123&moveNumber=12` retrieves one move.
-`GET /game/moves?keyCode=ABC123` retrieves paged history; optional parameters include
-`pageNumber` (0-based, default 0), `pageSize` (default 10), `sortField` (default `TIME_INDEX`),
-and `sortDirection` (`ASC` or `DESC`, default `ASC`).
+`GET /game/move?key_code=ABC123&move_number=12` retrieves one move.
+`GET /game/moves?key_code=ABC123` retrieves paged history; optional parameters include
+`page_number` (0-based, default 0), `page_size` (default 10), `sort_field` (default `TIME_INDEX`),
+and `sort_direction` (`ASC` or `DESC`, default `ASC`).
 
 The successful `POST /game/move` response includes the submitted move's `mainEvent` and
 `sideEvents`, when generated. A human move may also trigger automatic AI turns; those AI moves are
@@ -353,9 +353,9 @@ include `mainEvent` or `sideEvents`. Retrieve the match again to see the latest 
 | `GET /card/contract`                                           | List contract definitions and descriptions.                                                                |
 | `GET /card/contract/{id}`                                      | Get one contract by catalog ID.                                                                            |
 | `POST /sentinel/callback/subscribe`                            | Register a webhook for alerts. JSON includes `matchKeyCode`, `url`, and optional `secret`.                 |
-| `GET /sentinel/long-polling/subscribe?keyCode=...&seconds=120` | Wait for one alert; re-subscribe after receiving it. Minimum timeout is 10 seconds.                        |
-| `GET /sentinel/sse/subscribe?keyCode=...&seconds=3600`         | Receive alerts as Server-Sent Events until the connection closes or times out.                             |
-| `DELETE /sentinel/subscription?keyCode=...`                    | Remove the caller's subscription for this match.                                                           |
+| `GET /sentinel/long-polling/subscribe?key_code=...&seconds=120` | Wait for one alert; re-subscribe after receiving it. Minimum timeout is 10 seconds.                        |
+| `GET /sentinel/sse/subscribe?key_code=...&seconds=3600`         | Receive alerts as Server-Sent Events until the connection closes or times out.                             |
+| `DELETE /sentinel/subscription?key_code=...`                    | Remove the caller's subscription for this match.                                                           |
 
 **Sentinel is the preferred way for clients to learn about live match updates.** Subscribe once
 instead of repeatedly polling `/match/retrieve` on a timer, then refresh the match snapshot when

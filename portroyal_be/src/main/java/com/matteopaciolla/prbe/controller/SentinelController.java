@@ -63,7 +63,7 @@ The alerts refer to any match, that's why the matchKeyCode is required.
 The alert will be sent only if the alert is available before the timeout.""")
     @GetMapping(path = "/long-polling/subscribe", produces = MediaType.APPLICATION_JSON_VALUE)
     public DeferredResult<AlertDto> addLongPollingSentinel(
-            @Valid @NotBlank(message = "keyCode must not be blank") @RequestParam String keyCode,
+            @Valid @NotBlank(message = "key_code must not be blank") @RequestParam("key_code") String keyCode,
             @Valid @Min(value = 10, message = "seconds must be greater or equal to 10") @RequestParam(defaultValue = "120") int seconds) {
         String username = SecurityContextHolder.getContext().getAuthentication().getName();
         UserEntity user = userService.getUserEntityByUsername(username);
@@ -82,7 +82,7 @@ The alert will be sent only if the alert is available before the timeout.""",
                     schema = @io.swagger.v3.oas.annotations.media.Schema(implementation = AlertDto.class))),})
     @GetMapping(path = "/sse/subscribe", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
     public SseEmitter addSSESentinel(
-            @Valid @NotBlank(message = "keyCode must not be blank") @RequestParam(value = "keyCode") String keyCode,
+            @Valid @NotBlank(message = "key_code must not be blank") @RequestParam(value = "key_code") String keyCode,
             @Valid @Min(value = 1, message = "seconds must be greater or equal to 1") @RequestParam(value = "seconds", defaultValue = "3600") int seconds) {
         String username = SecurityContextHolder.getContext().getAuthentication().getName();
         UserEntity user = userService.getUserEntityByUsername(username);
@@ -95,7 +95,7 @@ The subscription will be removed from the user's subscriptions.
 The subscription will not be available anymore.""")
     @DeleteMapping(path = "/subscription", produces = MediaType.APPLICATION_JSON_VALUE)
     public ResponseEntity<VoidResponse> removeSentinelSubscription(
-            @Valid @NotBlank(message = "keyCode must not be blank") @RequestParam(value = "keyCode") String keyCode) {
+            @Valid @NotBlank(message = "key_code must not be blank") @RequestParam(value = "key_code") String keyCode) {
         String username = SecurityContextHolder.getContext().getAuthentication().getName();
         UserEntity user = userService.getUserEntityByUsername(username);
         sentinelService.removeSentinelSubscription(user.getId(), keyCode);

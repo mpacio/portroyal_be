@@ -71,8 +71,8 @@ public class PublicController {
     public ResponseEntity<VoidResponse> requestTgUnifyEmailOtp(
             @Parameter(description = "Email of the account to unify", required = true, example = "alice@example.com")
             @RequestParam String email,
-            @Parameter(description = "Optional Telegram id associated with the target account for the unification flow", required = false, example = "123456789")
-            @RequestParam(required = false) String telegramId) {
+            @Parameter(name = "telegram_id", description = "Optional Telegram id associated with the target account for the unification flow", required = false, example = "123456789")
+            @RequestParam(value = "telegram_id", required = false) String telegramId) {
         UserEntity user = userService.getUserEntityByEmail(email);
         if (!user.isEmailConfirmed()) {
             throw new EmailNotConfirmedException();

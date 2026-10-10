@@ -75,7 +75,7 @@ public class UserController {
      */
     @Operation(
             summary = "Retrieve a user",
-            description = "Resolve a user by username, telegram id or email. When multiple identifiers are provided, username takes precedence, then telegramId, then email.",
+            description = "Resolve a user by username, telegram_id or email. When multiple identifiers are provided, username takes precedence, then telegram_id, then email.",
             responses = {
                     @ApiResponse(responseCode = "200", description = "User found",
                             content = @Content(mediaType = "application/json", schema = @Schema(implementation = UserResponse.class))),
@@ -87,12 +87,12 @@ public class UserController {
     public ResponseEntity<UserResponse> getUser(
             @Parameter(description = "Username to resolve. Highest priority among identifiers.", example = "alice", required = false)
             @RequestParam(value = "username", required = false) String username,
-            @Parameter(description = "Telegram id to resolve. Used when username is absent.", example = "123456789", required = false)
-            @RequestParam(value = "telegramId", required = false) String telegramId,
+            @Parameter(name = "telegram_id", description = "Telegram id to resolve. Used when username is absent.", example = "123456789", required = false)
+            @RequestParam(value = "telegram_id", required = false) String telegramId,
             @Parameter(description = "Email to resolve. Used when username and telegramId are absent.", example = "alice@example.com", required = false)
             @RequestParam(value = "email", required = false) String email) {
         if (username == null && telegramId == null && email == null) {
-            throw new MandatoryParamException("At least one of these parameters must be provided", List.of("username", "telegramId", "email"));
+            throw new MandatoryParamException("At least one of these parameters must be provided", List.of("username", "telegram_id", "email"));
         }
 
         UserDto userDto;

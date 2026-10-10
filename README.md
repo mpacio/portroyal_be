@@ -113,7 +113,7 @@ computed by the backend.
   index.
 - `POST /match/ai-player` (host-only, match not yet started) adds an AI player with a chosen
   `BotDifficulty` (`EASY`/`MEDIUM`/`HARD`) and an optional display name; `DELETE
-  /match/ai-player?aiPlayerUsername=...` removes one before the match starts.
+  /match/ai-player?ai_player_username=...` removes one before the match starts.
 - Once the match is running, `GameService#autoPlayAiTurns` plays out every consecutive AI player
   turn by calling `Match#calculateNextMoveRecord(BotDifficulty)` (already implemented and tested in
   `portroyal_lib`) and persisting the resulting moves exactly like a human move — no game-rule logic
@@ -162,7 +162,7 @@ instance than the one holding a given subscription, that subscription will not b
 in-process. Deploying these two endpoints behind a load balancer therefore requires **sticky
 routing/session affinity** for the lifetime of a subscription, or accepting that push notifications
 may be missed when instances change mid-subscription (the client can always fall back to polling
-`GET /match/retrieve?keyCode=...&moveNumber=...`, which is instance-agnostic by design). The
+`GET /match/retrieve?key_code=...&move_number=...`, which is instance-agnostic by design). The
 webhook-style alternative, `POST /sentinel/callback/subscribe`, has no such limitation: it stores the
 callback URL in the database (`callbacks` table) and is invoked by whichever instance happens to
 process the triggering move, so it works correctly with any load-balancing strategy.
@@ -309,20 +309,20 @@ Paths in this table are relative to `/api/v1`.
 | `GET /user/me`                                     | Get the currently authenticated user                                                                                                    |
 | `PATCH /user/update?username=...`                  | Partially update a user profile                                                                                                          |
 | `POST /match/host`                                 | Host a new match (optionally with a custom configuration)                                                                               |
-| `POST /match/join?keyCode=...`                     | Join an open, not-yet-started match                                                                                                     |
+| `POST /match/join?key_code=...`                     | Join an open, not-yet-started match                                                                                                     |
 | `POST /match/start`                                | Start the match you are hosting (requires ≥ 2 players)                                                                                  |
 | `POST /match/close`                                | Close an unstarted match the caller participates in                                                                                     |
 | `POST /match/ai-player`                            | Add an autonomous AI player (`EASY`/`MEDIUM`/`HARD`) to the match you are hosting, before it starts                                     |
-| `DELETE /match/ai-player?aiPlayerUsername=...`     | Remove a previously added AI player from the match you are hosting, before it starts                                                    |
+| `DELETE /match/ai-player?ai_player_username=...`     | Remove a previously added AI player from the match you are hosting, before it starts                                                    |
 | `GET /match/status`                                | Get the match currently being played by the caller, if any                                                                              |
-| `GET /match/status?moveNumber=...`                 | If `moveNumber` equals the current move count, returns "No new moves"; otherwise returns the current match                              |
-| `GET /match/retrieve?keyCode=...&moveNumber=...`   | Get full match state; poll with `moveNumber` to cheaply check "any new moves?"                                                          |
+| `GET /match/status?move_number=...`                 | If `move_number` equals the current move count, returns "No new moves"; otherwise returns the current match                              |
+| `GET /match/retrieve?key_code=...&move_number=...`   | Get full match state; poll with `move_number` to cheaply check "any new moves?"                                                          |
 | `POST /game/move`                                  | Play a move (`DISCOVER`, `TRADE`, `HIRE`, `COMMIT_EXPEDITION`, `SIGN_CONTRACT`, `END_TURN`, ...); validated entirely by `portroyal_lib` |
-| `GET /game/moves?keyCode=...`                      | Paged move history of a match                                                                                                           |
+| `GET /game/moves?key_code=...`                      | Paged move history of a match                                                                                                           |
 | `GET /card`, `GET /card/contract`                  | Static card catalog                                                                                                                     |
 | `POST /sentinel/callback/subscribe`                | Register a webhook URL to be called on match alerts (works across any instance)                                                         |
-| `GET /sentinel/long-polling/subscribe?keyCode=...` | Long-poll for the next match alert (requires sticky routing at scale)                                                                   |
-| `GET /sentinel/sse/subscribe?keyCode=...`          | Subscribe to match alerts via Server-Sent Events (requires sticky routing at scale)                                                     |
+| `GET /sentinel/long-polling/subscribe?key_code=...` | Long-poll for the next match alert (requires sticky routing at scale)                                                                   |
+| `GET /sentinel/sse/subscribe?key_code=...`          | Subscribe to match alerts via Server-Sent Events (requires sticky routing at scale)                                                     |
 
 Bot-mediated calls (`MatchController`, `GameController`, `UserController#registerTelegramPlayer`,
 `UserController#unifyTelegramAndEmailAccounts`) require the `tgId` request header, set to the

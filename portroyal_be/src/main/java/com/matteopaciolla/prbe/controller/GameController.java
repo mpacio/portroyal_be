@@ -81,7 +81,7 @@ public class GameController {
 
     @Operation(
             summary = "Get a move",
-            description = "Returns a single move from a match by keyCode and move number.",
+            description = "Returns a single move from a match by key_code and move_number.",
             responses = {
                     @ApiResponse(responseCode = "200", description = "Move retrieved successfully",
                             content = @Content(mediaType = "application/json", schema = @Schema(implementation = MoveResponse.class))),
@@ -90,10 +90,10 @@ public class GameController {
     )
     @GetMapping("/move")
     public ResponseEntity<MoveResponse> getMove(
-            @Parameter(description = "Unique match key code", example = "ABC123", required = true)
-            @RequestParam String keyCode,
-            @Parameter(description = "Move number to retrieve", example = "12", required = true)
-            @RequestParam int moveNumber) {
+            @Parameter(name = "key_code", description = "Unique match key code", example = "ABC123", required = true)
+            @RequestParam("key_code") String keyCode,
+            @Parameter(name = "move_number", description = "Move number to retrieve", example = "12", required = true)
+            @RequestParam("move_number") int moveNumber) {
         return ResponseEntity.ok(gameService.getMove(keyCode, moveNumber));
     }
 
@@ -108,16 +108,16 @@ public class GameController {
     )
     @GetMapping("/moves")
     public ResponseEntity<MovesPageResponse> getMoves(
-          @Parameter(description = "Unique match key code", example = "ABC123", required = true)
-          @RequestParam String keyCode,
-          @Parameter(description = "Zero-based page number", example = "0", required = false)
-          @RequestParam(defaultValue = "0") Integer pageNumber,
-          @Parameter(description = "Page size", example = "10", required = false)
-          @RequestParam(defaultValue = "10") Integer pageSize,
-          @Parameter(description = "Field used to sort move records", example = "TIME_INDEX", required = false)
-          @RequestParam(defaultValue = "TIME_INDEX") MoveRepository.SortField sortField,
-          @Parameter(description = "Sort direction", example = "ASC", required = false)
-          @RequestParam(defaultValue = "ASC") Sort.Direction sortDirection) {
+          @Parameter(name = "key_code", description = "Unique match key code", example = "ABC123", required = true)
+          @RequestParam("key_code") String keyCode,
+          @Parameter(name = "page_number", description = "Zero-based page number", example = "0", required = false)
+          @RequestParam(value = "page_number", defaultValue = "0") Integer pageNumber,
+          @Parameter(name = "page_size", description = "Page size", example = "10", required = false)
+          @RequestParam(value = "page_size", defaultValue = "10") Integer pageSize,
+          @Parameter(name = "sort_field", description = "Field used to sort move records", example = "TIME_INDEX", required = false)
+          @RequestParam(value = "sort_field", defaultValue = "TIME_INDEX") MoveRepository.SortField sortField,
+          @Parameter(name = "sort_direction", description = "Sort direction", example = "ASC", required = false)
+          @RequestParam(value = "sort_direction", defaultValue = "ASC") Sort.Direction sortDirection) {
         return ResponseEntity.ok(gameService.getMoves(keyCode, pageNumber, pageSize, sortField, sortDirection));
     }
 }

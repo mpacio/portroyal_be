@@ -117,7 +117,7 @@ must not be used in production.
 The header applies when the API must resolve the real player for an action, including hosting,
 joining, starting or closing a match, managing the host's AI players, retrieving a player's current
 match status, and submitting a move. If a bot-mediated action omits `tgId`, the request is rejected.
-`GET /match/retrieve?keyCode=...` retrieves a match by key and does not require the header.
+`GET /match/retrieve?key_code=...` retrieves a match by key and does not require the header.
 
 Register a Telegram-only player with the bot account using `POST /user/register/telegram`:
 
@@ -163,13 +163,13 @@ curl -u alice42:your-password -H "Content-Type: application/json" \
   -d '{"id":1,"name":"default"}' "$BASE/match/host"
 
 # A second player joins using the keyCode returned by the host request.
-curl -u bob42:your-password -X POST "$BASE/match/join?keyCode=ABC123"
+curl -u bob42:your-password -X POST "$BASE/match/join?key_code=ABC123"
 
 # The host starts the match.
 curl -u alice42:your-password -X POST "$BASE/match/start"
 
 # Read the authoritative current state.
-curl -u alice42:your-password "$BASE/match/retrieve?keyCode=ABC123"
+curl -u alice42:your-password "$BASE/match/retrieve?key_code=ABC123"
 ```
 
 The match response's `data` contains the current snapshot. Use that snapshot to render the board
@@ -217,15 +217,15 @@ Useful read endpoints:
 
 | Method and path                                | Use                                                                               |
 |------------------------------------------------|-----------------------------------------------------------------------------------|
-| `GET /match/retrieve?keyCode=...`              | Read a specific match snapshot                                                    |
-| `GET /match/retrieve?keyCode=...&moveNumber=N` | Return `"No new moves"` with no match data when `N` equals the current move count |
+| `GET /match/retrieve?key_code=...`              | Read a specific match snapshot                                                    |
+| `GET /match/retrieve?key_code=...&move_number=N` | Return `"No new moves"` with no match data when `N` equals the current move count |
 | `GET /match/status`                            | Read the authenticated player's current match, if any                             |
 | `GET /match/retrieve-all`                      | List matches, with optional filters and pagination                                |
-| `GET /game/move?keyCode=...&moveNumber=N`      | Retrieve one persisted move                                                       |
-| `GET /game/moves?keyCode=...`                  | Retrieve paged move history                                                       |
+| `GET /game/move?key_code=...&move_number=N`      | Retrieve one persisted move                                                       |
+| `GET /game/moves?key_code=...`                  | Retrieve paged move history                                                       |
 
 For bot requests to `/match/status`, include `tgId` so the API can resolve which player's match to
-return. The `moveNumber` option is a lightweight unchanged-state check, not a substitute for
+return. The `move_number` option is a lightweight unchanged-state check, not a substitute for
 processing move events or reading the full snapshot when state changes.
 
 ## 5. Live updates
@@ -236,8 +236,8 @@ returned state.
 
 | Transport                | Endpoint                                                       | Behavior                                                                |
 |--------------------------|----------------------------------------------------------------|-------------------------------------------------------------------------|
-| Server-Sent Events (SSE) | `GET /sentinel/sse/subscribe?keyCode=...&seconds=3600`         | Open a stream for repeated alerts until it closes or times out          |
-| Long polling             | `GET /sentinel/long-polling/subscribe?keyCode=...&seconds=120` | Wait for one alert, then subscribe again; minimum timeout is 10 seconds |
+| Server-Sent Events (SSE) | `GET /sentinel/sse/subscribe?key_code=...&seconds=3600`         | Open a stream for repeated alerts until it closes or times out          |
+| Long polling             | `GET /sentinel/long-polling/subscribe?key_code=...&seconds=120` | Wait for one alert, then subscribe again; minimum timeout is 10 seconds |
 | Webhook callback         | `POST /sentinel/callback/subscribe`                            | Register a URL to receive alerts for a match                            |
 
 SSE is suitable for web/app clients that can keep a connection open. Long polling works for
@@ -288,16 +288,16 @@ is served at `/public/confirm-email` from the server root.
 | `GET`             | `SERVER_ROOT/public/confirm-email?token=...` | Confirm an email token; public browser flow                                       |
 | `GET`             | `/public/new-tg-unify-email-otp?email=...` | Request an OTP for identity unification; public                                   |
 | `GET`             | `/user/me`                                  | Get the authenticated API account; for bot auth this is the technical bot account |
-| `GET`             | `/user/retrieve?username=...`               | Look up a user by username, Telegram ID, or email                                 |
+| `GET`             | `/user/retrieve?username=...`               | Look up a user by username, Telegram ID, or email; use `telegram_id` for Telegram ID |
 | `POST`            | `/user/register/telegram`                   | Create a Telegram-linked user; requires `BOT` role                                |
 | `POST`            | `/user/unify`                               | Unify a Telegram identity and email account; requires `BOT` role                  |
 | `POST`            | `/match/host`                               | Host a match                                                                      |
-| `POST`            | `/match/join?keyCode=...`                   | Join a match before it starts                                                     |
+| `POST`            | `/match/join?key_code=...`                   | Join a match before it starts                                                     |
 | `POST`            | `/match/start`                              | Start the hosted match                                                            |
 | `POST`            | `/match/close`                              | Close an unstarted match                                                          |
 | `POST` / `DELETE` | `/match/ai-player`                          | Add or remove an AI player before match start                                     |
 | `GET`             | `/match/status`                             | Retrieve the authenticated player's current match                                 |
-| `GET`             | `/match/retrieve?keyCode=...`               | Retrieve a match by key                                                           |
+| `GET`             | `/match/retrieve?key_code=...`               | Retrieve a match by key                                                           |
 | `POST`            | `/game/move`                                | Submit one move                                                                   |
 | `GET`             | `/game/move` or `/game/moves`               | Read one move or paged move history                                               |
 | `GET`             | `/card` or `/card/contract`                 | Read the card or contract catalog                                                 |

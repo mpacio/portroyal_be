@@ -159,7 +159,7 @@ public class PortRoyalCli {
             System.out.println("Key code cannot be blank.");
             return;
         }
-        String path = "/api/v1/match/join?keyCode=" + urlEncode(keyCode);
+        String path = "/api/v1/match/join?key_code=" + urlEncode(keyCode);
         ApiClient.Response response = call(session, "POST", path, null, session.tgId == null ? null : Map.of("tgId", session.tgId));
         printResponse(response);
     }
@@ -190,7 +190,7 @@ public class PortRoyalCli {
             System.out.println("AI player username cannot be blank.");
             return;
         }
-        String path = "/api/v1/match/ai-player?aiPlayerUsername=" + urlEncode(aiPlayerUsername);
+        String path = "/api/v1/match/ai-player?ai_player_username=" + urlEncode(aiPlayerUsername);
         ApiClient.Response response = call(session, "DELETE", path, null, session.tgId == null ? null : Map.of("tgId", session.tgId));
         printResponse(response);
     }
@@ -207,7 +207,7 @@ public class PortRoyalCli {
             System.out.println("Key code cannot be blank.");
             return;
         }
-        ApiClient.Response response = call(session, "GET", "/api/v1/match/retrieve?keyCode=" + urlEncode(keyCode), null, null);
+        ApiClient.Response response = call(session, "GET", "/api/v1/match/retrieve?key_code=" + urlEncode(keyCode), null, null);
         printResponse(response);
     }
 
@@ -237,7 +237,7 @@ public class PortRoyalCli {
         }
 
         while (true) {
-            ApiClient.Response response = call(session, "GET", "/api/v1/match/retrieve?keyCode=" + urlEncode(keyCode), null, null);
+            ApiClient.Response response = call(session, "GET", "/api/v1/match/retrieve?key_code=" + urlEncode(keyCode), null, null);
             try {
                 JsonNode root = MAPPER.readTree(response.body());
                 JsonNode match = root.get("data");
@@ -314,7 +314,7 @@ public class PortRoyalCli {
         if (method.isBlank()) {
             method = "GET";
         }
-        System.out.print("Path, e.g. /api/v1/card or /api/v1/match/retrieve?keyCode=ABC123: ");
+        System.out.print("Path, e.g. /api/v1/card or /api/v1/match/retrieve?key_code=ABC123: ");
         String path = scanner.nextLine().trim();
         if (path.isBlank()) {
             path = "/api/v1/user/me";
