@@ -47,7 +47,7 @@ auth or user-resolution code:
   principal (see `MatchController#getUserEntity`, `GameController#move`).
 - Registration: `POST /api/v1/public/register` (web/app, username/email/password) vs.
   `POST /api/v1/user/register/telegram` (`BOT` role only, Telegram id only).
-- Identity unification: `GET /api/v1/public/newTgUnifyEmailOtp` + `POST /api/v1/user/unify` (`BOT` role only,
+- Identity unification: `GET /api/v1/public/new-tg-unify-email-otp` + `POST /api/v1/user/unify` (`BOT` role only,
   OTP via `temporary_tokens`) merges a Telegram-only user with an email account into one
   `UserEntity`.
 - Moves/matches are always keyed by the domain `UserEntity`, never by client type or session.

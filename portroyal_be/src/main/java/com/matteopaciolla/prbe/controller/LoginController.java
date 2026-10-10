@@ -28,7 +28,7 @@ public class LoginController {
         }
     }
 
-    @PostMapping("/perform_login")
+    @PostMapping("/perform-login")
     public String performLogin() {
         return "homepage";
     }

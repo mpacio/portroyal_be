@@ -272,9 +272,9 @@ public class UserService {
         otpRepository.save(emailAssent);
         // send email
         String subject = "Email Confirmation";
-        String htmlBody = "<p>Click <a href=\"https://" + APP_BASEURL + Paths.PUBLIC_PATH + "/confirmEmail?token=" + emailAssent.getToken() + "\">here</a> to confirm your email</p>" +
+        String htmlBody = "<p>Click <a href=\"https://" + APP_BASEURL + Paths.PUBLIC_PATH + "/confirm-email?token=" + emailAssent.getToken() + "\">here</a> to confirm your email</p>" +
                 "<p>Or copy and paste the following code in the confirmation page: " + emailAssent.getToken() + "</p>";
-        String textBody = "Click the following link to confirm your email: https://" + APP_BASEURL + Paths.PUBLIC_PATH + "/confirmEmail?token=" + emailAssent.getToken() +
+        String textBody = "Click the following link to confirm your email: https://" + APP_BASEURL + Paths.PUBLIC_PATH + "/confirm-email?token=" + emailAssent.getToken() +
                 " Or copy and paste the following code in the confirmation page: " + emailAssent.getToken();
         log.info("Sending email confirmation to {} with token {}", email, token);
         emailSenderFacade.sendEmail(email, user.getUsername(), subject, htmlBody, textBody);

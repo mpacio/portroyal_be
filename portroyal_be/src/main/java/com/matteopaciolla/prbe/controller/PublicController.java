@@ -56,7 +56,7 @@ public class PublicController {
     }
 
     @Operation(summary = "Request email confirmation OTP", description = "Sends an email containing the confirmation token required to activate the account.")
-    @GetMapping("/newEmailConfirmation")
+    @GetMapping("/new-email-confirmation")
     public ResponseEntity<VoidResponse> requestEmailConfirmation(
             @Parameter(description = "Email address for which to request confirmation", required = true, example = "alice@example.com")
             @RequestParam String email) {
@@ -67,7 +67,7 @@ public class PublicController {
     }
 
     @Operation(summary = "Request Telegram unification OTP", description = "Sends a one-time token to the user email so that a Telegram-only account can be merged with an email account.")
-    @GetMapping("/newTgUnifyEmailOtp")
+    @GetMapping("/new-tg-unify-email-otp")
     public ResponseEntity<VoidResponse> requestTgUnifyEmailOtp(
             @Parameter(description = "Email of the account to unify", required = true, example = "alice@example.com")
             @RequestParam String email,

@@ -84,7 +84,7 @@ authentication model.
   using only their Telegram id, or through a normal web/app registration
   (`POST /api/v1/public/register`) using username/email/password.
 - The two identities can later be **unified**: a Telegram-only user requests a one-time code sent to
-  an email address (`GET /api/v1/public/newTgUnifyEmailOtp`), then confirms the pairing through the bot
+  an email address (`GET /api/v1/public/new-tg-unify-email-otp`), then confirms the pairing through the bot
   (`POST /api/v1/user/unify`, `hasRole(BOT)`, backed by the OTP/`temporary_tokens` table). After unification,
   the same physical player can keep playing the very same match indifferently from the web front end
   or from Telegram — the API always resolves to the same `UserEntity` regardless of which channel is
@@ -289,7 +289,7 @@ standing up the full API/database stack.
 
 | Tag         | Base path          | Purpose                                                                                                     |
 |-------------|--------------------|-------------------------------------------------------------------------------------------------------------|
-| Public      | `/api/v1/public`   | Public JSON registration/OTP; HTML email confirmation at server-root `/public/confirmEmail`                 |
+| Public      | `/api/v1/public`   | Public JSON registration/OTP; HTML email confirmation at server-root `/public/confirm-email`                 |
 | User        | `/api/v1/user`     | Current-user lookup, retrieve/update/delete users, password change, bot registration & Telegram unification |
 | Match       | `/api/v1/match`    | Host/join/start/close a match, list matches, poll match status/state                                        |
 | Move (Game) | `/api/v1/game`     | Play a move, fetch a single move or paged move history                                                      |
@@ -304,7 +304,7 @@ Paths in this table are relative to `/api/v1`.
 |----------------------------------------------------|-----------------------------------------------------------------------------------------------------------------------------------------|
 | `POST /public/register`                            | Register a new user (username/email/password, web/app flow)                                                                             |
 | `POST /user/register/telegram`                     | Register a new user from the bot (Telegram id only) — `BOT` role only                                                                   |
-| `GET /public/newTgUnifyEmailOtp`                   | Request an OTP to unify a Telegram id with an email account                                                                             |
+| `GET /public/new-tg-unify-email-otp`               | Request an OTP to unify a Telegram id with an email account                                                                             |
 | `POST /user/unify`                                 | Confirm Telegram/email unification with the OTP — `BOT` role only                                                                       |
 | `GET /user/me`                                     | Get the currently authenticated user                                                                                                    |
 | `PATCH /user/update?username=...`                  | Partially update a user profile                                                                                                          |

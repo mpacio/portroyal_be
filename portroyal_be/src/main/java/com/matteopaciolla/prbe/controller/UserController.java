@@ -152,7 +152,7 @@ public class UserController {
                     @ApiResponse(responseCode = "400", description = "New password is empty or invalid")
             }
     )
-    @PostMapping(path = "/changePsw")
+    @PostMapping(path = "/change-psw")
     public ResponseEntity<VoidResponse> changePassword(@RequestBody ChangePasswordReqDto cpd) {
         if (cpd == null || cpd.getNewPassword() == null || cpd.getNewPassword().isBlank()) {
             return ResponseEntity.badRequest().body(new VoidResponse("New password cannot be empty"));

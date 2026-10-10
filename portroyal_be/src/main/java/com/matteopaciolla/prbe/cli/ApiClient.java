@@ -79,7 +79,7 @@ public final class ApiClient {
             return true;
         }
         String lower = path.toLowerCase();
-        return lower.contains("/public/") || lower.contains("/public") || lower.startsWith("/login") || lower.startsWith("/perform_login");
+        return lower.contains("/public/") || lower.contains("/public") || lower.startsWith("/login") || lower.startsWith("/perform-login");
     }
 
     public static String prettyPrint(String rawBody) {

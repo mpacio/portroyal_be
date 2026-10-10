@@ -24,7 +24,7 @@ public class PublicPagesController {
     @Autowired
     private UserService userService;
 
-    @RequestMapping("/confirmEmail")
+    @RequestMapping("/confirm-email")
     public ModelAndView confirmEmail(@RequestParam String token, ModelMap model) {
         log.info("Confirming email with token: {}", token);
         UserDto userDto = userService.confirmEmail(token);

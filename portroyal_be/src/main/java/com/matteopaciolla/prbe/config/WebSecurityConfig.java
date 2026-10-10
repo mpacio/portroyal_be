@@ -58,7 +58,7 @@ public class WebSecurityConfig {
                             .requestMatchers("/js/**").permitAll() //static js files
                             .requestMatchers("/login").permitAll() //login page
                             .requestMatchers(Paths.BASE_API_PATH + Paths.PUBLIC_PATH + "/**").permitAll() //public API paths
-                            .requestMatchers(Paths.PUBLIC_PATH + "/confirmEmail").permitAll() //HTML email confirmation page
+                            .requestMatchers(Paths.PUBLIC_PATH + "/confirm-email").permitAll() //HTML email confirmation page
 
                             .requestMatchers(HttpMethod.GET,"/swagger-ui/**").permitAll()
                             .requestMatchers(HttpMethod.GET,Paths.BASE_API_PATH + "/api-docs/**").permitAll()
@@ -77,7 +77,7 @@ public class WebSecurityConfig {
 //            .formLogin(Customizer.withDefaults())
             .formLogin(form -> form
                     .loginPage("/login") // Custom login page URL
-                    .loginProcessingUrl("/perform_login") // URL to submit the username and password
+                    .loginProcessingUrl("/perform-login") // URL to submit the username and password
                     .defaultSuccessUrl("/", true) // URL to redirect to after successful login
                     .failureUrl("/login?error=true") // URL to redirect to after failed login
                     .usernameParameter("username") // Custom username parameter name

@@ -24,7 +24,7 @@ status codes and generally return an object with `status`, `error`, and `message
 
 | Endpoint group | Authentication | Purpose                                                                              |
 |----------------|----------------|--------------------------------------------------------------------------------------|
-| `/public/**`   | None           | JSON registration/OTP; HTML email confirmation at server-root `/public/confirmEmail` |
+| `/public/**`   | None           | JSON registration/OTP; HTML email confirmation at server-root `/public/confirm-email` |
 | `/user/**`     | Basic          | User profile and identity operations                                                 |
 | `/match/**`    | Basic          | Create, join, start, close, and retrieve matches                                     |
 | `/game/**`     | Basic          | Submit moves and read move history                                                   |
@@ -134,7 +134,7 @@ player actions.
 ### Linking web and Telegram identities
 
 If a player already has a web account, keep using that account from the web client. To link it to
-Telegram, request an OTP using the public `GET /public/newTgUnifyEmailOtp?email=...` endpoint, then
+Telegram, request an OTP using the public `GET /public/new-tg-unify-email-otp?email=...` endpoint, then
 have the bot submit `POST /user/unify` using its `BOT` credentials:
 
 ```json
@@ -279,14 +279,14 @@ should refresh the match snapshot rather than relying on notifications as a dura
 ## 7. Endpoint reference
 
 API paths below are relative to `/api/v1`; the HTML email-confirmation page is the exception and
-is served at `/public/confirmEmail` from the server root.
+is served at `/public/confirm-email` from the server root.
 
 | Method            | Path                                        | Notes                                                                             |
 |-------------------|---------------------------------------------|-----------------------------------------------------------------------------------|
 | `POST`            | `/public/register`                          | Register a standard username/password account; public                             |
-| `GET`             | `/public/newEmailConfirmation?email=...`    | Request an email confirmation; public                                             |
-| `GET`             | `SERVER_ROOT/public/confirmEmail?token=...` | Confirm an email token; public browser flow                                       |
-| `GET`             | `/public/newTgUnifyEmailOtp?email=...`      | Request an OTP for identity unification; public                                   |
+| `GET`             | `/public/new-email-confirmation?email=...`  | Request an email confirmation; public                                             |
+| `GET`             | `SERVER_ROOT/public/confirm-email?token=...` | Confirm an email token; public browser flow                                       |
+| `GET`             | `/public/new-tg-unify-email-otp?email=...` | Request an OTP for identity unification; public                                   |
 | `GET`             | `/user/me`                                  | Get the authenticated API account; for bot auth this is the technical bot account |
 | `GET`             | `/user/retrieve?username=...`               | Look up a user by username, Telegram ID, or email                                 |
 | `POST`            | `/user/register/telegram`                   | Create a Telegram-linked user; requires `BOT` role                                |

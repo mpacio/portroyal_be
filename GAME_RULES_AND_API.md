@@ -195,17 +195,17 @@ API paths below are relative to `BASE` (`/api/v1`).
 | Method and path                                           | Purpose                                                                                                        |
 |-----------------------------------------------------------|----------------------------------------------------------------------------------------------------------------|
 | `POST /public/register`                                   | Create a standard account; public.                                                                             |
-| `GET /public/newEmailConfirmation?email=...`              | Request email confirmation; public.                                                                            |
-| `GET /public/newTgUnifyEmailOtp?email=...&telegramId=...` | Request the email OTP to link a Telegram identity; public. The email must be confirmed and not already linked. |
+| `GET /public/new-email-confirmation?email=...`                 | Request email confirmation; public.                                                                            |
+| `GET /public/new-tg-unify-email-otp?email=...&telegramId=...` | Request the email OTP to link a Telegram identity; public. The email must be confirmed and not already linked. |
 | `POST /user/register/telegram`                            | Create a Telegram-linked player; requires `BOT` authentication.                                                |
 | `POST /user/unify`                                        | Link the Telegram ID to the email account using the OTP; requires `BOT` authentication.                        |
 | `GET /user/me`                                            | Get the authenticated account.                                                                                 |
 | `GET /user/retrieve?username=...`                         | Look up a user by username, Telegram ID, or email.                                                             |
 | `PATCH /user/update?username=...`                         | Partially update user profile; requires `ADMIN` or `BOT` authorization.                                        |
-| `POST /user/changePsw`                                    | Change the authenticated user's password.                                                                      |
+| `POST /user/change-psw`                                    | Change the authenticated user's password.                                                                      |
 | `DELETE /user/delete?username=...`                        | Delete a user; requires `ADMIN` authorization.                                                                 |
 
-The HTML email-confirmation page is served separately at `/public/confirmEmail` from the server root.
+The HTML email-confirmation page is served separately at `/public/confirm-email` from the server root.
 
 Standard registration body:
 
