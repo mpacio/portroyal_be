@@ -195,8 +195,8 @@ API paths below are relative to `BASE` (`/api/v1`).
 | Method and path                                           | Purpose                                                                                                        |
 |-----------------------------------------------------------|----------------------------------------------------------------------------------------------------------------|
 | `POST /public/register`                                   | Create a standard account; public.                                                                             |
-| `GET /public/new-email-confirmation?email=...`                 | Request email confirmation; public.                                                                            |
-| `GET /public/new-tg-unify-email-otp?email=...&telegram_id=...` | Request the email OTP to link a Telegram identity; public. The email must be confirmed and not already linked. |
+| `GET /user/new-email-confirmation?email=...`                  | Request email confirmation; authentication required.                                                           |
+| `GET /user/new-tg-unify-email-otp?email=...&telegram_id=...`  | Request the email OTP to link a Telegram identity; authentication required. The email must be confirmed and not already linked. |
 | `POST /user/register/telegram`                            | Create a Telegram-linked player; requires `BOT` authentication.                                                |
 | `POST /user/unify`                                        | Link the Telegram ID to the email account using the OTP; requires `BOT` authentication.                        |
 | `GET /user/me`                                            | Get the authenticated account.                                                                                 |

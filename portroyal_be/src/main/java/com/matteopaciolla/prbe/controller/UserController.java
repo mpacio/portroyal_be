@@ -8,6 +8,9 @@ import com.matteopaciolla.prbe.dto.UserDto;
 import com.matteopaciolla.prbe.dto.response.UserResponse;
 import com.matteopaciolla.prbe.dto.response.VoidResponse;
 import com.matteopaciolla.prbe.exceptions.common.MandatoryParamException;
+import com.matteopaciolla.prbe.exceptions.user.EmailNotConfirmedException;
+import com.matteopaciolla.prbe.exceptions.user.TelegramAccountAlreadyUnifiedException;
+import com.matteopaciolla.prbe.model.entity.UserEntity;
 import com.matteopaciolla.prbe.repository.UserRepository;
 import com.matteopaciolla.prbe.service.UserService;
 import io.swagger.v3.oas.annotations.Operation;
@@ -62,6 +65,36 @@ public class UserController {
         String username = SecurityContextHolder.getContext().getAuthentication().getName();
         UserDto userDto = userService.getUserByUsername(username);
         return ResponseEntity.ok(new UserResponse(userDto));
+    }
+
+    @Operation(summary = "Request email confirmation OTP", description = "Sends an email containing the confirmation token required to activate the account.")
+    @GetMapping("/new-email-confirmation")
+    public ResponseEntity<VoidResponse> requestEmailConfirmation(
+            @Parameter(description = "Email address for which to request confirmation", required = true, example = "alice@example.com")
+            @RequestParam String email) {
+        UserEntity user = userService.getUserEntityByEmail(email);
+        userService.sendEmailConfirmationEmail(user);
+        log.info("Email confirmation requested for email {}", email);
+        return new ResponseEntity<>(new VoidResponse("Email confirmation sent"), HttpStatus.OK);
+    }
+
+    @Operation(summary = "Request Telegram unification OTP", description = "Sends a one-time token to the user email so that a Telegram-only account can be merged with an email account.")
+    @GetMapping("/new-tg-unify-email-otp")
+    public ResponseEntity<VoidResponse> requestTgUnifyEmailOtp(
+            @Parameter(description = "Email of the account to unify", required = true, example = "alice@example.com")
+            @RequestParam String email,
+            @Parameter(name = "telegram_id", description = "Optional Telegram id associated with the target account for the unification flow", required = false, example = "123456789")
+            @RequestParam(value = "telegram_id", required = false) String telegramId) {
+        UserEntity user = userService.getUserEntityByEmail(email);
+        if (!user.isEmailConfirmed()) {
+            throw new EmailNotConfirmedException();
+        }
+        if (user.getTelegramId() != null) {
+            throw new TelegramAccountAlreadyUnifiedException();
+        }
+        userService.sendEmailTelegramUnification(user, telegramId);
+        log.info("Telegram unify email OTP requested for email {}", email);
+        return new ResponseEntity<>(new VoidResponse("Telegram unify email OTP sent"), HttpStatus.OK);
     }
 
     /**

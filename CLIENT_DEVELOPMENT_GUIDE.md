@@ -134,7 +134,7 @@ player actions.
 ### Linking web and Telegram identities
 
 If a player already has a web account, keep using that account from the web client. To link it to
-Telegram, request an OTP using the public `GET /public/new-tg-unify-email-otp?email=...` endpoint, then
+Telegram, request an OTP using the authenticated `GET /user/new-tg-unify-email-otp?email=...` endpoint, then
 have the bot submit `POST /user/unify` using its `BOT` credentials:
 
 ```json
@@ -284,9 +284,9 @@ is served at `/public/confirm-email` from the server root.
 | Method            | Path                                        | Notes                                                                             |
 |-------------------|---------------------------------------------|-----------------------------------------------------------------------------------|
 | `POST`            | `/public/register`                          | Register a standard username/password account; public                             |
-| `GET`             | `/public/new-email-confirmation?email=...`  | Request an email confirmation; public                                             |
+| `GET`             | `/user/new-email-confirmation?email=...`  | Request an email confirmation; authentication required                            |
 | `GET`             | `SERVER_ROOT/public/confirm-email?token=...` | Confirm an email token; public browser flow                                       |
-| `GET`             | `/public/new-tg-unify-email-otp?email=...` | Request an OTP for identity unification; public                                   |
+| `GET`             | `/user/new-tg-unify-email-otp?email=...` | Request an OTP for identity unification; authentication required                   |
 | `GET`             | `/user/me`                                  | Get the authenticated API account; for bot auth this is the technical bot account |
 | `GET`             | `/user/retrieve?username=...`               | Look up a user by username, Telegram ID, or email; use `telegram_id` for Telegram ID |
 | `POST`            | `/user/register/telegram`                   | Create a Telegram-linked user; requires `BOT` role                                |
