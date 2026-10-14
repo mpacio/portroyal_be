@@ -175,6 +175,23 @@ public class UserController {
         return new ResponseEntity<>(new VoidResponse("Email confirmation sent"), HttpStatus.OK);
     }
 
+    @Operation(
+            summary = "Register a telegram player",
+            description = "Creates a Telegram-linked user account. Username and Telegram ID are required; first name and last name may be omitted and will be generated automatically. This endpoint is intended for bot-only use and requires the bot identity in the security context.",
+            responses = {
+                    @ApiResponse(responseCode = "201", description = "Telegram user registered successfully",
+                            content = @Content(mediaType = "application/json", schema = @Schema(implementation = UserResponse.class),
+                                    examples = @ExampleObject(value = "{\"status\":201,\"message\":\"User registered successfully by the bot\",\"data\":{\"id\":5,\"username\":\"telegram-user\",\"telegramId\":\"123456789\",\"enabled\":true,\"roles\":[\"USER\"]}}")))
+            }
+    )
+    @PostMapping(path = "/register/telegram")
+    public ResponseEntity<UserResponse> registerTelegramPlayer(@Valid @RequestBody UserReqDto userReqDto) {
+        UserDto savedUserDto = userService.registerUser(userReqDto, true);
+        log.info("User {} registered successfully by bot with id {}", savedUserDto.getUsername(), savedUserDto.getId());
+        UserResponse res = new UserResponse(HttpStatus.CREATED.value(), "User registered successfully by the bot", savedUserDto);
+        return new ResponseEntity<>(res, HttpStatus.CREATED);
+    }
+
     @Operation(summary = "Request Telegram unification OTP", description = "Sends a one-time token to the user email so that a Telegram-only account can be merged with an email account.")
     @GetMapping("/new-tg-unify-email-otp")
     public ResponseEntity<VoidResponse> requestTgUnifyEmailOtp(
@@ -192,23 +209,6 @@ public class UserController {
         userService.sendEmailTelegramUnification(user, telegramId);
         log.info("Telegram unify email OTP requested for email {}", email);
         return new ResponseEntity<>(new VoidResponse("Telegram unify email OTP sent"), HttpStatus.OK);
-    }
-
-    @Operation(
-            summary = "Register a telegram player",
-            description = "Creates a Telegram-linked user account. Username and Telegram ID are required; first name and last name may be omitted and will be generated automatically. This endpoint is intended for bot-only use and requires the bot identity in the security context.",
-            responses = {
-                    @ApiResponse(responseCode = "201", description = "Telegram user registered successfully",
-                            content = @Content(mediaType = "application/json", schema = @Schema(implementation = UserResponse.class),
-                                    examples = @ExampleObject(value = "{\"status\":201,\"message\":\"User registered successfully by the bot\",\"data\":{\"id\":5,\"username\":\"telegram-user\",\"telegramId\":\"123456789\",\"enabled\":true,\"roles\":[\"USER\"]}}")))
-            }
-    )
-    @PostMapping(path = "/register/telegram")
-    public ResponseEntity<UserResponse> registerTelegramPlayer(@Valid @RequestBody UserReqDto userReqDto) {
-        UserDto savedUserDto = userService.registerUser(userReqDto, true);
-        log.info("User {} registered successfully by bot with id {}", savedUserDto.getUsername(), savedUserDto.getId());
-        UserResponse res = new UserResponse(HttpStatus.CREATED.value(), "User registered successfully by the bot", savedUserDto);
-        return new ResponseEntity<>(res, HttpStatus.CREATED);
     }
 
     @Operation(
