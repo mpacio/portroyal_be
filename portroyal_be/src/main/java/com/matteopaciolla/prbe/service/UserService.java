@@ -50,8 +50,8 @@ public class UserService {
     /**
      * Registers a new user.
      * For the registration to be successful, the user must not already exist in the system.
-     * Web registration requires username and email; bot registration requires username and telegramId.
-     * Password and names are optional.
+     * Web registration requires username, email and password; bot registration requires username and telegramId.
+     * Names are optional and will be generated if missing. Email confirmation is sent for web registration.
      *
      * @param userReqDto the user request DTO
      * @param fromBot    true if the request is from a bot, false otherwise
@@ -88,8 +88,8 @@ public class UserService {
     private void requestValidationAgainstWeb(UserReqDto userReqDto) {
         boolean valid = true;
         List<String> missingParams = new ArrayList<>();
-        if (userReqDto.getUsername() == null || userReqDto.getUsername().isBlank()) {
-            missingParams.add("username");
+        if (userReqDto.getPassword() == null || userReqDto.getPassword().isBlank()) {
+            missingParams.add("password");
             valid = false;
         }
         if (userReqDto.getEmail() == null || userReqDto.getEmail().isBlank()) {
@@ -105,10 +105,6 @@ public class UserService {
     private void requestValidationAgainstBot(UserReqDto userReqDto) {
         boolean valid = true;
         List<String> missingParams = new ArrayList<>();
-        if (userReqDto.getUsername() == null || userReqDto.getUsername().isBlank()) {
-            missingParams.add("username");
-            valid = false;
-        }
         if (userReqDto.getTelegramId() == null || userReqDto.getTelegramId().isBlank()) {
             missingParams.add("telegramId");
             valid = false;
@@ -264,7 +260,7 @@ public class UserService {
             throw new EmailAlreadyConfirmedException();
         }
         String email = user.getEmail();
-        Optional<OtpEntity> confirmedEmailAssent = otpRepository.findFirstByEmailAndFlowType(email, OtpEntity.FlowType.EMAIL_CONFIRMATION);
+        Optional<OtpEntity> confirmedEmailAssent = otpRepository.findFirstByEmailAndFlowTypeOrderByCreatedAtDesc(email, OtpEntity.FlowType.EMAIL_CONFIRMATION);
         if (confirmedEmailAssent.isPresent() && confirmedEmailAssent.get().getConfirmedAt() != null) {
             log.debug("Email {} already confirmed", email);
             throw new EmailAlreadyConfirmedException();
@@ -285,12 +281,12 @@ public class UserService {
     }
 
     public UserDto confirmEmail(String token) {
-        OtpEntity emailAssent = otpRepository.findFirstByTokenAndFlowType(token, OtpEntity.FlowType.EMAIL_CONFIRMATION)
+        OtpEntity otpEntity = otpRepository.findFirstByTokenAndFlowTypeOrderByCreatedAtDesc(token, OtpEntity.FlowType.EMAIL_CONFIRMATION)
                 .orElseThrow(() -> new ResourceNotFoundException("Email otp with token " + token + " not found"));
-        checkOtpExpiration(emailAssent);
-        emailAssent.setConfirmedAt(LocalDateTime.now());
-        otpRepository.save(emailAssent);
-        String email = emailAssent.getEmail();
+        checkOtpExpiration(otpEntity);
+        otpEntity.setConfirmedAt(LocalDateTime.now());
+        otpRepository.save(otpEntity);
+        String email = otpEntity.getEmail();
         UserEntity user = getUserEntityByEmail(email);
         user.setEmailConfirmed(true);
         userRepository.save(user);
@@ -300,7 +296,7 @@ public class UserService {
 
     public void sendEmailTelegramUnification(UserEntity user, String telegramId) {
         String email = user.getEmail();
-        Optional<OtpEntity> confirmedEmailAssent = otpRepository.findFirstByEmailAndFlowType(email, OtpEntity.FlowType.TELEGRAM_UNIFICATION);
+        Optional<OtpEntity> confirmedEmailAssent = otpRepository.findFirstByEmailAndFlowTypeOrderByCreatedAtDesc(email, OtpEntity.FlowType.TELEGRAM_UNIFICATION);
         if (confirmedEmailAssent.isPresent() && confirmedEmailAssent.get().getConfirmedAt() != null) {
             log.debug("Account already unified");
             throw new TelegramAccountAlreadyUnifiedException("Telegram account [id: " + telegramId + "] already unified with email " + email);
@@ -319,11 +315,15 @@ public class UserService {
     }
 
     public UserDto unifyTelegramAndEmailAccounts(String email, String telegramId, String token) {
-        OtpEntity otp = otpRepository.findFirstByEmailAndFlowType(email, OtpEntity.FlowType.TELEGRAM_UNIFICATION)
+        OtpEntity otpEntity = otpRepository.findFirstByEmailAndFlowTypeOrderByCreatedAtDesc(email, OtpEntity.FlowType.TELEGRAM_UNIFICATION)
                 .orElseThrow(() -> new ResourceNotFoundException("Telegram assent with email " + email + " not found"));
-        checkOtpExpiration(otp);
-        otp.setConfirmedAt(LocalDateTime.now());
-        otpRepository.save(otp);
+        if (!otpEntity.getToken().equals(token)) {
+            log.debug("Invalid token {} for email {}", token, email);
+            throw new ResourceNotFoundException("Invalid token " + token + " for email " + email);
+        }
+        checkOtpExpiration(otpEntity);
+        otpEntity.setConfirmedAt(LocalDateTime.now());
+        otpRepository.save(otpEntity);
         userRepository.deleteAllByTelegramId(telegramId);
         UserEntity user = getUserEntityByEmail(email);
         user.setTelegramId(telegramId);
@@ -332,10 +332,10 @@ public class UserService {
         return UserConverter.toDto(user);
     }
 
-    private static void checkOtpExpiration(OtpEntity otp) {
-        if (otp.getExpiresAt().isBefore(LocalDateTime.now())) {
-            log.debug("Email otp with token {} has expired.", otp.getToken());
-            throw new ResourceNotFoundException("Email otp with token " + otp.getToken() + " has expired.");
+    private static void checkOtpExpiration(OtpEntity otpEntity) {
+        if (otpEntity.getExpiresAt().isBefore(LocalDateTime.now())) {
+            log.debug("Email otp with token {} has expired.", otpEntity.getToken());
+            throw new ResourceNotFoundException("Email otp with token " + otpEntity.getToken() + " has expired.");
         }
     }
 }

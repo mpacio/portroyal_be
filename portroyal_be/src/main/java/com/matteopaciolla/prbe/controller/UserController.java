@@ -1,12 +1,15 @@
 package com.matteopaciolla.prbe.controller;
 
+import com.matteopaciolla.prbe.constants.CommonConstants;
 import com.matteopaciolla.prbe.constants.Paths;
 import com.matteopaciolla.prbe.dto.request.ChangePasswordReqDto;
+import com.matteopaciolla.prbe.dto.request.EmailTelegramUnificationRequest;
 import com.matteopaciolla.prbe.dto.request.TgAccountUnificationRequest;
 import com.matteopaciolla.prbe.dto.request.UserReqDto;
 import com.matteopaciolla.prbe.dto.UserDto;
 import com.matteopaciolla.prbe.dto.response.UserResponse;
 import com.matteopaciolla.prbe.dto.response.VoidResponse;
+import com.matteopaciolla.prbe.exceptions.common.MandatoryBotParamException;
 import com.matteopaciolla.prbe.exceptions.common.MandatoryParamException;
 import com.matteopaciolla.prbe.exceptions.user.EmailNotConfirmedException;
 import com.matteopaciolla.prbe.exceptions.user.TelegramAccountAlreadyUnifiedException;
@@ -34,12 +37,17 @@ import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
 
+import static com.matteopaciolla.prbe.util.AuthenticationUtils.getUsername;
+import static com.matteopaciolla.prbe.util.AuthenticationUtils.isBotUser;
+
 @Tag(name = "User", description = "User profile management, identity queries and account security operations.")
 @SecurityRequirements({@SecurityRequirement(name = "basicAuth")})
 @Slf4j
 @RestController
 @RequestMapping(Paths.USER_PATH)
 public class UserController {
+
+    private static final String BH = CommonConstants.BOT_MANDATORY_HEADER;
 
     @Autowired
     private PasswordEncoder passwordEncoder;
@@ -185,7 +193,15 @@ public class UserController {
             }
     )
     @PostMapping(path = "/register/telegram")
-    public ResponseEntity<UserResponse> registerTelegramPlayer(@Valid @RequestBody UserReqDto userReqDto) {
+    public ResponseEntity<UserResponse> registerTelegramPlayer(
+            @RequestHeader(value = BH, required = true) String tgId,
+            @Valid @RequestBody UserReqDto userReqDto) {
+        if (tgId == null || tgId.isBlank()) {
+            throw new MandatoryBotParamException();
+        }
+        if (!tgId.equals(userReqDto.getTelegramId())) {
+            throw new MandatoryParamException("Telegram ID in header and body must match");
+        }
         UserDto savedUserDto = userService.registerUser(userReqDto, true);
         log.info("User {} registered successfully by bot with id {}", savedUserDto.getUsername(), savedUserDto.getId());
         UserResponse res = new UserResponse(HttpStatus.CREATED.value(), "User registered successfully by the bot", savedUserDto);
@@ -193,18 +209,34 @@ public class UserController {
     }
 
     @Operation(summary = "Request Telegram unification OTP", description = "Sends a one-time token to the user email so that a Telegram-only account can be merged with an email account.")
-    @GetMapping("/new-tg-unify-email-otp")
+    @PostMapping("/new-tg-unify-email-otp")
     public ResponseEntity<VoidResponse> requestTgUnifyEmailOtp(
-            @Parameter(description = "Email of the account to unify", required = true, example = "alice@example.com")
-            @RequestParam String email,
-            @Parameter(name = "telegram_id", description = "Optional Telegram id associated with the target account for the unification flow", required = false, example = "123456789")
-            @RequestParam(value = "telegram_id", required = false) String telegramId) {
-        UserEntity user = userService.getUserEntityByEmail(email);
-        if (!user.isEmailConfirmed()) {
-            throw new EmailNotConfirmedException();
-        }
-        if (user.getTelegramId() != null) {
-            throw new TelegramAccountAlreadyUnifiedException();
+            @RequestHeader(value = BH, required = false) String tgId,
+            @Valid @RequestBody EmailTelegramUnificationRequest request) {
+        String email = request.getEmail();
+        String telegramId = null;
+        UserEntity user;
+        if (isBotUser()) {
+            if (tgId == null || tgId.isBlank()) {
+                throw new MandatoryBotParamException();
+            }
+            user = userService.getUserEntityByTelegramId(tgId);
+            if (user.getEmail() != null) {
+                throw new TelegramAccountAlreadyUnifiedException();
+            }
+            telegramId = tgId;
+        } else {
+            String username = getUsername();
+            user = userService.getUserEntityByUsername(username);
+            if (!user.getEmail().equals(email)) {
+                throw new MandatoryParamException("Authenticated user's email does not match the provided email");
+            }
+            if (user.getTelegramId() != null) {
+                throw new TelegramAccountAlreadyUnifiedException();
+            }
+            if (!user.isEmailConfirmed()) {
+                throw new EmailNotConfirmedException();
+            }
         }
         userService.sendEmailTelegramUnification(user, telegramId);
         log.info("Telegram unify email OTP requested for email {}", email);
@@ -221,8 +253,13 @@ public class UserController {
             }
     )
     @PostMapping(path = "/unify")
-    public ResponseEntity<UserResponse> unifyTelegramAndEmailAccounts(@Valid @RequestBody TgAccountUnificationRequest request) {
-        UserDto userDto = userService.unifyTelegramAndEmailAccounts(request.getEmail(), request.getTelegramId(), request.getToken());
+    public ResponseEntity<UserResponse> unifyTelegramAndEmailAccounts(
+            @RequestHeader(value = BH, required = true) String tgId,
+            @Valid @RequestBody TgAccountUnificationRequest request) {
+        if (tgId == null || tgId.isBlank()) {
+            throw new MandatoryBotParamException();
+        }
+        UserDto userDto = userService.unifyTelegramAndEmailAccounts(request.getEmail(), tgId, request.getToken());
         return ResponseEntity.ok(new UserResponse("Telegram and email accounts unified successfully", userDto));
     }
 }

@@ -34,7 +34,7 @@ import org.springframework.web.bind.annotation.*;
 
 import java.util.Optional;
 
-import static com.matteopaciolla.prbe.util.AuthenticationUtils.getUserName;
+import static com.matteopaciolla.prbe.util.AuthenticationUtils.getUsername;
 import static com.matteopaciolla.prbe.util.AuthenticationUtils.isBotUser;
 
 @Tag(name = "Match", description = "Matches operations")
@@ -269,12 +269,12 @@ public class MatchController {
 
     private UserEntity getUserEntity(String tgId) {
         if (isBotUser()) {
-            if (tgId == null) {
+            if (tgId == null || tgId.isEmpty()) {
                 throw new MandatoryBotParamException();
             }
             return userService.getUserEntityByTelegramId(tgId);
         } else {
-            return userService.getUserEntityByUsername(getUserName());
+            return userService.getUserEntityByUsername(getUsername());
         }
     }
 }

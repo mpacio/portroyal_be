@@ -43,6 +43,8 @@ public class PortRoyalCli {
                     case "11" -> playInteractiveMatch(session, scanner);
                     case "12" -> apiExplorer(session, scanner);
                     case "13" -> printQuickGuide();
+                    case "14" -> requestTgUnificationOtp(session, scanner);
+                    case "15" -> unifyAccounts(session, scanner);
                     case "0", "exit", "quit" -> {
                         System.out.println("Bye.");
                         return;
@@ -88,34 +90,126 @@ public class PortRoyalCli {
     }
 
     private static void registerUser(Session session, Scanner scanner) {
+        ApiClient.Response currentUserResponse = call(session, "GET", "/api/v1/user/me", null, null);
+        boolean botUser;
+        if (currentUserResponse.statusCode() == 401) {
+            botUser = false;
+        } else if (currentUserResponse.statusCode() >= 400) {
+            printResponse(currentUserResponse);
+            return;
+        } else {
+            try {
+                JsonNode responseBody = MAPPER.readTree(currentUserResponse.body());
+                JsonNode roles = responseBody == null ? null : responseBody.path("data").path("roles");
+                if (roles == null || !roles.isArray()) {
+                    printResponse(currentUserResponse);
+                    System.out.println("Unable to determine the authenticated user's role.");
+                    return;
+                }
+                botUser = false;
+                for (JsonNode role : roles) {
+                    if ("BOT".equalsIgnoreCase(role.asText())) {
+                        botUser = true;
+                        break;
+                    }
+                }
+            } catch (IOException e) {
+                System.out.println("Unable to determine the authenticated user's role: " + e.getMessage());
+                return;
+            }
+        }
+
+        if (botUser && (session.tgId == null || session.tgId.isBlank())) {
+            System.out.println("Configure the Telegram user's tgId before registering from a bot account.");
+            return;
+        }
+
         System.out.print("Username: ");
         String username = scanner.nextLine().trim();
         if (username.isBlank()) {
             System.out.println("Username is required.");
             return;
         }
-        System.out.print("Password: ");
-        String password = scanner.nextLine();
-        if (password.isBlank()) {
-            System.out.println("Password is required.");
-            return;
-        }
-        System.out.print("Email (optional): ");
-        String email = scanner.nextLine().trim();
-        System.out.print("Telegram Id (optional): ");
-        String telegramId = scanner.nextLine().trim();
 
         Map<String, Object> payload = new LinkedHashMap<>();
         payload.put("username", username);
-        payload.put("password", password);
-        if (!email.isBlank()) {
+        String path;
+        Map<String, String> headers = null;
+        if (botUser) {
+            payload.put("telegramId", session.tgId);
+            path = "/api/v1/user/register/telegram";
+            headers = Map.of("tgId", session.tgId);
+        } else {
+            System.out.print("Password: ");
+            String password = scanner.nextLine();
+            if (password.isBlank()) {
+                System.out.println("Password is required.");
+                return;
+            }
+            System.out.print("Email: ");
+            String email = scanner.nextLine().trim();
+            if (email.isBlank()) {
+                System.out.println("Email is required.");
+                return;
+            }
+            payload.put("password", password);
             payload.put("email", email);
+            System.out.print("Telegram Id (optional): ");
+            String telegramId = scanner.nextLine().trim();
+            if (!telegramId.isBlank()) {
+                payload.put("telegramId", telegramId);
+            }
+            path = "/api/v1/public/register";
         }
-        if (!telegramId.isBlank()) {
-            payload.put("telegramId", telegramId);
+        ApiClient.Response response = call(session, "POST", path, payload, headers);
+        printResponse(response);
+    }
+
+    private static void requestTgUnificationOtp(Session session, Scanner scanner) {
+        System.out.print("Email address to unify: ");
+        String email = scanner.nextLine().trim();
+        if (email.isBlank()) {
+            System.out.println("Email address is required.");
+            return;
         }
 
-        ApiClient.Response response = call(session, "POST", "/api/v1/public/register", payload, null);
+        Map<String, Object> payload = new LinkedHashMap<>();
+        payload.put("email", email);
+        Map<String, String> headers = session.tgId == null ? null : Map.of("tgId", session.tgId);
+        ApiClient.Response response = call(session, "POST", "/api/v1/user/new-tg-unify-email-otp", payload, headers);
+        printResponse(response);
+    }
+
+    private static void unifyAccounts(Session session, Scanner scanner) {
+        if (session.tgId == null || session.tgId.isBlank()) {
+            System.out.println("Configure the bot account and its tgId before unifying accounts.");
+            return;
+        }
+
+        System.out.print("Email address to unify: ");
+        String email = scanner.nextLine().trim();
+        if (email.isBlank()) {
+            System.out.println("Email address is required.");
+            return;
+        }
+        System.out.print("OTP token from the email: ");
+        String token = scanner.nextLine().trim();
+        if (token.isBlank()) {
+            System.out.println("OTP token is required.");
+            return;
+        }
+        System.out.println("This will link Telegram ID " + session.tgId + " to " + email + ".");
+        System.out.print("Continue? [y/N]: ");
+        String confirmation = scanner.nextLine().trim();
+        if (!confirmation.equalsIgnoreCase("y") && !confirmation.equalsIgnoreCase("yes")) {
+            System.out.println("Account unification cancelled.");
+            return;
+        }
+
+        Map<String, Object> payload = new LinkedHashMap<>();
+        payload.put("email", email);
+        payload.put("token", token);
+        ApiClient.Response response = call(session, "POST", "/api/v1/user/unify", payload, Map.of("tgId", session.tgId));
         printResponse(response);
     }
 
@@ -341,6 +435,7 @@ public class PortRoyalCli {
         System.out.println("- Default base URL: http://localhost:8080");
         System.out.println("- The app calls the running Spring Boot instance via HTTP Basic Auth");
         System.out.println("- For Bot flows, set a tgId in the connection config and the CLI will include the tgId header");
+        System.out.println("- Request an account-unification OTP while authenticated as the email account, then configure Bot credentials and tgId to unify");
         System.out.println("- To play a match, host it, join it, start it, then use the interactive move menu");
         System.out.println("- To mix in autonomous players, host a match, use 'Add AI player' (EASY/MEDIUM/HARD) before starting it");
         System.out.println("- AI turns are auto-played by the backend; poll 'View a match' to see their moves as they happen");
@@ -391,6 +486,8 @@ public class PortRoyalCli {
         System.out.println("11. Play a match interactively");
         System.out.println("12. API explorer / generic endpoint tester");
         System.out.println("13. Quick guide");
+        System.out.println("14. Request account-unification OTP");
+        System.out.println("15. Unify Telegram and email accounts");
         System.out.println("0. Exit");
     }
 

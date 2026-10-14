@@ -55,7 +55,7 @@ class UserServiceTest {
                 .thenReturn(Optional.empty());
         when(passwordEncoder.encode(any())).thenReturn("encoded-password");
         when(userRepository.save(any(UserEntity.class))).thenAnswer(invocation -> invocation.getArgument(0));
-        when(otpRepository.findFirstByEmailAndFlowType("alice@example.com", OtpEntity.FlowType.EMAIL_CONFIRMATION))
+        when(otpRepository.findFirstByEmailAndFlowTypeOrderByCreatedAtDesc("alice@example.com", OtpEntity.FlowType.EMAIL_CONFIRMATION))
                 .thenReturn(Optional.empty());
 
         UserDto result = userService.registerUser(request, false);

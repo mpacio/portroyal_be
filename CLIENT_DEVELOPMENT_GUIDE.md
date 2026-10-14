@@ -134,13 +134,21 @@ player actions.
 ### Linking web and Telegram identities
 
 If a player already has a web account, keep using that account from the web client. To link it to
-Telegram, request an OTP using the authenticated `GET /user/new-tg-unify-email-otp?email=...` endpoint, then
-have the bot submit `POST /user/unify` using its `BOT` credentials:
+Telegram, request an OTP using the email account's authenticated `POST /user/new-tg-unify-email-otp`
+endpoint with this JSON body:
+
+```json
+{
+  "email": "alice@example.com"
+}
+```
+
+Then have the bot submit `POST /user/unify` using its `BOT` credentials, the Telegram user's ID in
+the `tgId` header, and the email and OTP in the JSON body:
 
 ```json
 {
   "email": "alice@example.com",
-  "telegramId": "123456789",
   "token": "OTP_FROM_EMAIL"
 }
 ```
@@ -286,11 +294,11 @@ is served at `/public/confirm-email` from the server root.
 | `POST`            | `/public/register`                          | Register a standard username/password account; public                             |
 | `GET`             | `/user/new-email-confirmation?email=...`  | Request an email confirmation; authentication required                            |
 | `GET`             | `SERVER_ROOT/public/confirm-email?token=...` | Confirm an email token; public browser flow                                       |
-| `GET`             | `/user/new-tg-unify-email-otp?email=...` | Request an OTP for identity unification; authentication required                   |
+| `POST`            | `/user/new-tg-unify-email-otp`          | Request an OTP for identity unification with `{"email":"..."}`; authentication required |
 | `GET`             | `/user/me`                                  | Get the authenticated API account; for bot auth this is the technical bot account |
 | `GET`             | `/user/retrieve?username=...`               | Look up a user by username, Telegram ID, or email; use `telegram_id` for Telegram ID |
 | `POST`            | `/user/register/telegram`                   | Create a Telegram-linked user; requires `BOT` role                                |
-| `POST`            | `/user/unify`                               | Unify a Telegram identity and email account; requires `BOT` role                  |
+| `POST`            | `/user/unify`                               | Unify with `{"email":"...","token":"..."}`; requires `BOT` role and `tgId` header |
 | `POST`            | `/match/host`                               | Host a match                                                                      |
 | `POST`            | `/match/join?key_code=...`                   | Join a match before it starts                                                     |
 | `POST`            | `/match/start`                              | Start the hosted match                                                            |

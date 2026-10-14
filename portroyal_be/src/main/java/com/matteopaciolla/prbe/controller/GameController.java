@@ -2,16 +2,12 @@ package com.matteopaciolla.prbe.controller;
 
 import com.matteopaciolla.prbe.constants.CommonConstants;
 import com.matteopaciolla.prbe.constants.Paths;
-import com.matteopaciolla.prbe.constants.enums.SentinelAlertMessage;
-import com.matteopaciolla.prbe.dto.MatchDto;
 import com.matteopaciolla.prbe.dto.request.MoveReqDto;
 import com.matteopaciolla.prbe.dto.response.*;
 import com.matteopaciolla.prbe.exceptions.common.MandatoryBotParamException;
-import com.matteopaciolla.prbe.exceptions.common.ResourceNotFoundException;
 import com.matteopaciolla.prbe.repository.MoveRepository;
 import com.matteopaciolla.prbe.service.GameService;
 import com.matteopaciolla.prbe.service.MatchService;
-import com.matteopaciolla.prbe.service.SentinelService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.enums.ParameterIn;
@@ -29,7 +25,7 @@ import org.springframework.data.domain.Sort;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
-import static com.matteopaciolla.prbe.util.AuthenticationUtils.getUserName;
+import static com.matteopaciolla.prbe.util.AuthenticationUtils.getUsername;
 import static com.matteopaciolla.prbe.util.AuthenticationUtils.isBotUser;
 
 @Tag(name = "Game", description = "Game move execution and move history APIs.")
@@ -74,7 +70,7 @@ public class GameController {
             }
             moveResponse = gameService.insertMoveWithTelegramId(tgId, moveReqDto);
         } else {
-            moveResponse = gameService.insertMoveWithUsername(getUserName(), moveReqDto);
+            moveResponse = gameService.insertMoveWithUsername(getUsername(), moveReqDto);
         }
         return ResponseEntity.ok(moveResponse);
     }

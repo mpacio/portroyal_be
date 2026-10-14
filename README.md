@@ -250,9 +250,11 @@ cd portroyal_be
 mvn exec:java -Dexec.mainClass=com.matteopaciolla.prbe.cli.PortRoyalCli
 ```
 
-This CLI can register users, inspect the current user, list/host/join/start matches, add/remove
-autonomous AI players before starting a match, issue arbitrary HTTP calls to the REST API, and play
-a match interactively without starting the Spring app in the same JVM.
+This CLI can register users, inspect the current user, request an account-unification OTP and
+complete Telegram/email account unification, list/host/join/start matches, add/remove autonomous AI
+players before starting a match, issue arbitrary HTTP calls to the REST API, and play a match
+interactively without starting the Spring app in the same JVM. Request the OTP while configured
+with the email account's credentials; complete unification with the bot credentials and its `tgId`.
 
 or run the packaged jar:
 
