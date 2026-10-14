@@ -259,6 +259,10 @@ public class UserService {
     }
 
     public void sendEmailConfirmationEmail(UserEntity user) {
+        if (user.isEmailConfirmed()) {
+            log.debug("Email {} already confirmed", user.getEmail());
+            throw new EmailAlreadyConfirmedException();
+        }
         String email = user.getEmail();
         Optional<OtpEntity> confirmedEmailAssent = otpRepository.findFirstByEmailAndFlowType(email, OtpEntity.FlowType.EMAIL_CONFIRMATION);
         if (confirmedEmailAssent.isPresent() && confirmedEmailAssent.get().getConfirmedAt() != null) {
