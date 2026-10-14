@@ -22,14 +22,14 @@ bodies with `Content-Type: application/json`. Most successful API responses use 
 status codes and generally return an object with `status`, `error`, and `message`, with optional
 `errorDetails`, `description`, or `suggestion`.
 
-| Endpoint group | Authentication | Purpose                                                                              |
-|----------------|----------------|--------------------------------------------------------------------------------------|
+| Endpoint group | Authentication | Purpose                                                                               |
+|----------------|----------------|---------------------------------------------------------------------------------------|
 | `/public/**`   | None           | JSON registration/OTP; HTML email confirmation at server-root `/public/confirm-email` |
-| `/user/**`     | Basic          | User profile and identity operations                                                 |
-| `/match/**`    | Basic          | Create, join, start, close, and retrieve matches                                     |
-| `/game/**`     | Basic          | Submit moves and read move history                                                   |
-| `/card/**`     | Basic          | Read the card and contract catalogs                                                  |
-| `/sentinel/**` | Basic          | Subscribe to match notifications                                                     |
+| `/user/**`     | Basic          | User profile and identity operations                                                  |
+| `/match/**`    | Basic          | Create, join, start, close, and retrieve matches                                      |
+| `/game/**`     | Basic          | Submit moves and read move history                                                    |
+| `/card/**`     | Basic          | Read the card and contract catalogs                                                   |
+| `/sentinel/**` | Basic          | Subscribe to match notifications                                                      |
 
 ## 2. Choose an identity model
 
@@ -131,11 +131,35 @@ Register a Telegram-only player with the bot account using `POST /user/register/
 This registration body contains the Telegram ID; it is distinct from the `tgId` header used on
 player actions.
 
-### Linking web and Telegram identities
+### Unifying web and Telegram accounts
 
-If a player already has a web account, keep using that account from the web client. To link it to
-Telegram, request an OTP using the email account's authenticated `POST /user/new-tg-unify-email-otp`
-endpoint with this JSON body:
+Account unification always finishes through the Telegram bot: the bot submits `POST /user/unify`
+with the Telegram user's `tgId`, the email address, and the OTP received by email. The OTP can be
+requested in either of two ways, depending on where the user starts:
+
+#### The user starts from the web
+
+This flow is for a user who already has a web account and wants to use that same account through
+Telegram:
+
+1. The signed-in user requests an OTP from the web client with
+   `POST /user/new-tg-unify-email-otp`, authenticated as the web account. The JSON email must match
+   that account's email. The email must be confirmed, and the web account must not already have a
+   Telegram ID.
+2. The API emails an OTP to that address.
+3. The user switches to Telegram, provides the email and OTP to the bot, and the bot calls
+   `POST /user/unify`.
+4. If the OTP is valid and has not expired, the Telegram-only account is merged into the web
+   account. The web account remains the account used for email/password sign-in, and Telegram
+   requests resolve to that same user.
+
+Web client's OTP request:
+
+```http
+POST /api/v1/user/new-tg-unify-email-otp
+Authorization: Basic <web-account-credentials>
+Content-Type: application/json
+```
 
 ```json
 {
@@ -143,8 +167,49 @@ endpoint with this JSON body:
 }
 ```
 
-Then have the bot submit `POST /user/unify` using its `BOT` credentials, the Telegram user's ID in
-the `tgId` header, and the email and OTP in the JSON body:
+#### The user starts from Telegram
+
+This flow is for a user who has already been registered by the bot and wants to link that
+Telegram-only account to an existing web account:
+
+1. The user asks the bot to unify accounts and provides the email address of the existing web
+   account.
+2. The bot calls `POST /user/new-tg-unify-email-otp` using its `BOT` credentials, with the user's
+   Telegram ID in the `tgId` header and the supplied email in the JSON body.
+3. The API emails an OTP to the supplied address.
+4. The user provides the email and OTP to the bot. The bot calls `POST /user/unify` with the same
+   `tgId` and those values.
+5. If the OTP is valid and has not expired, the Telegram-only account is merged into the existing
+   web account. The web account remains the account used for email/password sign-in, and Telegram
+   requests resolve to that same user.
+
+Bot's OTP request:
+
+```http
+POST /api/v1/user/new-tg-unify-email-otp
+Authorization: Basic <bot-credentials>
+tgId: 123456789
+Content-Type: application/json
+```
+
+```json
+{
+  "email": "alice@example.com"
+}
+```
+
+#### Completing unification from Telegram
+
+For either flow, the bot makes the final request using its `BOT` credentials and the Telegram ID
+of the user who is unifying. The email and token in the request body must match the address and
+OTP used for the request:
+
+```http
+POST /api/v1/user/unify
+Authorization: Basic <bot-credentials>
+tgId: 123456789
+Content-Type: application/json
+```
 
 ```json
 {
@@ -153,9 +218,9 @@ the `tgId` header, and the email and OTP in the JSON body:
 }
 ```
 
-The email account must be confirmed and the Telegram identity must not already be linked. Once
-unified, web requests authenticate as the user's account and bot-mediated requests use the same
-person's Telegram ID; the server associates both with one player record.
+The Telegram-only account must already be registered and not already linked. OTPs expire after
+24 hours; requesting another OTP for the same email replaces the previous one. The bot must keep
+its credentials server-side and must set `tgId` to the Telegram user represented by each request.
 
 ## 3. Typical match lifecycle
 
@@ -223,14 +288,14 @@ snapshot after a move or notification to display the latest state.
 
 Useful read endpoints:
 
-| Method and path                                | Use                                                                               |
-|------------------------------------------------|-----------------------------------------------------------------------------------|
-| `GET /match/retrieve?key_code=...`              | Read a specific match snapshot                                                    |
+| Method and path                                  | Use                                                                               |
+|--------------------------------------------------|-----------------------------------------------------------------------------------|
+| `GET /match/retrieve?key_code=...`               | Read a specific match snapshot                                                    |
 | `GET /match/retrieve?key_code=...&move_number=N` | Return `"No new moves"` with no match data when `N` equals the current move count |
-| `GET /match/status`                            | Read the authenticated player's current match, if any                             |
-| `GET /match/retrieve-all`                      | List matches, with optional filters and pagination                                |
+| `GET /match/status`                              | Read the authenticated player's current match, if any                             |
+| `GET /match/retrieve-all`                        | List matches, with optional filters and pagination                                |
 | `GET /game/move?key_code=...&move_number=N`      | Retrieve one persisted move                                                       |
-| `GET /game/moves?key_code=...`                  | Retrieve paged move history                                                       |
+| `GET /game/moves?key_code=...`                   | Retrieve paged move history                                                       |
 
 For bot requests to `/match/status`, include `tgId` so the API can resolve which player's match to
 return. The `move_number` option is a lightweight unchanged-state check, not a substitute for
@@ -242,11 +307,11 @@ Sentinel notifications tell a client that a match changed; they are not a full s
 move history. When an alert arrives, refresh `/match/retrieve` (or `/match/status`) and render the
 returned state.
 
-| Transport                | Endpoint                                                       | Behavior                                                                |
-|--------------------------|----------------------------------------------------------------|-------------------------------------------------------------------------|
+| Transport                | Endpoint                                                        | Behavior                                                                |
+|--------------------------|-----------------------------------------------------------------|-------------------------------------------------------------------------|
 | Server-Sent Events (SSE) | `GET /sentinel/sse/subscribe?key_code=...&seconds=3600`         | Open a stream for repeated alerts until it closes or times out          |
 | Long polling             | `GET /sentinel/long-polling/subscribe?key_code=...&seconds=120` | Wait for one alert, then subscribe again; minimum timeout is 10 seconds |
-| Webhook callback         | `POST /sentinel/callback/subscribe`                            | Register a URL to receive alerts for a match                            |
+| Webhook callback         | `POST /sentinel/callback/subscribe`                             | Register a URL to receive alerts for a match                            |
 
 SSE is suitable for web/app clients that can keep a connection open. Long polling works for
 clients that prefer a request/response loop. SSE and long-polling subscriptions are held in the
@@ -289,27 +354,27 @@ should refresh the match snapshot rather than relying on notifications as a dura
 API paths below are relative to `/api/v1`; the HTML email-confirmation page is the exception and
 is served at `/public/confirm-email` from the server root.
 
-| Method            | Path                                        | Notes                                                                             |
-|-------------------|---------------------------------------------|-----------------------------------------------------------------------------------|
-| `POST`            | `/public/register`                          | Register a standard username/password account; public                             |
-| `GET`             | `/user/new-email-confirmation?email=...`  | Request an email confirmation; authentication required                            |
-| `GET`             | `SERVER_ROOT/public/confirm-email?token=...` | Confirm an email token; public browser flow                                       |
-| `POST`            | `/user/new-tg-unify-email-otp`          | Request an OTP for identity unification with `{"email":"..."}`; authentication required |
-| `GET`             | `/user/me`                                  | Get the authenticated API account; for bot auth this is the technical bot account |
-| `GET`             | `/user/retrieve?username=...`               | Look up a user by username, Telegram ID, or email; use `telegram_id` for Telegram ID |
-| `POST`            | `/user/register/telegram`                   | Create a Telegram-linked user; requires `BOT` role                                |
-| `POST`            | `/user/unify`                               | Unify with `{"email":"...","token":"..."}`; requires `BOT` role and `tgId` header |
-| `POST`            | `/match/host`                               | Host a match                                                                      |
-| `POST`            | `/match/join?key_code=...`                   | Join a match before it starts                                                     |
-| `POST`            | `/match/start`                              | Start the hosted match                                                            |
-| `POST`            | `/match/close`                              | Close an unstarted match                                                          |
-| `POST` / `DELETE` | `/match/ai-player`                          | Add or remove an AI player before match start                                     |
-| `GET`             | `/match/status`                             | Retrieve the authenticated player's current match                                 |
-| `GET`             | `/match/retrieve?key_code=...`               | Retrieve a match by key                                                           |
-| `POST`            | `/game/move`                                | Submit one move                                                                   |
-| `GET`             | `/game/move` or `/game/moves`               | Read one move or paged move history                                               |
-| `GET`             | `/card` or `/card/contract`                 | Read the card or contract catalog                                                 |
-| `GET` / `POST`    | `/sentinel/...`                             | Subscribe to match alerts                                                         |
+| Method            | Path                                         | Notes                                                                                                        |
+|-------------------|----------------------------------------------|--------------------------------------------------------------------------------------------------------------|
+| `POST`            | `/public/register`                           | Register a standard username/password account; public                                                        |
+| `GET`             | `/user/new-email-confirmation?email=...`     | Request an email confirmation; authentication required                                                       |
+| `GET`             | `SERVER_ROOT/public/confirm-email?token=...` | Confirm an email token; public browser flow                                                                  |
+| `POST`            | `/user/new-tg-unify-email-otp`               | Request an unification OTP as the email account, or as `BOT` with the user's `tgId`; body: `{"email":"..."}` |
+| `GET`             | `/user/me`                                   | Get the authenticated API account; for bot auth this is the technical bot account                            |
+| `GET`             | `/user/retrieve?username=...`                | Look up a user by username, Telegram ID, or email; use `telegram_id` for Telegram ID                         |
+| `POST`            | `/user/register/telegram`                    | Create a Telegram-linked user; requires `BOT` role                                                           |
+| `POST`            | `/user/unify`                                | Complete unification with `{"email":"...","token":"..."}`; requires `BOT` role and the user's `tgId` header  |
+| `POST`            | `/match/host`                                | Host a match                                                                                                 |
+| `POST`            | `/match/join?key_code=...`                   | Join a match before it starts                                                                                |
+| `POST`            | `/match/start`                               | Start the hosted match                                                                                       |
+| `POST`            | `/match/close`                               | Close an unstarted match                                                                                     |
+| `POST` / `DELETE` | `/match/ai-player`                           | Add or remove an AI player before match start                                                                |
+| `GET`             | `/match/status`                              | Retrieve the authenticated player's current match                                                            |
+| `GET`             | `/match/retrieve?key_code=...`               | Retrieve a match by key                                                                                      |
+| `POST`            | `/game/move`                                 | Submit one move                                                                                              |
+| `GET`             | `/game/move` or `/game/moves`                | Read one move or paged move history                                                                          |
+| `GET`             | `/card` or `/card/contract`                  | Read the card or contract catalog                                                                            |
+| `GET` / `POST`    | `/sentinel/...`                              | Subscribe to match alerts                                                                                    |
 
 See the live OpenAPI definition for request and response schemas, and
 [`GAME_RULES_AND_API.md`](GAME_RULES_AND_API.md) for detailed match, move, and notification
