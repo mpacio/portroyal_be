@@ -238,7 +238,7 @@ public class UserController {
                 throw new EmailNotConfirmedException();
             }
         }
-        userService.sendEmailTelegramUnification(user, telegramId);
+        userService.sendEmailTelegramUnification(user.getUsername(), email, telegramId);
         log.info("Telegram unify email OTP requested for email {}", email);
         return new ResponseEntity<>(new VoidResponse("Telegram unify email OTP sent"), HttpStatus.OK);
     }

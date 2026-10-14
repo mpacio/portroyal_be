@@ -294,8 +294,7 @@ public class UserService {
         return UserConverter.toDto(user);
     }
 
-    public void sendEmailTelegramUnification(UserEntity user, String telegramId) {
-        String email = user.getEmail();
+    public void sendEmailTelegramUnification(String username, String email, String telegramId) {
         Optional<OtpEntity> confirmedEmailAssent = otpRepository.findFirstByEmailAndFlowTypeOrderByCreatedAtDesc(email, OtpEntity.FlowType.TELEGRAM_UNIFICATION);
         if (confirmedEmailAssent.isPresent() && confirmedEmailAssent.get().getConfirmedAt() != null) {
             log.debug("Account already unified");
@@ -304,14 +303,14 @@ public class UserService {
         otpRepository.deleteAllByEmailAndFlowType(email, OtpEntity.FlowType.TELEGRAM_UNIFICATION);
         String token = get4DigitRandomCode();
         LocalDateTime expiresAt = LocalDateTime.now().plusHours(24);
-        OtpEntity telegramAssent = new OtpEntity(OtpEntity.FlowType.TELEGRAM_UNIFICATION, user.getEmail(), telegramId, token, expiresAt);
+        OtpEntity telegramAssent = new OtpEntity(OtpEntity.FlowType.TELEGRAM_UNIFICATION, email, telegramId, token, expiresAt);
         otpRepository.save(telegramAssent);
         // send email
         String subject = "Telegram Account Unification";
         String textBody = "Your code for telegram unification is: " + token + ". Text to the bot: \"/unify " + token + "\"";
         String htmlBody = "<p>Your code for telegram unification is: " + token + ". Text to the bot: <b>/unify " + token + "</b></p>";
         log.info("Sending telegram unification email to {} with token {}", email, token);
-        emailSenderFacade.sendEmail(user.getEmail(), user.getUsername(), subject, htmlBody, textBody);
+        emailSenderFacade.sendEmail(email, username, subject, htmlBody, textBody);
     }
 
     public UserDto unifyTelegramAndEmailAccounts(String email, String telegramId, String token) {
