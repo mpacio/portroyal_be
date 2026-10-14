@@ -165,14 +165,13 @@ public class UserController {
         return ResponseEntity.ok(new VoidResponse("Password changed successfully"));
     }
 
-    @Operation(summary = "Request email confirmation OTP", description = "Sends an email containing the confirmation token required to activate the account.")
+    @Operation(summary = "Request email confirmation OTP", description = "Sends an email containing the confirmation token required to activate the authenticated user's account.")
     @GetMapping("/new-email-confirmation")
-    public ResponseEntity<VoidResponse> requestEmailConfirmation(
-            @Parameter(description = "Email address for which to request confirmation", required = true, example = "alice@example.com")
-            @RequestParam String email) {
-        UserEntity user = userService.getUserEntityByEmail(email);
+    public ResponseEntity<VoidResponse> requestEmailConfirmation() {
+        String username = SecurityContextHolder.getContext().getAuthentication().getName();
+        UserEntity user = userService.getUserEntityByUsername(username);
         userService.sendEmailConfirmationEmail(user);
-        log.info("Email confirmation requested for email {}", email);
+        log.info("Email confirmation requested for user {}", username);
         return new ResponseEntity<>(new VoidResponse("Email confirmation sent"), HttpStatus.OK);
     }
 
