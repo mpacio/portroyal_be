@@ -193,20 +193,20 @@ expedition indices, contract indices, and current state.
 
 API paths below are relative to `BASE` (`/api/v1`).
 
-| Method and path                                           | Purpose                                                                                                        |
-|-----------------------------------------------------------|----------------------------------------------------------------------------------------------------------------|
-| `POST /public/register`                                   | Create a standard account; public.                                                                             |
-| `GET /user/new-email-confirmation?email=...`                  | Request email confirmation; authentication required.                                                           |
-| `GET /user/new-tg-unify-email-otp?email=...&telegram_id=...`  | Request the email OTP to link a Telegram identity; authentication required. The email must be confirmed and not already linked. |
-| `POST /user/register/telegram`                            | Create a Telegram-linked player; requires `BOT` authentication.                                                |
-| `POST /user/unify`                                        | Link the Telegram ID to the email account using the OTP; requires `BOT` authentication.                        |
-| `GET /user/me`                                            | Get the authenticated account.                                                                                 |
-| `GET /user/retrieve?username=...`                         | Administrator-only lookup by username, Telegram ID, or email.                                                  |
-| `PATCH /user/update?username=...`                         | Update first/last name; users may update themselves, ADMIN may update another account.                         |
-| `POST /user/change-psw`                                    | Change the authenticated user's password; revokes existing refresh tokens.                                    |
-| `POST /public/password-reset/request`                      | Request an emailed one-time password reset code; response does not reveal whether the account exists.            |
-| `POST /public/password-reset/confirm`                      | Reset the password using the emailed code; revokes existing refresh tokens.                                    |
-| `DELETE /user/delete?username=...`                        | Delete a user; requires `ADMIN` authorization.                                                                 |
+| Method and path                                              | Purpose                                                                                                                         |
+|--------------------------------------------------------------|---------------------------------------------------------------------------------------------------------------------------------|
+| `POST /public/register`                                      | Create a standard account; public.                                                                                              |
+| `GET /user/new-email-confirmation?email=...`                 | Request email confirmation; authentication required.                                                                            |
+| `GET /user/new-tg-unify-email-otp?email=...&telegram_id=...` | Request the email OTP to link a Telegram identity; authentication required. The email must be confirmed and not already linked. |
+| `POST /user/register/telegram`                               | Create a Telegram-linked player; requires `BOT` authentication.                                                                 |
+| `POST /user/unify`                                           | Link the Telegram ID to the email account using the OTP; requires `BOT` authentication.                                         |
+| `GET /user/me`                                               | Get the authenticated account.                                                                                                  |
+| `GET /user/retrieve?username=...`                            | Administrator-only lookup by username, Telegram ID, or email.                                                                   |
+| `PATCH /user/update?username=...`                            | Update first/last name; users may update themselves, ADMIN may update another account.                                          |
+| `POST /user/change-psw`                                      | Change the authenticated user's password; revokes existing refresh tokens.                                                      |
+| `POST /public/password-reset/request`                        | Request an emailed one-time password reset code; response does not reveal whether the account exists.                           |
+| `POST /public/password-reset/confirm`                        | Reset the password using the emailed code; revokes existing refresh tokens.                                                     |
+| `DELETE /user/delete?username=...`                           | Delete a user; requires `ADMIN` authorization.                                                                                  |
 
 The HTML email-confirmation page is served separately at `/public/confirm-email` from the server root.
 
@@ -245,19 +245,19 @@ not an optional identity hint for a bot request.
 
 ## 6. Create and manage a match
 
-| Method and path                                | Purpose                                                                                                                               |
-|------------------------------------------------|---------------------------------------------------------------------------------------------------------------------------------------|
-| `POST /match/host`                             | Host a match. Optional JSON body identifies a known configuration by `id` and `name`; omitting it selects default configuration ID 1. |
-| `POST /match/join?key_code=...`                 | Join an open match before it starts.                                                                                                  |
-| `POST /match/ai-player`                        | Host adds an AI before the match starts. Body requires `difficulty` (`EASY`, `MEDIUM`, or `HARD`) and may include `name`.             |
+| Method and path                                  | Purpose                                                                                                                               |
+|--------------------------------------------------|---------------------------------------------------------------------------------------------------------------------------------------|
+| `POST /match/host`                               | Host a match. Optional JSON body identifies a known configuration by `id` and `name`; omitting it selects default configuration ID 1. |
+| `POST /match/join?key_code=...`                  | Join an open match before it starts.                                                                                                  |
+| `POST /match/ai-player`                          | Host adds an AI before the match starts. Body requires `difficulty` (`EASY`, `MEDIUM`, or `HARD`) and may include `name`.             |
 | `DELETE /match/ai-player?ai_player_username=...` | Host removes an AI before the match starts.                                                                                           |
-| `POST /match/start`                            | Host starts the match; requires at least two total players.                                                                           |
-| `POST /match/close`                            | Close an unstarted match the caller participates in.                                                                                  |
-| `GET /match/status`                            | Get the caller's current match, if any.                                                                                               |
-| `GET /match/status?move_number=N`               | If `N` equals the current move count, returns "No new moves"; otherwise returns the current match snapshot.                           |
-| `GET /match/retrieve?key_code=...`              | Get the match snapshot.                                                                                                               |
+| `POST /match/start`                              | Host starts the match; requires at least two total players.                                                                           |
+| `POST /match/close`                              | Close an unstarted match the caller participates in.                                                                                  |
+| `GET /match/status`                              | Get the caller's current match, if any.                                                                                               |
+| `GET /match/status?move_number=N`                | If `N` equals the current move count, returns "No new moves"; otherwise returns the current match snapshot.                           |
+| `GET /match/retrieve?key_code=...`               | Get the match snapshot.                                                                                                               |
 | `GET /match/retrieve?key_code=...&move_number=N` | If `N` equals the current move count, returns "No new moves"; otherwise returns the snapshot.                                         |
-| `GET /match/retrieve-all`                      | List matches; supports `username`, `ended`, `page_number`, `page_size`, `sort_field`, and `sort_direction`.                           |
+| `GET /match/retrieve-all`                        | List matches; supports `username`, `ended`, `page_number`, `page_size`, `sort_field`, and `sort_direction`.                           |
 
 Typical sequence:
 
@@ -349,16 +349,16 @@ include `mainEvent` or `sideEvents`. Retrieve the match again to see the latest 
 
 ## 8. Card catalog and Sentinel notifications
 
-| Method and path                                                | Purpose                                                                                                    |
-|----------------------------------------------------------------|------------------------------------------------------------------------------------------------------------|
-| `GET /card`                                                    | List base-game and JOMC card definitions.                                                                  |
-| `GET /card/{id}`                                               | Get one card by catalog ID.                                                                                |
-| `GET /card/contract`                                           | List contract definitions and descriptions.                                                                |
-| `GET /card/contract/{id}`                                      | Get one contract by catalog ID.                                                                            |
-| `POST /sentinel/callback/subscribe`                            | Register an HTTPS webhook. JSON includes `matchKeyCode`, `url`, and a random signing `secret` of at least 32 bytes. |
-| `GET /sentinel/long-polling/subscribe?key_code=...&seconds=120` | Wait for one alert; re-subscribe after receiving it. Minimum timeout is 10 seconds.                        |
-| `GET /sentinel/sse/subscribe?key_code=...&seconds=3600`         | Receive alerts as Server-Sent Events until the connection closes or times out.                             |
-| `DELETE /sentinel/subscription?key_code=...`                    | Remove the caller's subscription for this match.                                                           |
+| Method and path                                                 | Purpose                                                                                                             |
+|-----------------------------------------------------------------|---------------------------------------------------------------------------------------------------------------------|
+| `GET /card`                                                     | List base-game and JOMC card definitions.                                                                           |
+| `GET /card/{id}`                                                | Get one card by catalog ID.                                                                                         |
+| `GET /card/contract`                                            | List contract definitions and descriptions.                                                                         |
+| `GET /card/contract/{id}`                                       | Get one contract by catalog ID.                                                                                     |
+| `POST /sentinel/callback/subscribe`                             | Register an HTTPS webhook. JSON includes `matchKeyCode`, `url`, and a random signing `secret` of at least 32 bytes. |
+| `GET /sentinel/long-polling/subscribe?key_code=...&seconds=120` | Wait for one alert; re-subscribe after receiving it. Minimum timeout is 10 seconds.                                 |
+| `GET /sentinel/sse/subscribe?key_code=...&seconds=3600`         | Receive alerts as Server-Sent Events until the connection closes or times out.                                      |
+| `DELETE /sentinel/subscription?key_code=...`                    | Remove the caller's subscription for this match.                                                                    |
 
 **Sentinel is the preferred way for clients to learn about live match updates.** Subscribe once
 instead of repeatedly polling `/match/retrieve` on a timer, then refresh the match snapshot when

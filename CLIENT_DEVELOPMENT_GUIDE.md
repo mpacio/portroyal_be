@@ -377,10 +377,10 @@ is served at `/public/confirm-email` from the server root.
 | `GET`             | `SERVER_ROOT/public/confirm-email?token=...` | Confirm an email token; public browser flow                                                                  |
 | `POST`            | `/user/new-tg-unify-email-otp`               | Request an unification OTP as the email account, or as `BOT` with the user's `tgId`; body: `{"email":"..."}` |
 | `GET`             | `/user/me`                                   | Get the authenticated API account; for bot auth this is the technical bot account                            |
-| `GET`             | `/user/retrieve?username=...`                | Administrator-only lookup by username, Telegram ID, or email; use `telegram_id` for Telegram ID             |
-| `PATCH`           | `/user/update?username=...`                  | Update first/last name only; users may update their own profile, ADMIN may update others                    |
-| `POST`            | `/public/password-reset/request`              | Request a reset code; response does not disclose whether the email is registered                            |
-| `POST`            | `/public/password-reset/confirm`              | Reset password using the emailed one-time code                                                             |
+| `GET`             | `/user/retrieve?username=...`                | Administrator-only lookup by username, Telegram ID, or email; use `telegram_id` for Telegram ID              |
+| `PATCH`           | `/user/update?username=...`                  | Update first/last name only; users may update their own profile, ADMIN may update others                     |
+| `POST`            | `/public/password-reset/request`             | Request a reset code; response does not disclose whether the email is registered                             |
+| `POST`            | `/public/password-reset/confirm`             | Reset password using the emailed one-time code                                                               |
 | `POST`            | `/user/register/telegram`                    | Create a Telegram-linked user; requires `BOT` role                                                           |
 | `POST`            | `/user/unify`                                | Complete unification with `{"email":"...","token":"..."}`; requires `BOT` role and the user's `tgId` header  |
 | `POST`            | `/match/host`                                | Host a match                                                                                                 |
