@@ -56,3 +56,7 @@ logs/**
 /portroyal_be/mvnw
 /portroyal_be/logs/*.log
 /portroyal_lib/csv_files/*.csv
+.env
+.env.*
+!.env.example
+!.env.production.example

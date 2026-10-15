@@ -10,7 +10,7 @@ This repository is a **Maven multi-module** project:
 | Module                           | Type                                | Responsibility                                                                                                                                                       |
 |----------------------------------|-------------------------------------|----------------------------------------------------------------------------------------------------------------------------------------------------------------------|
 | [`portroyal_lib`](portroyal_lib) | Plain Java library (Java 21)        | The **game engine**: all Port Royal rules, cards, phases, effects and match/move validation logic. No web, no persistence, no framework dependency.                  |
-| [`portroyal_be`](portroyal_be)   | Spring Boot 3 application (Java 21) | The **REST API**: authentication, persistence (PostgreSQL/JPA), match/user orchestration, real-time notifications. Delegates every rule decision to `portroyal_lib`. |
+| [`portroyal_be`](portroyal_be)   | Spring Boot 4 application (Java 21) | The **REST API**: OIDC/OAuth authentication, persistence (PostgreSQL/JPA), match/user orchestration, real-time notifications. Delegates every rule decision to `portroyal_lib`. |
 
 The root [`pom.xml`](pom.xml) is a `pom`-packaged aggregator; building it builds both modules in the
 correct order (the library is built/installed before the API, since `portroyal_be` depends on it).
@@ -27,6 +27,7 @@ correct order (the library is built/installed before the API, since `portroyal_b
 - [Configuration / environment variables](#configuration--environment-variables)
 - [Database](#database)
 - [Build & run](#build--run)
+- [Installation guide (Windows, Linux, Docker Compose, IntelliJ IDEA)](INSTALLATION_GUIDE.md)
 - [API overview](#api-overview)
 - [Game rules and API guide](GAME_RULES_AND_API.md)
 - [Client development guide](CLIENT_DEVELOPMENT_GUIDE.md)
@@ -252,6 +253,40 @@ tables):
 - `auth_login_attempts` — account/address login throttles shared across backend instances.
 
 ## Build & run
+
+See the step-by-step [installation guide](INSTALLATION_GUIDE.md) for Windows, Linux, Docker Compose,
+OIDC CLI sign-in, IntelliJ IDEA, and the production deployment layout.
+
+### Local development with Docker Compose
+
+Copy `.env.example` to `.env`, replace the local PostgreSQL and administrator passphrases, then run
+from the repository root:
+
+```bash
+docker compose up --build -d
+```
+
+The local Compose file starts PostgreSQL and the backend in the `dev` profile. The local database is
+stored in a named volume. Stop containers with `docker compose down`; **do not use `-v`** unless you
+intend to delete that volume.
+
+### Production deployment
+
+`docker-compose.yml` is the production stack for an existing PostgreSQL Docker volume and the
+external `email_sender_bot` checkout. It joins the existing `npm_main_net` network so Nginx Proxy
+Manager can route HTTPS traffic to `be_app:8080`; PostgreSQL is not published to the host.
+
+After completing the production prerequisites in the installation guide, set up `.env.production`
+and check the resolved Compose settings before starting anything:
+
+```bash
+docker compose --env-file .env.production -f docker-compose.yml config
+docker compose --env-file .env.production -f docker-compose.yml up --build -d
+```
+
+The Compose file requires the exact existing database volume name to prevent accidentally starting
+against a new empty volume. The email worker image is built from the separately maintained
+`email_sender_bot` directory; it is not included in this repository.
 
 Build everything (library + API) from the repository root:
 

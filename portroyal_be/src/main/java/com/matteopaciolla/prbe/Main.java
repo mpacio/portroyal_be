@@ -75,7 +75,13 @@ public class Main {
 				log.warn("Disabled the legacy default admin credential; provision a new password out of band.");
 			}
 
-			if (bootstrapAdminEnabled && StringUtils.hasText(initialAdminPassword)) {
+			if (bootstrapAdminEnabled) {
+				if (!StringUtils.hasText(initialAdminPassword)
+						|| initialAdminPassword.length() < 15
+						|| initialAdminPassword.length() > 128) {
+					throw new IllegalStateException(
+							"PORTROYAL_INITIAL_ADMIN_PASSWORD must be between 15 and 128 characters when bootstrapping.");
+				}
 				if (admin == null) {
 					admin = new UserEntity("admin", passwordEncoder.encode(initialAdminPassword),
 							List.of(UserRole.ADMIN, UserRole.USER));

@@ -1,0 +1,52 @@
+services:
+  postgres:
+    image: postgres:17
+    restart: unless-stopped
+    shm_size: 128mb
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-portroyal}
+      POSTGRES_USER: ${POSTGRES_USER:-portroyal}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Copy .env.example to .env and set POSTGRES_PASSWORD}
+      TZ: Europe/Rome
+      PGTZ: Europe/Rome
+    volumes:
+      - portroyal_dev_data:/var/lib/postgresql/data
+    ports:
+      - "127.0.0.1:5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -h 127.0.0.1 -U \"$${POSTGRES_USER}\" -d \"$${POSTGRES_DB}\""]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+      start_period: 10s
+
+  be_app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      SPRING_PROFILES_ACTIVE: dev
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/${POSTGRES_DB:-portroyal}
+      SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER:-portroyal}
+      SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD:?Copy .env.example to .env and set POSTGRES_PASSWORD}
+      PORTROYAL_AUTH_ISSUER: ${PORTROYAL_AUTH_ISSUER:-http://localhost:8080}
+      PORTROYAL_API_ALLOWED_ORIGINS: ${PORTROYAL_API_ALLOWED_ORIGINS:-http://localhost:3000,http://127.0.0.1:3000}
+      PORTROYAL_WEB_REDIRECT_URIS: ${PORTROYAL_WEB_REDIRECT_URIS:-http://localhost:3000/auth/callback}
+      PORTROYAL_WEB_LOGOUT_REDIRECT_URIS: ${PORTROYAL_WEB_LOGOUT_REDIRECT_URIS:-http://localhost:3000/}
+      PORTROYAL_BOOTSTRAP_ADMIN_ENABLED: ${PORTROYAL_BOOTSTRAP_ADMIN_ENABLED:-false}
+      PORTROYAL_INITIAL_ADMIN_PASSWORD: ${PORTROYAL_INITIAL_ADMIN_PASSWORD:-}
+      PORTROYAL_BOT_CLIENT_SECRET: ${PORTROYAL_BOT_CLIENT_SECRET:-}
+      PORTROYAL_CALLBACK_ENCRYPTION_KEY: ${PORTROYAL_CALLBACK_ENCRYPTION_KEY:-}
+      SPRING_JPA_HIBERNATE_DDL_AUTO: update
+    ports:
+      - "127.0.0.1:8080:8080"
+    volumes:
+      - portroyal_dev_logs:/app/logs
+
+volumes:
+  portroyal_dev_data:
+  portroyal_dev_logs:

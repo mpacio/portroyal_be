@@ -1,0 +1,111 @@
+services:
+  postgres:
+    image: postgres:16.3-bookworm
+    restart: unless-stopped
+    shm_size: 128mb
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:?Set POSTGRES_USER in .env.production}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env.production}
+      POSTGRES_DB: ${POSTGRES_DB:?Set POSTGRES_DB in .env.production}
+      TZ: Europe/Rome
+      PGTZ: Europe/Rome
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - type: bind
+        source: ${POSTGRES_INIT_SCHEMA_FILE:?Set POSTGRES_INIT_SCHEMA_FILE to the domain schema SQL file}
+        target: /docker-entrypoint-initdb.d/01-domain-schema.sql
+        read_only: true
+        bind:
+          create_host_path: false
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -h 127.0.0.1 -U \"$${POSTGRES_USER}\" -d \"$${POSTGRES_DB}\""]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+    networks:
+      - db_internal
+
+  be_app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      SPRING_PROFILES_ACTIVE: prod
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/${POSTGRES_DB}
+      SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER}
+      SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD}
+      PORTROYAL_AUTH_ISSUER: ${PORTROYAL_AUTH_ISSUER:?Set the public HTTPS issuer}
+      PORTROYAL_API_ALLOWED_ORIGINS: ${PORTROYAL_API_ALLOWED_ORIGINS:?Set exact browser origins}
+      PORTROYAL_WEB_REDIRECT_URIS: ${PORTROYAL_WEB_REDIRECT_URIS:?Set exact HTTPS web redirect URIs}
+      PORTROYAL_WEB_LOGOUT_REDIRECT_URIS: ${PORTROYAL_WEB_LOGOUT_REDIRECT_URIS:?Set exact HTTPS logout redirect URIs}
+      PORTROYAL_BOT_CLIENT_SECRET: ${PORTROYAL_BOT_CLIENT_SECRET:?Set the bot OAuth client secret}
+      PORTROYAL_AUTH_KEYSTORE: file:/run/secrets/portroyal-auth-keystore
+      PORTROYAL_AUTH_KEYSTORE_PASSWORD: ${PORTROYAL_AUTH_KEYSTORE_PASSWORD:?Set the signing keystore password}
+      PORTROYAL_AUTH_KEY_ALIAS: ${PORTROYAL_AUTH_KEY_ALIAS:-portroyal-signing}
+      PORTROYAL_AUTH_PUBLIC_KEY_ALIASES: ${PORTROYAL_AUTH_PUBLIC_KEY_ALIASES:-}
+      PORTROYAL_CALLBACK_ENCRYPTION_KEY: ${PORTROYAL_CALLBACK_ENCRYPTION_KEY:?Set the callback encryption key}
+      PORTROYAL_CALLBACK_ENCRYPTION_KEY_ID: ${PORTROYAL_CALLBACK_ENCRYPTION_KEY_ID:-current}
+      PORTROYAL_CALLBACK_PREVIOUS_ENCRYPTION_KEYS: ${PORTROYAL_CALLBACK_PREVIOUS_ENCRYPTION_KEYS:-}
+      PORTROYAL_BOOTSTRAP_ADMIN_ENABLED: ${PORTROYAL_BOOTSTRAP_ADMIN_ENABLED:-false}
+      PORTROYAL_INITIAL_ADMIN_PASSWORD: ${PORTROYAL_INITIAL_ADMIN_PASSWORD:-}
+    secrets:
+      - portroyal-auth-keystore
+    expose:
+      - "8080"
+    volumes:
+      - type: bind
+        source: ${BE_APP_LOG_DIR:-./logs}
+        target: /app/logs
+        bind:
+          create_host_path: true
+    networks:
+      - db_internal
+      - npm_main_net
+
+  email_batch:
+    build:
+      context: ${EMAIL_WORKER_BUILD_CONTEXT:?Set EMAIL_WORKER_BUILD_CONTEXT to the email_sender_bot checkout}
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      MJ_APIKEY_PUBLIC: ${MJ_APIKEY_PUBLIC:?Set the Mailjet public key}
+      MJ_APIKEY_PRIVATE: ${MJ_APIKEY_PRIVATE:?Set the Mailjet private key}
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_HOST: postgres
+      SENDER_EMAIL: ${SENDER_EMAIL:?Set the sender address}
+      SENDER_NAME: ${SENDER_NAME:?Set the sender name}
+      CHECK_PERIOD_SECONDS: ${CHECK_PERIOD_SECONDS:-10}
+      MAX_EMAILS_PER_DAY: ${MAX_EMAILS_PER_DAY:-1000}
+      EMAIL_SENDING_BOT_ENABLED: ${EMAIL_SENDING_BOT_ENABLED:-true}
+      HEALTH_CHECK_EMAIL_RECIPIENT: ${HEALTH_CHECK_EMAIL_RECIPIENT:?Set the health-check recipient}
+    networks:
+      - db_internal
+      - mail_egress
+
+secrets:
+  portroyal-auth-keystore:
+    file: ${PORTROYAL_AUTH_KEYSTORE_FILE:?Set PORTROYAL_AUTH_KEYSTORE_FILE to the PKCS#12 keystore file}
+
+volumes:
+  postgres_data:
+    external: true
+    name: ${POSTGRES_VOLUME_NAME:?Set POSTGRES_VOLUME_NAME to the existing production database volume}
+
+networks:
+  db_internal:
+    internal: true
+  mail_egress:
+    driver: bridge
+  npm_main_net:
+    external: true
+    name: npm_main_net

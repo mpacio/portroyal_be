@@ -7,7 +7,7 @@ Maven **multi-module** project (root `pom.xml` is a `pom`-packaged aggregator):
 - [`portroyal_lib`](../portroyal_lib) — plain Java library (Java 21), package
   `com.matteopaciolla.portroyal`. The **entire game engine**: rules, cards, phases, effects,
   match/move validation. No web, no persistence, no framework dependency.
-- [`portroyal_be`](../portroyal_be) — Spring Boot 3 application (Java 21). The **REST API**:
+- [`portroyal_be`](../portroyal_be) — Spring Boot 4 application (Java 21). The **REST API**:
   auth, persistence (PostgreSQL/JPA), match/user orchestration, real-time notifications.
 
 `portroyal_be` depends on `portroyal_lib` via the `prlib.version` property in
