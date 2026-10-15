@@ -8,11 +8,9 @@ public class AlertCallbackWrapperDto {
 
     private String username;
     private AlertDto alert;
-    private String secret;
 
-    public AlertCallbackWrapperDto(String username, AlertDto alert, String secret) {
+    public AlertCallbackWrapperDto(String username, AlertDto alert) {
         this.username = username;
         this.alert = alert;
-        this.secret = secret;
     }
 }

@@ -1,6 +1,5 @@
 package com.matteopaciolla.prbe.logging;
 
-import com.matteopaciolla.prbe.constants.CommonConstants;
 import lombok.NonNull;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -11,7 +10,7 @@ import java.util.List;
 
 public class CustomHttpLogFormatter implements HttpLogFormatter {
 
-    private static final String requestPattern = "Request: %s %s by %s -> Params=[%s] Headers: " + CommonConstants.BOT_MANDATORY_HEADER + "=%s, cookie=%s";
+    private static final String requestPattern = "Request: %s %s by %s";
     private static final String anonymousUser = "anonymous";
 
     @Override
@@ -19,30 +18,15 @@ public class CustomHttpLogFormatter implements HttpLogFormatter {
         String res = String.format(requestPattern,
                 request.getMethod(),
                 request.getPath(),
-                getAuthenticatedUser(),
-                request.getQuery(),
-                request.getHeaders().get(CommonConstants.BOT_MANDATORY_HEADER),
-                request.getHeaders().get("cookie"));
-        if (request.getBodyAsString() != null && !request.getBodyAsString().isEmpty()) {
-            res += String.format(" Body: %s", request.getBodyAsString());}
+                getAuthenticatedUser());
         return res;
     }
 
     @Override
     public String format(@NonNull Correlation correlation, HttpResponse response) throws IOException {
-        String res = String.format("Response: %d to %s -> Headers: Set-Cookie=%s",
+        return String.format("Response: %d to %s",
                 response.getStatus(),
-                getAuthenticatedUser(),
-                response.getHeaders().get("Set-Cookie"));
-        if (response.getBodyAsString() != null && !response.getBodyAsString().isEmpty()) {
-            if (response.getBodyAsString().startsWith("<!DOCTYPE html>")) {
-                // avoid logging the body of html responses
-                res += " [HTML response]";
-            } else {
-                res += String.format(" Body: %s", response.getBodyAsString());
-            }
-        }
-        return res;
+                getAuthenticatedUser());
     }
 
     private String getAuthenticatedUser() {

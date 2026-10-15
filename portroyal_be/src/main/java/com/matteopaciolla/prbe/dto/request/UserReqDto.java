@@ -19,6 +19,7 @@ public class UserReqDto {
     private String username;
 
     @Schema(description = "Password for the account. Sent in clear text by the client and then hashed server-side.", example = "MyP@ssw0rd")
+    @Size(min = 15, max = 128, message = "Password must be between 15 and 128 characters")
     @JsonInclude(JsonInclude.Include.NON_NULL)
     private String password;
 

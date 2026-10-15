@@ -68,7 +68,7 @@ public class GlobalExceptionHandler {
 
     @ExceptionHandler(HandlerMethodValidationException.class)
     public ResponseEntity<ErrorResponse> handleHandlerMethodValidationException(HandlerMethodValidationException e) {
-        List<ErrorResponse.ErrorDetail> details = e.getAllValidationResults().stream()
+        List<ErrorResponse.ErrorDetail> details = e.getParameterValidationResults().stream()
                 .flatMap(result -> {
                     String parameterName = Objects.requireNonNullElse(
                             result.getMethodParameter().getParameterName(), "request parameter");

@@ -173,14 +173,15 @@ board index is not the contract's catalog ID.
 ## 4. API basics
 
 Set `BASE` to the service root, for example `http://localhost:8080/api/v1`. Unless noted as public,
-endpoints require **HTTP Basic authentication**. Send JSON with `Content-Type: application/json`.
-Bot-mediated calls use the bot account's Basic credentials plus a `tgId` header containing the
-human player's Telegram ID. AI players are match participants, not API identities.
+endpoints require an **OAuth2 bearer access token**. Send JSON with `Content-Type: application/json`.
+Human clients obtain tokens with OpenID Connect Authorization Code + PKCE. Bot-mediated calls use a
+short-lived client-credentials access token plus a `tgId` header containing the human player's
+Telegram ID. AI players are match participants, not API identities.
 
 Example authenticated request:
 
 ```sh
-curl -u alice:password "$BASE/user/me"
+curl -H "Authorization: Bearer $ACCESS_TOKEN" "$BASE/user/me"
 ```
 
 The server returns JSON response wrappers for most operations. Validation failures, illegal moves,
@@ -200,9 +201,11 @@ API paths below are relative to `BASE` (`/api/v1`).
 | `POST /user/register/telegram`                            | Create a Telegram-linked player; requires `BOT` authentication.                                                |
 | `POST /user/unify`                                        | Link the Telegram ID to the email account using the OTP; requires `BOT` authentication.                        |
 | `GET /user/me`                                            | Get the authenticated account.                                                                                 |
-| `GET /user/retrieve?username=...`                         | Look up a user by username, Telegram ID, or email; use `telegram_id` when identifying by Telegram ID.          |
-| `PATCH /user/update?username=...`                         | Partially update user profile; requires `ADMIN` or `BOT` authorization.                                        |
-| `POST /user/change-psw`                                    | Change the authenticated user's password.                                                                      |
+| `GET /user/retrieve?username=...`                         | Administrator-only lookup by username, Telegram ID, or email.                                                  |
+| `PATCH /user/update?username=...`                         | Update first/last name; users may update themselves, ADMIN may update another account.                         |
+| `POST /user/change-psw`                                    | Change the authenticated user's password; revokes existing refresh tokens.                                    |
+| `POST /public/password-reset/request`                      | Request an emailed one-time password reset code; response does not reveal whether the account exists.            |
+| `POST /public/password-reset/confirm`                      | Reset the password using the emailed code; revokes existing refresh tokens.                                    |
 | `DELETE /user/delete?username=...`                        | Delete a user; requires `ADMIN` authorization.                                                                 |
 
 The HTML email-confirmation page is served separately at `/public/confirm-email` from the server root.
@@ -212,7 +215,7 @@ Standard registration body:
 ```json
 {
   "username": "alice42",
-  "password": "replace-with-a-secret",
+  "password": "a-long-passphrase-with-at-least-15-chars",
   "email": "alice@example.com",
   "firstName": "Alice",
   "lastName": "Example"
@@ -234,7 +237,7 @@ Do not use development seed credentials in a deployed environment.
 For bot requests to match and game endpoints, include, for example:
 
 ```sh
-curl -u shaslabot:replace-with-secret -H "tgId: 123456789" ...
+curl -H "Authorization: Bearer $BOT_ACCESS_TOKEN" -H "tgId: 123456789" ...
 ```
 
 The API resolves that Telegram ID to the real player for supported bot-mediated operations. It is
@@ -260,17 +263,17 @@ Typical sequence:
 
 ```sh
 # Host (save the keyCode returned in the response)
-curl -u alice:password -H "Content-Type: application/json" \
+curl -H "Authorization: Bearer $ACCESS_TOKEN" -H "Content-Type: application/json" \
   -d '{"id":1,"name":"default"}' "$BASE/match/host"
 
 # Another player joins with that keyCode
-curl -u bob:password -X POST "$BASE/match/join?key_code=ABC123"
+curl -H "Authorization: Bearer $BOB_ACCESS_TOKEN" -X POST "$BASE/match/join?key_code=ABC123"
 
 # Host starts
-curl -u alice:password -X POST "$BASE/match/start"
+curl -H "Authorization: Bearer $ACCESS_TOKEN" -X POST "$BASE/match/start"
 
 # Read state before choosing a move
-curl -u alice:password "$BASE/match/retrieve?key_code=ABC123"
+curl -H "Authorization: Bearer $ACCESS_TOKEN" "$BASE/match/retrieve?key_code=ABC123"
 ```
 
 The host is automatically a player. A player cannot join multiple open matches. Human and AI
@@ -302,7 +305,7 @@ ship. For a normal `HIRE`, `parameterIndex` is the employee's current harbor ind
 Example discover:
 
 ```sh
-curl -u alice:password -H "Content-Type: application/json" \
+curl -H "Authorization: Bearer $ACCESS_TOKEN" -H "Content-Type: application/json" \
   -d '{"move":"DISCOVER"}' "$BASE/game/move"
 ```
 
@@ -323,7 +326,7 @@ To sign a manual contract, read the current match snapshot, find the contract in
 then send its **zero-based board index** as `parameterIndex`:
 
 ```sh
-curl -u alice:password -H "Content-Type: application/json" \
+curl -H "Authorization: Bearer $ACCESS_TOKEN" -H "Content-Type: application/json" \
   -d '{"move":"SIGN_CONTRACT","parameterIndex":1}' "$BASE/game/move"
 ```
 
@@ -352,7 +355,7 @@ include `mainEvent` or `sideEvents`. Retrieve the match again to see the latest 
 | `GET /card/{id}`                                               | Get one card by catalog ID.                                                                                |
 | `GET /card/contract`                                           | List contract definitions and descriptions.                                                                |
 | `GET /card/contract/{id}`                                      | Get one contract by catalog ID.                                                                            |
-| `POST /sentinel/callback/subscribe`                            | Register a webhook for alerts. JSON includes `matchKeyCode`, `url`, and optional `secret`.                 |
+| `POST /sentinel/callback/subscribe`                            | Register an HTTPS webhook. JSON includes `matchKeyCode`, `url`, and a random signing `secret` of at least 32 bytes. |
 | `GET /sentinel/long-polling/subscribe?key_code=...&seconds=120` | Wait for one alert; re-subscribe after receiving it. Minimum timeout is 10 seconds.                        |
 | `GET /sentinel/sse/subscribe?key_code=...&seconds=3600`         | Receive alerts as Server-Sent Events until the connection closes or times out.                             |
 | `DELETE /sentinel/subscription?key_code=...`                    | Remove the caller's subscription for this match.                                                           |
@@ -375,6 +378,13 @@ Choose a subscription transport to suit the client:
   subscription after handling the alert; a timeout is returned as a `SUBSCRIPTION_TIMEOUT` alert.
 - **Callback** sends an HTTP POST to the registered URL for each alert. The callback subscription
   is database-backed and works across API instances without sticky routing.
+
+Callback destinations must be public HTTPS endpoints on port 443; the API blocks private-network
+destinations and does not follow redirects. Callback JSON bodies do not contain the signing secret.
+Each delivery includes `X-Callback-Timestamp`, `X-Callback-Event-Id`, and
+`X-Callback-Signature: v1=<hex>`. Verify `HMAC-SHA-256(secret, timestamp + "." + event-id + "." +
+exact-raw-body)` using a constant-time comparison; reject old timestamps and event IDs already
+processed.
 
 Long-polling and SSE subscriptions are held by the serving API instance, so deployments using
 multiple instances should use sticky routing for these connections. `DELETE` removes the
@@ -403,8 +413,9 @@ generated event/side-event payload.
 
 ## 9. Client integration checklist
 
-1. Authenticate each protected request with HTTP Basic; use `tgId` when a bot acts on behalf of a
-   human player.
+1. Authenticate protected requests with a bearer access token. Use Authorization Code + PKCE for
+   human clients, and client credentials for the bot; include `tgId` when the bot acts for a
+   particular human player.
 2. Host or join a match, and wait for the host to start it.
 3. Read the match snapshot before a move. Use its current player ordering and board lists to
    resolve all indices.

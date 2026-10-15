@@ -38,7 +38,7 @@ import static com.matteopaciolla.prbe.util.AuthenticationUtils.getUsername;
 import static com.matteopaciolla.prbe.util.AuthenticationUtils.isBotUser;
 
 @Tag(name = "Match", description = "Matches operations")
-@SecurityRequirements({@SecurityRequirement(name = "basicAuth")})
+@SecurityRequirements({@SecurityRequirement(name = "bearerAuth")})
 @Slf4j
 @RestController
 @RequiredArgsConstructor

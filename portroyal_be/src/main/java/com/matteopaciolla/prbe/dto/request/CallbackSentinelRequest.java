@@ -2,6 +2,8 @@ package com.matteopaciolla.prbe.dto.request;
 
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.Size;
+import lombok.ToString;
 import lombok.Value;
 
 @Schema(name = "CallbackSentinelRequest", description = "Payload used to register an HTTP callback for match notifications.")
@@ -16,6 +18,9 @@ public class CallbackSentinelRequest {
     @NotBlank(message = "url must not be blank")
     String url;
 
-    @Schema(description = "Optional secret used to validate or sign callback requests.", example = "my-secret")
+    @Schema(description = "Random shared secret of at least 32 characters used to verify the callback's HMAC signature.", requiredMode = Schema.RequiredMode.REQUIRED)
+    @NotBlank(message = "secret must not be blank")
+    @Size(min = 32, max = 256, message = "secret must be between 32 and 256 characters")
+    @ToString.Exclude
     String secret;
 }

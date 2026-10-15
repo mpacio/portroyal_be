@@ -13,11 +13,16 @@ import java.util.function.Predicate;
 public class LogbookConfig {
 
     @Bean
-    public Logbook logbook() {
+    public HttpLogFormatter httpLogFormatter() {
+        return new CustomHttpLogFormatter();
+    }
+
+    @Bean
+    public Logbook logbook(HttpLogFormatter httpLogFormatter) {
         return Logbook.builder()
                 .condition(excludeEndpoints("/health", "/info")) // Example: Exclude specific endpoints
                 .sink(new DefaultSink(
-                        new CustomHttpLogFormatter(),
+                        httpLogFormatter,
                         new DefaultHttpLogWriter()
                 ))
                 .build();

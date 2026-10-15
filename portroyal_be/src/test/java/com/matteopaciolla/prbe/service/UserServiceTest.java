@@ -9,6 +9,7 @@ import com.matteopaciolla.prbe.model.entity.OtpEntity;
 import com.matteopaciolla.prbe.model.entity.UserEntity;
 import com.matteopaciolla.prbe.repository.OtpRepository;
 import com.matteopaciolla.prbe.repository.UserRepository;
+import com.matteopaciolla.prbe.security.OAuthAuthorizationRevocationService;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
@@ -36,6 +37,8 @@ class UserServiceTest {
     private OtpRepository otpRepository;
     @Mock
     private EmailSenderFacade emailSenderFacade;
+    @Mock
+    private OAuthAuthorizationRevocationService authorizationRevocationService;
 
     @InjectMocks
     private UserService userService;
@@ -47,13 +50,14 @@ class UserServiceTest {
     }
 
     @Test
-    void registerWebUser_requiresUsernameAndEmailButNotPassword() {
+    void registerWebUser_requiresUsernameEmailAndPassword() {
         UserReqDto request = new UserReqDto();
         request.setUsername("alice42");
         request.setEmail("alice@example.com");
+        request.setPassword("a-long-test-password");
         when(userRepository.findByUsernameOrEmailOrTelegramId("alice42", "alice@example.com", ""))
                 .thenReturn(Optional.empty());
-        when(passwordEncoder.encode(any())).thenReturn("encoded-password");
+        when(passwordEncoder.encode(request.getPassword())).thenReturn("encoded-password");
         when(userRepository.save(any(UserEntity.class))).thenAnswer(invocation -> invocation.getArgument(0));
         when(otpRepository.findFirstByEmailAndFlowTypeOrderByCreatedAtDesc("alice@example.com", OtpEntity.FlowType.EMAIL_CONFIRMATION))
                 .thenReturn(Optional.empty());
@@ -64,7 +68,7 @@ class UserServiceTest {
         assertThat(result.getEmail()).isEqualTo("alice@example.com");
         assertThat(FakeNames.FIRST_NAMES).contains(result.getFirstName());
         assertThat(result.getLastName()).isNotBlank();
-        verify(passwordEncoder).encode(any());
+        verify(passwordEncoder).encode(request.getPassword());
         verify(emailSenderFacade).sendEmail(any(), any(), any(), any(), any());
     }
 
@@ -75,7 +79,6 @@ class UserServiceTest {
         request.setTelegramId("123456789");
         when(userRepository.findByUsernameOrEmailOrTelegramId("pirate42", "", "123456789"))
                 .thenReturn(Optional.empty());
-        when(passwordEncoder.encode(any())).thenReturn("encoded-password");
         when(userRepository.save(any(UserEntity.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
         UserDto result = userService.registerUser(request, true);
@@ -89,6 +92,7 @@ class UserServiceTest {
     void registerWebUser_reportsEmailAsRequired() {
         UserReqDto request = new UserReqDto();
         request.setUsername("alice42");
+        request.setPassword("a-long-test-password");
 
         assertThatThrownBy(() -> userService.registerUser(request, false))
                 .isInstanceOf(MandatoryParamException.class)
@@ -115,7 +119,6 @@ class UserServiceTest {
         request.setFirstName("Alice");
         when(userRepository.findByUsernameOrEmailOrTelegramId("alice42", "", "123456789"))
                 .thenReturn(Optional.empty());
-        when(passwordEncoder.encode(any())).thenReturn("encoded-password");
         ArgumentCaptor<UserEntity> savedUser = ArgumentCaptor.forClass(UserEntity.class);
         when(userRepository.save(savedUser.capture())).thenAnswer(invocation -> invocation.getArgument(0));
 

@@ -24,7 +24,7 @@ import org.springframework.web.context.request.async.DeferredResult;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
 @Tag(name = "Sentinel", description = "Notification subscription APIs")
-@SecurityRequirements({@SecurityRequirement(name = "basicAuth")})
+@SecurityRequirements({@SecurityRequirement(name = "bearerAuth")})
 @Slf4j
 @RestController
 @RequestMapping(Paths.SENTINEL_PATH)
@@ -38,17 +38,17 @@ public class SentinelController {
 
     @Operation(summary = "Subscribe to a callback notification", description = """
 Subscribe to a callback notification.
-The callback will be sent to the URL specified in the request.
-The callback will be sent when a new alert is available.
-The alert will be sent in the request body.
-The alert will be sent only once.
+The callback will be sent to the public HTTPS URL specified in the request.
+Each delivery signs the exact JSON body with HMAC-SHA-256; the secret is never sent in the body.
+The timestamp and event ID headers support receiver-side replay protection.
+The callback will be sent when a new alert is available and is sent only once.
 The alerts refer to any match, that's why the matchKeyCode is required.""")
     @PostMapping(path = "/callback/subscribe", consumes = MediaType.APPLICATION_JSON_VALUE, produces = MediaType.APPLICATION_JSON_VALUE)
     public ResponseEntity<VoidResponse> addCallbackSentinel(
             @io.swagger.v3.oas.annotations.parameters.RequestBody(description = "Callback request body", required = true,
                     content = @io.swagger.v3.oas.annotations.media.Content(
                             schema = @io.swagger.v3.oas.annotations.media.Schema(implementation = CallbackSentinelRequest.class),
-                            examples = @io.swagger.v3.oas.annotations.media.ExampleObject(value = "{\"matchKeyCode\":\"xxxxxx\",\"url\":\"http://localhost:8080/callback\"}")))
+                            examples = @io.swagger.v3.oas.annotations.media.ExampleObject(value = "{\"matchKeyCode\":\"ABC123\",\"url\":\"https://client.example.com/callback\",\"secret\":\"<at-least-32-random-bytes>\"}")))
             @Valid @RequestBody CallbackSentinelRequest request) {
         String username = SecurityContextHolder.getContext().getAuthentication().getName();
         UserEntity user = userService.getUserEntityByUsername(username);

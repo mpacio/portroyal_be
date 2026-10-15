@@ -5,6 +5,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.matteopaciolla.portroyal.core.enums.MoveAction;
 
 import java.io.IOException;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
@@ -18,11 +19,9 @@ public class PortRoyalCli {
 
     private static final ObjectMapper MAPPER = new ObjectMapper();
     private static final String DEFAULT_URL = "http://localhost:8080";
-    private static final String DEFAULT_USERNAME = "admin";
-    private static final String DEFAULT_PASSWORD = "password";
 
     public static void main(String[] args) {
-        Session session = new Session(DEFAULT_URL, DEFAULT_USERNAME, DEFAULT_PASSWORD, null);
+        Session session = new Session(DEFAULT_URL, null);
         try (Scanner scanner = new Scanner(System.in)) {
             printBanner();
             while (true) {
@@ -32,6 +31,8 @@ public class PortRoyalCli {
                 switch (option) {
                     case "1" -> configureConnection(session, scanner);
                     case "2" -> showCurrentUser(session, scanner);
+                    case "16" -> signIn(session);
+                    case "17" -> signOut(session);
                     case "3" -> registerUser(session, scanner);
                     case "4" -> listMatches(session, scanner);
                     case "5" -> hostMatch(session, scanner);
@@ -62,26 +63,52 @@ public class PortRoyalCli {
             session.baseUrl = baseUrl;
         }
 
-        System.out.print("Username [" + session.username + "]: ");
-        String username = scanner.nextLine().trim();
-        if (!username.isBlank()) {
-            session.username = username;
-        }
-
-        System.out.print("Password [" + session.password + "]: ");
-        String password = scanner.nextLine();
-        if (!password.isBlank()) {
-            session.password = password;
-        }
-
         System.out.print("tgId for bot flows (blank to disable): ");
         String tgId = scanner.nextLine().trim();
         session.tgId = tgId.isBlank() ? null : tgId;
 
         System.out.println("Connection configured.");
         System.out.println("Base URL: " + session.baseUrl);
-        System.out.println("Username: " + session.username);
         System.out.println("Bot tgId: " + (session.tgId == null ? "disabled" : session.tgId));
+    }
+
+    private static void signIn(Session session) {
+        try {
+            session.clearTokens();
+            session.tokens = OidcCliAuthenticator.login(session.baseUrl);
+            ApiClient.Response userResponse = call(session, "GET", "/api/v1/user/me", null, null);
+            if (userResponse.statusCode() != 200) {
+                session.clearTokens();
+                printResponse(userResponse);
+                return;
+            }
+            JsonNode response = MAPPER.readTree(userResponse.body());
+            session.username = response.path("data").path("username").asText();
+            System.out.println("Signed in as " + session.username + ". Tokens are held in memory only.");
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            System.out.println("Sign-in was interrupted.");
+        } catch (IOException e) {
+            System.out.println("Sign-in failed: " + e.getMessage());
+        }
+    }
+
+    private static void signOut(Session session) {
+        OidcCliAuthenticator.TokenSet currentTokens = session.tokens;
+        try {
+            if (currentTokens != null) {
+                OidcCliAuthenticator.revoke(session.baseUrl, currentTokens.refreshToken());
+            }
+            System.out.println("Signed out. Refresh token revoked and local tokens cleared.");
+        } catch (IOException | InterruptedException e) {
+            if (e instanceof InterruptedException) {
+                Thread.currentThread().interrupt();
+            }
+            System.out.println("Remote revocation failed: " + e.getMessage());
+        } finally {
+            session.clearTokens();
+            session.username = null;
+        }
     }
 
     private static void showCurrentUser(Session session, Scanner scanner) {
@@ -420,9 +447,8 @@ public class PortRoyalCli {
         if (session.tgId != null && !session.tgId.isBlank()) {
             headers.put("tgId", session.tgId);
         }
-        boolean basicAuthRequired = !ApiClient.isPublicEndpoint(path);
         try {
-            ApiClient.Response response = ApiClient.execute(session.baseUrl, session.username, session.password, method, path, body, headers, basicAuthRequired);
+            ApiClient.Response response = execute(session, method, path, body, headers);
             printResponse(response);
         } catch (IOException | InterruptedException e) {
             System.out.println("Request failed: " + e.getMessage());
@@ -431,9 +457,10 @@ public class PortRoyalCli {
 
     private static void printQuickGuide() {
         System.out.println("Quick guide:");
-        System.out.println("- Default credentials: admin / password");
         System.out.println("- Default base URL: http://localhost:8080");
-        System.out.println("- The app calls the running Spring Boot instance via HTTP Basic Auth");
+        System.out.println("- Choose Sign in, then complete OpenID Connect PKCE in your browser");
+        System.out.println("- Access and rotating refresh tokens are held in memory only and are not saved between runs");
+        System.out.println("- Use HTTPS for any non-loopback API URL");
         System.out.println("- For Bot flows, set a tgId in the connection config and the CLI will include the tgId header");
         System.out.println("- Request an account-unification OTP while authenticated as the email account, then configure Bot credentials and tgId to unify");
         System.out.println("- To play a match, host it, join it, start it, then use the interactive move menu");
@@ -451,10 +478,38 @@ public class PortRoyalCli {
             }
         }
         try {
-            return ApiClient.execute(session.baseUrl, session.username, session.password, method, path, body, headers, !ApiClient.isPublicEndpoint(path));
+            return execute(session, method, path, body, headers);
         } catch (IOException | InterruptedException e) {
+            if (e instanceof InterruptedException) {
+                Thread.currentThread().interrupt();
+            }
             throw new IllegalStateException("Request failed: " + e.getMessage(), e);
         }
+    }
+
+    private static ApiClient.Response execute(
+            Session session, String method, String path, String body, Map<String, String> headers)
+            throws IOException, InterruptedException {
+        if (!ApiClient.isPublicEndpoint(path) && session.tokens == null) {
+            return new ApiClient.Response(401, "", "{\"status\":401,\"error\":\"Unauthorized\",\"message\":\"Sign in first using menu option 16.\"}");
+        }
+        if (session.tokens != null && !ApiClient.isPublicEndpoint(path)
+                && session.tokens.expiresAt().isBefore(Instant.now().plusSeconds(30))) {
+            try {
+                session.tokens = OidcCliAuthenticator.refresh(session.baseUrl, session.tokens.refreshToken());
+            } catch (IOException | InterruptedException refreshFailure) {
+                session.clearTokens();
+                throw refreshFailure;
+            }
+        }
+        return ApiClient.execute(
+                session.baseUrl,
+                session.tokens == null ? null : session.tokens.accessToken(),
+                method,
+                path,
+                body,
+                headers,
+                !ApiClient.isPublicEndpoint(path));
     }
 
     private static void printResponse(ApiClient.Response response) {
@@ -488,6 +543,8 @@ public class PortRoyalCli {
         System.out.println("13. Quick guide");
         System.out.println("14. Request account-unification OTP");
         System.out.println("15. Unify Telegram and email accounts");
+        System.out.println("16. Sign in with OpenID Connect");
+        System.out.println("17. Sign out");
         System.out.println("0. Exit");
     }
 
@@ -577,14 +634,16 @@ public class PortRoyalCli {
     private static final class Session {
         private String baseUrl;
         private String username;
-        private String password;
         private String tgId;
+        private OidcCliAuthenticator.TokenSet tokens;
 
-        private Session(String baseUrl, String username, String password, String tgId) {
+        private Session(String baseUrl, String tgId) {
             this.baseUrl = baseUrl;
-            this.username = username;
-            this.password = password;
             this.tgId = tgId;
+        }
+
+        private void clearTokens() {
+            this.tokens = null;
         }
     }
 }

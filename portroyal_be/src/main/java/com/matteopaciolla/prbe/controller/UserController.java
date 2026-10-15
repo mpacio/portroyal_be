@@ -3,6 +3,7 @@ package com.matteopaciolla.prbe.controller;
 import com.matteopaciolla.prbe.constants.CommonConstants;
 import com.matteopaciolla.prbe.constants.Paths;
 import com.matteopaciolla.prbe.dto.request.ChangePasswordReqDto;
+import com.matteopaciolla.prbe.dto.request.UserProfileUpdateReqDto;
 import com.matteopaciolla.prbe.dto.request.EmailTelegramUnificationRequest;
 import com.matteopaciolla.prbe.dto.request.TgAccountUnificationRequest;
 import com.matteopaciolla.prbe.dto.request.UserReqDto;
@@ -41,7 +42,7 @@ import static com.matteopaciolla.prbe.util.AuthenticationUtils.getUsername;
 import static com.matteopaciolla.prbe.util.AuthenticationUtils.isBotUser;
 
 @Tag(name = "User", description = "User profile management, identity queries and account security operations.")
-@SecurityRequirements({@SecurityRequirement(name = "basicAuth")})
+@SecurityRequirements({@SecurityRequirement(name = "bearerAuth")})
 @Slf4j
 @RestController
 @RequestMapping(Paths.USER_PATH)
@@ -60,7 +61,7 @@ public class UserController {
 
     @Operation(
             summary = "Retrieve the current user",
-            description = "Returns the authenticated user profile. The identity is resolved from the HTTP Basic principal currently in the security context.",
+            description = "Returns the authenticated user's profile using the subject from the validated bearer access token.",
             responses = {
                     @ApiResponse(responseCode = "200", description = "Current user retrieved successfully",
                             content = @Content(mediaType = "application/json", schema = @Schema(implementation = UserResponse.class),
@@ -86,7 +87,7 @@ public class UserController {
      */
     @Operation(
             summary = "Retrieve a user",
-            description = "Resolve a user by username, telegram_id or email. When multiple identifiers are provided, username takes precedence, then telegram_id, then email.",
+            description = "Administrator-only lookup by username, Telegram ID or email. Users should use /user/me for their own profile.",
             responses = {
                     @ApiResponse(responseCode = "200", description = "User found",
                             content = @Content(mediaType = "application/json", schema = @Schema(implementation = UserResponse.class))),
@@ -95,6 +96,7 @@ public class UserController {
             }
     )
     @GetMapping(path = {"/retrieve", ""})
+    @PreAuthorize("hasAuthority('ROLE_ADMIN')")
     public ResponseEntity<UserResponse> getUser(
             @Parameter(description = "Username to resolve. Highest priority among identifiers.", example = "alice", required = false)
             @RequestParam(value = "username", required = false) String username,
@@ -126,7 +128,7 @@ public class UserController {
                     @ApiResponse(responseCode = "403", description = "Forbidden for the current principal")
             }
     )
-    @PreAuthorize("hasAuthority('ROLE_ADMIN') or #username == authentication.name")
+    @PreAuthorize("hasRole('ADMIN') or #username == authentication.name")
     @DeleteMapping(path = "/delete")
     public ResponseEntity<VoidResponse> deleteUser(@Parameter(description = "Username to delete", required = true, example = "alice") @RequestParam String username) {
         userService.deleteUser(username);
@@ -136,22 +138,23 @@ public class UserController {
 
     @Operation(
             summary = "Update a user",
-            description = "Partially updates the profile data for the specified user. The username in query string identifies the subject; include only the profile values to change in the body.",
+            description = "Updates only first/last name. Users may update their own profile; administrators may update another user's profile.",
             responses = {
                     @ApiResponse(responseCode = "200", description = "User updated successfully",
                             content = @Content(mediaType = "application/json", schema = @Schema(implementation = UserResponse.class))),
                     @ApiResponse(responseCode = "400", description = "Validation error")
             }
     )
+    @PreAuthorize("hasRole('ADMIN') or #username == authentication.name")
     @PatchMapping(path = "/update")
     public ResponseEntity<UserResponse> updateUser(
             @Parameter(description = "Username of the user to update", required = true, example = "alice")
             @RequestParam String username,
-            @RequestBody UserReqDto userDto) {
-        if (username == null ||username.isBlank()) {
+            @Valid @RequestBody UserProfileUpdateReqDto profile) {
+        if (username == null || username.isBlank()) {
             throw new MandatoryParamException(List.of("username"));
         }
-        UserDto updatedUser = userService.updateUser(userDto);
+        UserDto updatedUser = userService.updateUserProfile(username, profile);
         return ResponseEntity.ok(new UserResponse(updatedUser));
     }
 
@@ -164,7 +167,7 @@ public class UserController {
             }
     )
     @PostMapping(path = "/change-psw")
-    public ResponseEntity<VoidResponse> changePassword(@RequestBody ChangePasswordReqDto cpd) {
+    public ResponseEntity<VoidResponse> changePassword(@Valid @RequestBody ChangePasswordReqDto cpd) {
         if (cpd == null || cpd.getNewPassword() == null || cpd.getNewPassword().isBlank()) {
             return ResponseEntity.badRequest().body(new VoidResponse("New password cannot be empty"));
         }

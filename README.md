@@ -144,11 +144,11 @@ This works because of a specific design:
      the match) and their next request lands on instance B, instance B independently reconstructs the
      exact same match state from the database and will keep it consistent going forward — no
      shared cache, sticky sessions or distributed lock is required for the core game/match API.
-3. **Authentication is per-request, not session-based, for the API itself.** All game/match/user API
-   endpoints use HTTP Basic Auth (`httpBasic()` in `WebSecurityConfig`), which is verified against
-   the database on every call — there is no server-side session state a load balancer would need to
-   pin a client to. (The small Thymeleaf web login pages under `/login` do use a servlet session for
-   the browser UI experience, which is unrelated to the JSON API.)
+3. **Authentication is per-request, not session-based, for the API itself.** Protected JSON
+   endpoints validate OAuth2 bearer access tokens as a stateless Resource Server. Human clients use
+   OpenID Connect Authorization Code with PKCE; the Telegram bot uses a confidential
+   client-credentials grant. The authorization server may keep a browser session for interactive
+   login, but API requests do not use that session.
 4. **Outbound side effects are queued/derived from the DB, not kept in memory.** For example emails
    are written to an `emails_queue` table (`EmailSenderFacade`) rather than sent synchronously from
    request-handling memory, keeping request handling itself stateless.
@@ -184,6 +184,22 @@ Spring `application-*.properties`/`application.yml` override) when running the s
 | `SPRING_DATASOURCE_URL`                        | yes      | —                                                                                                      | JDBC URL of the PostgreSQL database, e.g. `jdbc:postgresql://host:5432/prdb`                                                                                                         |
 | `SPRING_DATASOURCE_USERNAME`                   | yes      | —                                                                                                      | Database user                                                                                                                                                                        |
 | `SPRING_DATASOURCE_PASSWORD`                   | yes      | —                                                                                                      | Database password                                                                                                                                                                    |
+| `SPRING_PROFILES_ACTIVE`                       | yes      | —                                                                                                      | Use `dev` locally; production must not activate `dev` or `test`                                                                                                                       |
+| `PORTROYAL_AUTH_ISSUER`                        | yes      | `http://localhost:8080`                                                                               | Public issuer URL; use HTTPS in production and match the externally visible service URL                                                                                              |
+| `PORTROYAL_AUTH_KEYSTORE`                      | yes      | —                                                                                                      | External PKCS#12 signing keystore URI (`file:/...`); ephemeral keys are only generated in `dev`/`test`                                                                               |
+| `PORTROYAL_AUTH_KEYSTORE_PASSWORD`              | yes      | —                                                                                                      | Keystore password, stored in a secret manager                                                                                                                                         |
+| `PORTROYAL_AUTH_KEY_ALIAS`                      | no       | `portroyal-signing`                                                                                   | Active RSA private-key alias used to sign new access and ID tokens                                                                                                                     |
+| `PORTROYAL_AUTH_PUBLIC_KEY_ALIASES`             | no       | —                                                                                                      | Comma-separated keystore aliases for old public keys retained during rotation                                                                                                         |
+| `PORTROYAL_BOT_CLIENT_SECRET`                 | yes      | —                                                                                                      | Confidential OAuth client secret for Telegram; never commit or expose it                                                                                                             |
+| `PORTROYAL_CALLBACK_ENCRYPTION_KEY`             | for callbacks | —                                                                                                  | Base64 encoding of exactly 32 random bytes to encrypt webhook secrets at rest                                                                                                         |
+| `PORTROYAL_CALLBACK_ENCRYPTION_KEY_ID`           | no       | `current`                                                                                            | Identifier for the active callback-secret encryption key                                                                                                                              |
+| `PORTROYAL_CALLBACK_PREVIOUS_ENCRYPTION_KEYS`    | during rotation | —                                                                                               | Comma-separated `key-id=base64-key` values used to decrypt old callback secrets during online re-encryption                                                                             |
+| `PORTROYAL_API_ALLOWED_ORIGINS`                 | for browser clients | local origins                                                                                | Comma-separated exact CORS origins; never use `*`                                                                                                                                     |
+| `PORTROYAL_WEB_REDIRECT_URIS`                  | for web OIDC | local callback                                                                                      | Comma-separated exact redirect URIs; production must use HTTPS                                                                                                                       |
+| `PORTROYAL_BOOTSTRAP_ADMIN_ENABLED`            | for initial admin | `false`                                                                                            | Explicitly enables provisioning of the first administrator                                                                                                                           |
+| `PORTROYAL_INITIAL_ADMIN_PASSWORD`             | for initial admin | —                                                                                                  | One-time unique passphrase supplied through a secret manager                                                                                                                          |
+| `PORTROYAL_LOGIN_RATE_LIMIT_ACCOUNT_ATTEMPTS`   | no       | `5`                                                                                                    | Failed password attempts per account in the login window                                                                                                                              |
+| `PORTROYAL_LOGIN_RATE_LIMIT_ADDRESS_ATTEMPTS`   | no       | `100`                                                                                                  | Failed password attempts per remote address in the login window                                                                                                                       |
 | `server.port`                                  | no       | `8080`                                                                                                 | HTTP port the API listens on                                                                                                                                                         |
 | `be_app.baseurl`                               | no       | `prbe.mightyshaman.com`                                                                                | Public base URL used to build links sent in emails (e.g. email confirmation links)                                                                                                   |
 | `be_app.user.telegram_unification.enabled`     | no       | `true`                                                                                                 | Feature flag for the Telegram/email account unification flow                                                                                                                         |
@@ -198,16 +214,17 @@ and HTTP request/response logging is provided by [Logbook](https://github.com/za
 
 ## Database
 
-The API uses PostgreSQL through Spring Data JPA/Hibernate. There is **no Flyway/Liquibase**
-migration tool in the project: the schema is derived directly from the JPA entities. In development,
-Hibernate is configured to export the schema it would generate to the repository-root
+The API uses PostgreSQL through Spring Data JPA/Hibernate. Flyway versions OAuth/authorization,
+callback-secret and login-rate-limit tables; the existing game/domain schema remains derived from
+JPA entities. In development, Hibernate is configured to export the schema it would generate to the repository-root
 [`create-schema.sql`](create-schema.sql) / [`drop-schema.sql`](drop-schema.sql) files on every
 startup (`spring.jpa.properties.jakarta.persistence.schema-generation.scripts.action=drop-and-create`)
-— these files are a convenient, always-up-to-date **reference** of the current schema, not something
+— these files are a convenient, always-up-to-date **reference** of the JPA-managed schema, not something
 you need to run by hand for a real deployment (`ddl-auto` is left to Hibernate's normal behavior for
 actually creating/updating the live schema).
 
-Key tables (see [`create-schema.sql`](create-schema.sql) for the authoritative, generated DDL):
+Key JPA-managed domain tables (the generated DDL reference does not include Flyway-managed OAuth
+tables):
 
 - `users` — accounts; unique on `username`, `email`, `telegram_id`; `roles` is a Postgres array of
   `ADMIN`/`USER`/`BOT` (autonomous AI players are **not** stored here — see
@@ -227,6 +244,12 @@ Key tables (see [`create-schema.sql`](create-schema.sql) for the authoritative, 
 - `temporary_tokens` — OTP tokens for email confirmation and Telegram unification flows.
 - `callbacks` — webhook subscriptions for match notifications (see `sentinel` API).
 - `emails_queue` — outbound transactional emails, queued for asynchronous delivery.
+- `oauth2_registered_client`, `oauth2_authorization`, `oauth2_authorization_consent` — OAuth clients,
+  grants and consents, managed through Flyway.
+- `oauth2_refresh_token_history` — hashed refresh-token lineage for one-time rotation and replay
+  detection; token values themselves are not stored in this table.
+- `callback_secrets` — callback signing secrets encrypted using a key external to PostgreSQL.
+- `auth_login_attempts` — account/address login throttles shared across backend instances.
 
 ## Build & run
 
@@ -240,8 +263,14 @@ Run the API module directly:
 
 ```bash
 cd portroyal_be
-mvn spring-boot:run
+mvn spring-boot:run -Dspring-boot.run.profiles=dev
 ```
+
+Set the PostgreSQL connection variables first. The `dev` profile creates an ephemeral signing key
+and omits the Telegram OAuth client unless `PORTROYAL_BOT_CLIENT_SECRET` is supplied; do not use
+this profile for a reachable deployment. Public users sign in through OIDC PKCE. To provision the
+first administrator, explicitly set `PORTROYAL_BOOTSTRAP_ADMIN_ENABLED=true` and
+`PORTROYAL_INITIAL_ADMIN_PASSWORD`.
 
 Run the standalone CLI tester against the Spring API running on localhost:8080:
 
@@ -250,11 +279,12 @@ cd portroyal_be
 mvn exec:java -Dexec.mainClass=com.matteopaciolla.prbe.cli.PortRoyalCli
 ```
 
-This CLI can register users, inspect the current user, request an account-unification OTP and
-complete Telegram/email account unification, list/host/join/start matches, add/remove autonomous AI
-players before starting a match, issue arbitrary HTTP calls to the REST API, and play a match
-interactively without starting the Spring app in the same JVM. Request the OTP while configured
-with the email account's credentials; complete unification with the bot credentials and its `tgId`.
+This CLI signs in using OIDC Authorization Code + PKCE in the system browser. Access and rotating
+refresh tokens stay in memory and are never saved between runs. It can register users, inspect the
+current user, request an account-unification OTP and complete Telegram/email account unification,
+list/host/join/start matches, add/remove autonomous AI players before starting a match, issue API
+calls, and play a match interactively. Request the OTP as the email account; complete unification
+using the bot client's OAuth access token and the player's `tgId`.
 
 or run the packaged jar:
 
@@ -283,7 +313,7 @@ standing up the full API/database stack.
 - Base path: `/api/v1`
 - Interactive docs: Swagger UI at `/swagger-ui/index.html`, raw OpenAPI spec at `/api/v1/api-docs`
   (see `springdoc.api-docs.path`).
-- Authentication: HTTP Basic Auth on essentially every endpoint under `/api/v1/**` (see
+- Authentication: OAuth2 bearer tokens on protected endpoints under `/api/v1/**` (see
   [Designed to scale horizontally](#designed-to-scale-horizontally)); roles are `ADMIN`, `USER`,
   `BOT` (see [Designed for many kinds of clients](#designed-for-many-kinds-of-clients) for how `BOT`
   callers mediate for other users via the `tgId` header) and `AI` (autonomous, per-match AI players
@@ -309,7 +339,11 @@ Paths in this table are relative to `/api/v1`.
 | `GET /user/new-tg-unify-email-otp`                 | Request an OTP to unify a Telegram id with an email account; authentication required                                                     |
 | `POST /user/unify`                                 | Confirm Telegram/email unification with the OTP — `BOT` role only                                                                       |
 | `GET /user/me`                                     | Get the currently authenticated user                                                                                                    |
-| `PATCH /user/update?username=...`                  | Partially update a user profile                                                                                                          |
+| `GET /user/retrieve?username=...`                  | Administrator-only lookup of another user                                                                                               |
+| `PATCH /user/update?username=...`                  | Update first/last name; self-service for the current user, ADMIN for other users                                                       |
+| `POST /user/change-psw`                            | Change password after current-password verification; revokes refresh tokens                                                            |
+| `POST /public/password-reset/request`              | Request a password-reset code without revealing account existence                                                                       |
+| `POST /public/password-reset/confirm`              | Set a new password with the one-time email code                                                                                          |
 | `POST /match/host`                                 | Host a new match (optionally with a custom configuration)                                                                               |
 | `POST /match/join?key_code=...`                     | Join an open, not-yet-started match                                                                                                     |
 | `POST /match/start`                                | Start the match you are hosting (requires ≥ 2 players)                                                                                  |
@@ -342,10 +376,27 @@ or scoped to a single module, e.g. `mvn -pl portroyal_lib test` for the game eng
 
 ## Development notes
 
-- On startup, `Main.java` seeds two default accounts if they don't already exist: an `admin` user
-  (`ADMIN`+`USER` roles) and a `shaslabot` user (`BOT` role) — both with the **hardcoded password
-  `"password"`**. This is a convenience for local development only; **rotate or remove these
-  credentials before exposing an instance publicly**.
-- CORS is currently configured with a wildcard origin pattern and credentials enabled
-  (`WebSecurityConfig#corsConfigurationSource`); restrict `allowedOriginPatterns` to your real front
-  end origins for any non-local environment.
+- The `shaslabot` technical identity is provisioned without a password and cannot log in
+  interactively. The bot OAuth client secret must be supplied through `PORTROYAL_BOT_CLIENT_SECRET`.
+  `PORTROYAL_BOOTSTRAP_ADMIN_ENABLED` and `PORTROYAL_INITIAL_ADMIN_PASSWORD` are required to
+  bootstrap a new administrator; there is no universal seeded admin password. Disable the bootstrap
+  flag and remove the initial password from the deployment environment after provisioning.
+- Production must set an HTTPS `PORTROYAL_AUTH_ISSUER`, an external PKCS#12 signing keystore and
+  password (`PORTROYAL_AUTH_KEYSTORE`, `PORTROYAL_AUTH_KEYSTORE_PASSWORD`), a callback-encryption
+  key (`PORTROYAL_CALLBACK_ENCRYPTION_KEY`), bot client secret, web/CLI redirect URIs, and the exact
+  browser origins in `PORTROYAL_API_ALLOWED_ORIGINS`. Never use development signing material or
+  credentials in production.
+- For JWT signing-key rotation, add the new RSA key/certificate to the PKCS#12 store, set
+  `PORTROYAL_AUTH_KEY_ALIAS` to the new private-key alias, and temporarily list the old public-key
+  certificate alias in `PORTROYAL_AUTH_PUBLIC_KEY_ALIASES`. Verify the JWKS contains both `kid`
+  values, then remove the old public alias only after all access/ID tokens signed by it have expired.
+- For callback-secret encryption-key rotation, configure a new key and key ID, and provide the old
+  key as `key-id=base64-key` in `PORTROYAL_CALLBACK_PREVIOUS_ENCRYPTION_KEYS`. On startup, stored
+  secrets are re-encrypted with the active key. After all instances have completed migration and
+  verification, remove the old key on a coordinated rollout.
+- Password sign-in is limited per account and remote address in PostgreSQL (defaults: 5 account
+  failures and 100 address failures per 15-minute window). Configure equivalent or stricter
+  edge/gateway throttles as well, especially when the API is behind a shared proxy or load balancer.
+- Flyway starts at baseline version `0` for existing populated installations and applies the OAuth
+  migrations without rebuilding existing users, matches, moves or game tables. Back up PostgreSQL
+  before upgrading and validate a production-like copy first.

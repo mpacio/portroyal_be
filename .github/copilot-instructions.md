@@ -62,8 +62,9 @@ Every `portroyal_be` instance must remain stateless and disposable:
   optimization. Before returning a cached `Match`, it compares the cached move count against the
   persisted move count and **invalidates/rebuilds** (`MatchCreator.createMatch(...)`) on mismatch.
   Never treat this cache as authoritative state.
-- **Auth is per-request** (HTTP Basic, `WebSecurityConfig`), not session-based, for all JSON API
-  endpoints — do not introduce server-side session state for `/api/v1/**`.
+- **API auth is per-request** (OAuth2 bearer tokens, `WebSecurityConfig`) and stateless for all JSON
+  API endpoints — do not introduce server-side session state for `/api/v1/**`. The OIDC login flow
+  may use a browser session; that session must not authorize JSON API calls.
 - **Outbound side effects are queued via DB tables**, not sent synchronously in-memory (e.g.
   `emails_queue` / `EmailSenderFacade`).
 - **Known exception:** `sentinel` long-polling and SSE endpoints hold subscriptions
@@ -74,9 +75,10 @@ Every `portroyal_be` instance must remain stateless and disposable:
 
 ## Database
 
-- Spring Data JPA/Hibernate against PostgreSQL. **No Flyway/Liquibase** — schema is derived from
-  JPA entities. `create-schema.sql` / `drop-schema.sql` at the repo root are generated on every
-  startup for reference only; don't hand-edit them or expect them to drive real migrations.
+- Spring Data JPA/Hibernate against PostgreSQL. Flyway manages OAuth/authorization and other
+  explicitly versioned infrastructure changes; the existing game/domain schema remains JPA-derived.
+  `create-schema.sql` / `drop-schema.sql` at the repo root are generated on startup for reference
+  only; never hand-edit them or treat them as migrations.
 - Key tables: `users`, `matches`, `match_user`, `moves` (append-only; `move_name` check constraint
   mirrors the `MoveAction` enum from `portroyal_lib`), `game_configurations`, `temporary_tokens`,
   `callbacks`, `emails_queue`.
@@ -86,7 +88,8 @@ Every `portroyal_be` instance must remain stateless and disposable:
 ## API conventions
 
 - Base path `/api/v1`; Swagger UI at `/swagger-ui/index.html`, OpenAPI JSON at `/api/v1/api-docs`.
-- HTTP Basic Auth on essentially every endpoint under `/api/v1/**`.
+- OAuth2 bearer access tokens on protected endpoints under `/api/v1/**`. Human clients use OIDC
+  Authorization Code with PKCE; the Telegram bot uses a confidential client-credentials grant.
 - Tags/base paths: `public` (no auth), `user`, `match`, `game` (moves), `card` (read-only catalog),
   `sentinel` (real-time notifications).
 - Bot-mediated endpoints (`MatchController`, `GameController`, `UserController#registerTelegramPlayer`,

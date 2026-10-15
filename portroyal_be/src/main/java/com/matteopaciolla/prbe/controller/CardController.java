@@ -27,7 +27,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 @Tag(name = "Cards", description = "Card operations")
-@SecurityRequirements({@SecurityRequirement(name = "basicAuth")})
+@SecurityRequirements({@SecurityRequirement(name = "bearerAuth")})
 @Slf4j
 @RestController
 @RequestMapping(Paths.CARD_PATH)

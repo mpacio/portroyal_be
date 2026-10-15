@@ -4,24 +4,38 @@ import com.matteopaciolla.prbe.constants.enums.SentinelAlertMessage;
 import com.matteopaciolla.prbe.dto.AlertCallbackWrapperDto;
 import com.matteopaciolla.prbe.dto.request.CallbackSentinelRequest;
 import com.matteopaciolla.prbe.dto.AlertDto;
+import com.matteopaciolla.prbe.exceptions.BaseClientCausedException;
+import com.matteopaciolla.prbe.exceptions.callback.InvalidCallbackUrlException;
 import com.matteopaciolla.prbe.exceptions.common.ResourceNotFoundException;
 import com.matteopaciolla.prbe.model.SentinelSubscription;
 import com.matteopaciolla.prbe.model.entity.CallbackEntity;
+import com.matteopaciolla.prbe.model.entity.CallbackEntityId;
+import com.matteopaciolla.prbe.model.entity.CallbackSecretEntity;
 import com.matteopaciolla.prbe.model.entity.UserEntity;
 import com.matteopaciolla.prbe.repository.CallbackRepository;
+import com.matteopaciolla.prbe.repository.CallbackSecretRepository;
 import com.matteopaciolla.prbe.repository.MatchRepository;
+import com.matteopaciolla.prbe.security.callback.CallbackSecretCrypto;
+import com.matteopaciolla.prbe.security.callback.CallbackSignature;
+import com.matteopaciolla.prbe.security.callback.CallbackUrlValidator;
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.http.HttpEntity;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
-import org.springframework.web.client.ResourceAccessException;
 import org.springframework.web.client.RestClientException;
 import org.springframework.web.client.RestTemplate;
 import org.springframework.web.context.request.async.DeferredResult;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
 import java.io.IOException;
+import java.security.GeneralSecurityException;
+import java.time.Instant;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
@@ -35,9 +49,13 @@ import java.util.concurrent.*;
 public class SentinelService {
 
     private final CallbackRepository callbackRepository;
+    private final CallbackSecretRepository callbackSecretRepository;
     private final MatchRepository matchRepository;
     private final ExecutorService executorService = Executors.newCachedThreadPool();
     private final RestTemplate restTemplate;
+    private final ObjectMapper objectMapper;
+    private final CallbackUrlValidator callbackUrlValidator;
+    private final CallbackSecretCrypto callbackSecretCrypto;
 
     private final Map<String, Set<SentinelSubscription>> matchSubsMap = new ConcurrentHashMap<>();
 
@@ -56,6 +74,10 @@ public class SentinelService {
 
     public String addCallbackSentinel(Long userId, String keyCode, String url, String secret) {
         log.info("Requested callback sentinel for match: {}", keyCode);
+        callbackUrlValidator.validate(url);
+        if (secret == null || secret.getBytes(java.nio.charset.StandardCharsets.UTF_8).length < 32) {
+            throw new BaseClientCausedException("A callback signing secret of at least 32 bytes is required.");
+        }
         checkMatchExists(keyCode);
         Set<SentinelSubscription> subs = matchSubsMap.get(keyCode);
         if (subs != null) {
@@ -68,17 +90,13 @@ public class SentinelService {
                 }
             });
         }
-        callbackRepository.findByUserIdAndMatchKeyCode(userId, keyCode)
-                .ifPresentOrElse(
-                        callback -> {
-                            if (!callback.getUrl().equals(url)) {
-                                callback.setUrl(url);
-                                callback.setSecret(secret);
-                                callbackRepository.save(callback);
-                            }
-                        },
-                        () -> callbackRepository.save(new CallbackEntity(keyCode, userId, url, secret))
-                );
+        CallbackEntity callback = callbackRepository.findByUserIdAndMatchKeyCode(userId, keyCode)
+                .orElseGet(() -> new CallbackEntity(keyCode, userId, url, null));
+        callback.setUrl(url);
+        callback.setSecret(null);
+        callbackRepository.save(callback);
+        callbackSecretRepository.save(new CallbackSecretEntity(
+                keyCode, userId, callbackSecretCrypto.encrypt(secret)));
         return "Callback sentinel added";
     }
 
@@ -178,13 +196,14 @@ public class SentinelService {
     private void removeCallbackSubscription(Long userId, String keyCode) {
         callbackRepository.findByUserIdAndMatchKeyCode(userId, keyCode)
                 .ifPresent(callbackRepository::delete);
+        callbackSecretRepository.deleteById(new CallbackEntityId(keyCode, userId));
     }
 
     public void sendUpdate(String keyCode, String username, SentinelAlertMessage message) {
         boolean lastMessage = isLastMessage(message);
-        Set<CallbackRepository.UrlSecret> urlSecrets = callbackRepository.findDistinctUrlSecretByMatchKeyCode(keyCode);
-        if (!urlSecrets.isEmpty()) {
-            sendCallbackUpdate(urlSecrets, keyCode, username, message);
+        List<CallbackEntity> callbacks = callbackRepository.findByMatchKeyCode(keyCode);
+        if (!callbacks.isEmpty()) {
+            sendCallbackUpdate(callbacks, keyCode, username, message);
         }
         Set<SentinelSubscription> subs = matchSubsMap.get(keyCode);
         if (subs != null) {
@@ -219,24 +238,41 @@ public class SentinelService {
     }
 
     @Async
-    private void sendCallbackUpdate(Set<CallbackRepository.UrlSecret> urlSecrets, String keyCode, String username, SentinelAlertMessage message) {
-        urlSecrets.forEach(urlSecret -> {
-            String url = urlSecret.getUrl();
-            String secret = urlSecret.getSecret();
-            log.debug("Sending notification to {}", url);
+    private void sendCallbackUpdate(List<CallbackEntity> callbacks, String keyCode, String username, SentinelAlertMessage message) {
+        callbacks.forEach(callbackRecord -> {
+            String url = callbackRecord.getUrl();
             try {
+                callbackUrlValidator.validate(url);
+                CallbackSecretEntity secretRecord = callbackSecretRepository.findById(
+                        new CallbackEntityId(callbackRecord.getMatchKeyCode(), callbackRecord.getUserId()))
+                        .orElse(null);
+                if (secretRecord == null) {
+                    log.warn("Skipping callback notification for match {} because its signing secret is missing.", keyCode);
+                    return;
+                }
+                String secret = callbackSecretCrypto.decrypt(secretRecord.getEncryptedSecret());
                 AlertDto alert = new AlertDto(message, keyCode);
-                AlertCallbackWrapperDto request = new AlertCallbackWrapperDto(username, alert, secret);
-                ResponseEntity<Object> response = restTemplate.postForEntity(url, request, Object.class);
-                log.debug("Notification sent to {} with status code {}", url, response.getStatusCode());
-            } catch (ResourceNotFoundException e) {
-                log.warn("Error sending notification to {} because of ResourceNotFoundException {}", url, e.getMessage());
-            } catch (ResourceAccessException e) {
-                log.warn("Error sending notification to {} because of ResourceAccessException {}", url, e.getMessage());
+                AlertCallbackWrapperDto callback = new AlertCallbackWrapperDto(username, alert);
+                byte[] body = objectMapper.writeValueAsBytes(callback);
+                String timestamp = Long.toString(Instant.now().getEpochSecond());
+                String eventId = UUID.randomUUID().toString();
+                String signature = CallbackSignature.sign(secret, timestamp, eventId, body);
+                HttpHeaders headers = new HttpHeaders();
+                headers.setContentType(MediaType.APPLICATION_JSON);
+                headers.set("X-Callback-Timestamp", timestamp);
+                headers.set("X-Callback-Event-Id", eventId);
+                headers.set("X-Callback-Signature", signature);
+                ResponseEntity<Void> response = restTemplate.postForEntity(
+                        url, new HttpEntity<>(body, headers), Void.class);
+                log.debug("Callback notification sent for match {} with status code {}", keyCode, response.getStatusCode());
+            } catch (InvalidCallbackUrlException e) {
+                log.warn("Skipping callback notification for match {} because its URL failed validation.", keyCode);
+            } catch (IllegalStateException e) {
+                log.error("Could not decrypt callback signing secret for match {}.", keyCode);
+            } catch (JsonProcessingException | GeneralSecurityException | IllegalArgumentException e) {
+                log.error("Could not prepare callback notification for match {}.", keyCode);
             } catch (RestClientException e) {
-                log.warn("Error sending notification to {} because of RestClientException {}", url, e.getMessage());
-            } catch (Exception e) {
-                log.warn("Error sending notification to {} with message {}", url, e.getMessage());
+                log.warn("Callback notification failed for match {} ({})", keyCode, e.getClass().getSimpleName());
             }
         });
     }
@@ -244,6 +280,7 @@ public class SentinelService {
     public void removeSentinelSubscription(Long userId, String keyCode) {
         callbackRepository.findByUserIdAndMatchKeyCode(userId, keyCode)
                 .ifPresent(callbackRepository::delete);
+        callbackSecretRepository.deleteById(new CallbackEntityId(keyCode, userId));
         Set<SentinelSubscription> subs = matchSubsMap.get(keyCode);
         if (subs != null) {
             Iterator<SentinelSubscription> iterator = subs.iterator();
@@ -289,6 +326,8 @@ public class SentinelService {
         List<CallbackEntity> callbacks = callbackRepository.findByMatchKeyCode(keyCode);
         if (!callbacks.isEmpty()) {
             callbackRepository.deleteAll(callbacks);
+            callbacks.forEach(callback -> callbackSecretRepository.deleteById(
+                    new CallbackEntityId(callback.getMatchKeyCode(), callback.getUserId())));
         }
         Set<SentinelSubscription> subs = matchSubsMap.get(keyCode);
         if (subs != null) {

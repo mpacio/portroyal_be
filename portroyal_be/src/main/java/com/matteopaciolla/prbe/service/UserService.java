@@ -5,7 +5,9 @@ import com.matteopaciolla.prbe.constants.Paths;
 import com.matteopaciolla.prbe.constants.enums.UserRole;
 import com.matteopaciolla.prbe.converter.UserConverter;
 import com.matteopaciolla.prbe.dto.request.UserReqDto;
+import com.matteopaciolla.prbe.dto.request.UserProfileUpdateReqDto;
 import com.matteopaciolla.prbe.dto.UserDto;
+import com.matteopaciolla.prbe.exceptions.BaseClientCausedException;
 import com.matteopaciolla.prbe.exceptions.common.MandatoryParamException;
 import com.matteopaciolla.prbe.exceptions.common.ResourceNotFoundException;
 import com.matteopaciolla.prbe.exceptions.common.UniqueConstraintViolatedException;
@@ -16,6 +18,7 @@ import com.matteopaciolla.prbe.model.entity.UserEntity;
 import com.matteopaciolla.prbe.model.entity.OtpEntity;
 import com.matteopaciolla.prbe.repository.OtpRepository;
 import com.matteopaciolla.prbe.repository.UserRepository;
+import com.matteopaciolla.prbe.security.OAuthAuthorizationRevocationService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -23,15 +26,20 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDateTime;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
+import java.security.SecureRandom;
+import java.util.HexFormat;
 import java.util.*;
 import java.util.concurrent.ThreadLocalRandom;
-
-import static com.matteopaciolla.prbe.util.RandomUtils.*;
 
 @Slf4j
 @Service
 @RequiredArgsConstructor
 public class UserService {
+
+    private static final SecureRandom SECURE_RANDOM = new SecureRandom();
+    private static final int PASSWORD_RESET_MAX_RETRIES = 5;
 
     private final PasswordEncoder passwordEncoder;
 
@@ -40,6 +48,7 @@ public class UserService {
     private final OtpRepository otpRepository;
 
     private final EmailSenderFacade emailSenderFacade;
+    private final OAuthAuthorizationRevocationService authorizationRevocationService;
 
     @Value("${be_app.baseurl}")
     private String APP_BASEURL;
@@ -147,6 +156,7 @@ public class UserService {
 
     public void deleteUser(String username) {
         UserEntity user = getUserEntityByUsername(username);
+        authorizationRevocationService.revokeUserAuthorizations(username);
         userRepository.delete(user);
     }
 
@@ -154,8 +164,9 @@ public class UserService {
         UserEntity user = UserConverter.toEntity(userReqDto, roles);
         user.setEnabled(true);
         user.setEmailConfirmed(false);
-        String password = userReqDto.getPassword() != null ? userReqDto.getPassword() : getRandomPassword(8);
-        user.setPassword(passwordEncoder.encode(password));
+        if (userReqDto.getPassword() != null) {
+            user.setPassword(passwordEncoder.encode(userReqDto.getPassword()));
+        }
         return userRepository.save(user);
     }
 
@@ -176,27 +187,15 @@ public class UserService {
         return value == null || value.isBlank();
     }
 
-    public UserDto updateUser(UserReqDto userDto) {
-        UserEntity user = getExistingUser(userDto);
+    public UserDto updateUserProfile(String username, UserProfileUpdateReqDto profile) {
+        UserEntity user = getUserEntityByUsername(username);
         boolean modified = false;
-        if (userDto.getFirstName() != null && !userDto.getFirstName().equals(user.getFirstName())) {
-            user.setFirstName(userDto.getFirstName());
+        if (profile.getFirstName() != null && !profile.getFirstName().equals(user.getFirstName())) {
+            user.setFirstName(profile.getFirstName());
             modified = true;
         }
-        if (userDto.getLastName() != null && !userDto.getLastName().equals(user.getLastName())) {
-            user.setLastName(userDto.getLastName());
-            modified = true;
-        }
-        if (userDto.getTelegramId() != null && !userDto.getTelegramId().isBlank() && user.getTelegramId() == null) {
-            user.setTelegramId(userDto.getTelegramId());
-            modified = true;
-        }
-        if (userDto.getEmail() != null && !userDto.getEmail().isBlank() && user.getEmail() == null) {
-            user.setEmail(userDto.getEmail());
-            modified = true;
-        }
-        if (userDto.getPassword() != null && !userDto.getPassword().isBlank()) {
-            user.setPassword(passwordEncoder.encode(userDto.getPassword()));
+        if (profile.getLastName() != null && !profile.getLastName().equals(user.getLastName())) {
+            user.setLastName(profile.getLastName());
             modified = true;
         }
         if (modified) {
@@ -215,42 +214,17 @@ public class UserService {
         );
     }
 
-    private UserEntity getExistingUser(UserReqDto userReqDto) {
-        UserEntity user = null;
-        if (userReqDto.getUsername() != null) {
-            user = userRepository.findByUsername(userReqDto.getUsername()).orElse(null);
-            if (user != null && userReqDto.getEmail() != null && user.getEmail() != null && !user.getEmail().equals(userReqDto.getEmail())) {
-                log.error("User with username {} has different email {}", userReqDto.getUsername(), userReqDto.getEmail());
-                throw new ResourceNotFoundException("User with username " + userReqDto.getUsername() + " has different email " + userReqDto.getEmail());
-            }
-            if (user != null && userReqDto.getTelegramId() != null && user.getTelegramId() != null && !user.getTelegramId().equals(userReqDto.getTelegramId())) {
-                log.error("User with username {} has different telegram id {}", userReqDto.getUsername(), userReqDto.getTelegramId());
-                throw new ResourceNotFoundException("User with username " + userReqDto.getUsername() + " has different telegram id " + userReqDto.getTelegramId());
-            }
-        } else if (userReqDto.getEmail() != null) {
-            user = userRepository.findByEmail(userReqDto.getEmail()).orElse(null);
-            if (user != null && userReqDto.getTelegramId() != null && user.getTelegramId() != null && !user.getTelegramId().equals(userReqDto.getTelegramId())) {
-                log.error("User with email {} has different telegram id {}", userReqDto.getEmail(), userReqDto.getTelegramId());
-                throw new ResourceNotFoundException("User with email " + userReqDto.getEmail() + " has different telegram id " + userReqDto.getTelegramId());
-            }
-        } else if (userReqDto.getTelegramId() != null) {
-            user = userRepository.findByTelegramId(userReqDto.getTelegramId()).orElseThrow(() -> new ResourceNotFoundException("User not found with telegram id " + userReqDto.getTelegramId()));
-        }
-        if (user == null) {
-            log.error("User not found with email {}, username {} or telegram id {}", userReqDto.getEmail(), userReqDto.getUsername(), userReqDto.getTelegramId());
-            throw new ResourceNotFoundException("User not found. Please provide a valid email and/or username and/or telegram id");
-        }
-        return user;
-    }
-
     public void changePassword(String username, String oldPassword, String newPassword) {
         UserEntity user = getUserEntityByUsername(username);
-        if (passwordEncoder.matches(oldPassword, user.getPassword())) {
+        if (oldPassword != null && user.getPassword() != null
+                && passwordEncoder.matches(oldPassword, user.getPassword())
+                && newPassword != null && newPassword.length() >= 15 && newPassword.length() <= 128) {
             user.setPassword(passwordEncoder.encode(newPassword));
             userRepository.save(user);
+            authorizationRevocationService.revokeUserAuthorizations(username);
         } else {
-            log.error("Invalid old password");
-            throw new ResourceNotFoundException("Invalid old password");
+            throw new BaseClientCausedException(
+                    "The current password is invalid or the new password does not meet policy.");
         }
     }
 
@@ -266,24 +240,25 @@ public class UserService {
             throw new EmailAlreadyConfirmedException();
         }
         otpRepository.deleteAllByEmailAndFlowType(email, OtpEntity.FlowType.EMAIL_CONFIRMATION);
-        String token = java.util.UUID.randomUUID().toString();
+        String token = generateSecureToken();
         LocalDateTime expiresAt = LocalDateTime.now().plusHours(24);
-        OtpEntity emailAssent = new OtpEntity(OtpEntity.FlowType.EMAIL_CONFIRMATION, email, token, expiresAt);
+        OtpEntity emailAssent = new OtpEntity(
+                OtpEntity.FlowType.EMAIL_CONFIRMATION, email, hashToken(token), expiresAt);
         otpRepository.save(emailAssent);
         // send email
         String subject = "Email Confirmation";
-        String htmlBody = "<p>Click <a href=\"https://" + APP_BASEURL + Paths.PUBLIC_PATH + "/confirm-email?token=" + emailAssent.getToken() + "\">here</a> to confirm your email</p>" +
-                "<p>Or copy and paste the following code in the confirmation page: " + emailAssent.getToken() + "</p>";
-        String textBody = "Click the following link to confirm your email: https://" + APP_BASEURL + Paths.PUBLIC_PATH + "/confirm-email?token=" + emailAssent.getToken() +
-                " Or copy and paste the following code in the confirmation page: " + emailAssent.getToken();
-        log.info("Sending email confirmation to {} with token {}", email, token);
+        String htmlBody = "<p>Click <a href=\"https://" + APP_BASEURL + Paths.PUBLIC_PATH + "/confirm-email?token=" + token + "\">here</a> to confirm your email</p>" +
+                "<p>Or copy and paste the following code in the confirmation page: " + token + "</p>";
+        String textBody = "Click the following link to confirm your email: https://" + APP_BASEURL + Paths.PUBLIC_PATH + "/confirm-email?token=" + token +
+                " Or copy and paste the following code in the confirmation page: " + token;
+        log.info("Sending email confirmation to {}", email);
         emailSenderFacade.sendEmail(email, user.getUsername(), subject, htmlBody, textBody);
     }
 
     public UserDto confirmEmail(String token) {
-        OtpEntity otpEntity = otpRepository.findFirstByTokenAndFlowTypeOrderByCreatedAtDesc(token, OtpEntity.FlowType.EMAIL_CONFIRMATION)
-                .orElseThrow(() -> new ResourceNotFoundException("Email otp with token " + token + " not found"));
+        OtpEntity otpEntity = findOtpByToken(token, OtpEntity.FlowType.EMAIL_CONFIRMATION);
         checkOtpExpiration(otpEntity);
+        upgradeLegacyOtpToken(otpEntity, token);
         otpEntity.setConfirmedAt(LocalDateTime.now());
         otpRepository.save(otpEntity);
         String email = otpEntity.getEmail();
@@ -301,26 +276,35 @@ public class UserService {
             throw new TelegramAccountAlreadyUnifiedException("Telegram account [id: " + telegramId + "] already unified with email " + email);
         }
         otpRepository.deleteAllByEmailAndFlowType(email, OtpEntity.FlowType.TELEGRAM_UNIFICATION);
-        String token = get4DigitRandomCode();
+        String token = generateUnificationCode();
         LocalDateTime expiresAt = LocalDateTime.now().plusHours(24);
-        OtpEntity telegramAssent = new OtpEntity(OtpEntity.FlowType.TELEGRAM_UNIFICATION, email, telegramId, token, expiresAt);
+        OtpEntity telegramAssent = new OtpEntity(
+                OtpEntity.FlowType.TELEGRAM_UNIFICATION, email, telegramId, hashToken(token), expiresAt);
         otpRepository.save(telegramAssent);
         // send email
         String subject = "Telegram Account Unification";
         String textBody = "Your code for telegram unification is: " + token + ". Text to the bot: \"/unify " + token + "\"";
         String htmlBody = "<p>Your code for telegram unification is: " + token + ". Text to the bot: <b>/unify " + token + "</b></p>";
-        log.info("Sending telegram unification email to {} with token {}", email, token);
+        log.info("Sending Telegram unification email to {}", email);
         emailSenderFacade.sendEmail(email, username, subject, htmlBody, textBody);
     }
 
     public UserDto unifyTelegramAndEmailAccounts(String email, String telegramId, String token) {
         OtpEntity otpEntity = otpRepository.findFirstByEmailAndFlowTypeOrderByCreatedAtDesc(email, OtpEntity.FlowType.TELEGRAM_UNIFICATION)
-                .orElseThrow(() -> new ResourceNotFoundException("Telegram assent with email " + email + " not found"));
-        if (!otpEntity.getToken().equals(token)) {
-            log.debug("Invalid token {} for email {}", token, email);
-            throw new ResourceNotFoundException("Invalid token " + token + " for email " + email);
+                .orElseThrow(UserService::invalidOtp);
+        if (failedAttempts(otpEntity) >= TELEGRAM_UNIFICATION_MAX_RETRIES) {
+            throw invalidOtp();
+        }
+        if (!tokenMatches(token, otpEntity.getToken())) {
+            otpEntity.setFailedAttempts(failedAttempts(otpEntity) + 1);
+            otpRepository.save(otpEntity);
+            throw invalidOtp();
+        }
+        if (otpEntity.getTelegramId() != null && !otpEntity.getTelegramId().equals(telegramId)) {
+            throw invalidOtp();
         }
         checkOtpExpiration(otpEntity);
+        upgradeLegacyOtpToken(otpEntity, token);
         otpEntity.setConfirmedAt(LocalDateTime.now());
         otpRepository.save(otpEntity);
         userRepository.deleteAllByTelegramId(telegramId);
@@ -331,10 +315,117 @@ public class UserService {
         return UserConverter.toDto(user);
     }
 
+    public void requestPasswordReset(String email) {
+        Optional<UserEntity> userOptional = userRepository.findByEmailAndEnabled(email, true);
+        if (userOptional.isEmpty() || !userOptional.get().isEmailConfirmed()) {
+            return;
+        }
+
+        Optional<OtpEntity> latestReset = otpRepository.findFirstByEmailAndFlowTypeOrderByCreatedAtDesc(
+                email, OtpEntity.FlowType.PASSWORD_RESET);
+        if (latestReset.isPresent()
+                && latestReset.get().getCreatedAt().isAfter(LocalDateTime.now().minusMinutes(1))) {
+            return;
+        }
+        otpRepository.deleteAllByEmailAndFlowType(email, OtpEntity.FlowType.PASSWORD_RESET);
+
+        String token = generateSecureToken();
+        OtpEntity reset = new OtpEntity(OtpEntity.FlowType.PASSWORD_RESET, email, hashToken(token),
+                LocalDateTime.now().plusMinutes(15));
+        otpRepository.save(reset);
+        String subject = "Password reset";
+        String textBody = "Use this one-time code to reset your Port Royal password: " + token
+                + ". It expires in 15 minutes.";
+        String htmlBody = "<p>Use this one-time code to reset your Port Royal password:</p><p><b>"
+                + token + "</b></p><p>It expires in 15 minutes.</p>";
+        emailSenderFacade.sendEmail(email, userOptional.get().getUsername(), subject, htmlBody, textBody);
+    }
+
+    public void resetPassword(String email, String token, String newPassword) {
+        OtpEntity reset = otpRepository.findFirstByEmailAndFlowTypeOrderByCreatedAtDesc(
+                        email, OtpEntity.FlowType.PASSWORD_RESET)
+                .orElseThrow(UserService::invalidOtp);
+        if (failedAttempts(reset) >= PASSWORD_RESET_MAX_RETRIES) {
+            throw invalidOtp();
+        }
+        if (!tokenMatches(token, reset.getToken())) {
+            reset.setFailedAttempts(failedAttempts(reset) + 1);
+            otpRepository.save(reset);
+            throw invalidOtp();
+        }
+        checkOtpExpiration(reset);
+        if (newPassword == null || newPassword.length() < 15 || newPassword.length() > 128) {
+            throw new MandatoryParamException("Password must be between 15 and 128 characters");
+        }
+        UserEntity user = userRepository.findByEmailAndEnabled(email, true)
+                .filter(UserEntity::isEmailConfirmed)
+                .orElseThrow(UserService::invalidOtp);
+        user.setPassword(passwordEncoder.encode(newPassword));
+        userRepository.save(user);
+        reset.setConfirmedAt(LocalDateTime.now());
+        otpRepository.save(reset);
+        authorizationRevocationService.revokeUserAuthorizations(user.getUsername());
+    }
+
+    private OtpEntity findOtpByToken(String token, OtpEntity.FlowType flowType) {
+        return otpRepository.findFirstByTokenAndFlowTypeOrderByCreatedAtDesc(hashToken(token), flowType)
+                .or(() -> otpRepository.findFirstByTokenAndFlowTypeOrderByCreatedAtDesc(token, flowType))
+                .orElseThrow(UserService::invalidOtp);
+    }
+
+    private static void upgradeLegacyOtpToken(OtpEntity otpEntity, String token) {
+        if (!isHashedToken(otpEntity.getToken())) {
+            otpEntity.setToken(hashToken(token));
+        }
+    }
+
+    private static boolean tokenMatches(String presentedToken, String persistedToken) {
+        if (presentedToken == null || persistedToken == null) {
+            return false;
+        }
+        String comparisonValue = isHashedToken(persistedToken) ? hashToken(presentedToken) : presentedToken;
+        return MessageDigest.isEqual(
+                comparisonValue.getBytes(java.nio.charset.StandardCharsets.US_ASCII),
+                persistedToken.getBytes(java.nio.charset.StandardCharsets.US_ASCII));
+    }
+
+    private static boolean isHashedToken(String token) {
+        return token != null && token.matches("[0-9a-f]{64}");
+    }
+
+    private static String generateSecureToken() {
+        byte[] bytes = new byte[32];
+        SECURE_RANDOM.nextBytes(bytes);
+        return HexFormat.of().formatHex(bytes);
+    }
+
+    private static String generateUnificationCode() {
+        return String.format("%08d", SECURE_RANDOM.nextInt(100_000_000));
+    }
+
+    private static String hashToken(String token) {
+        if (token == null) {
+            return "";
+        }
+        try {
+            return HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256")
+                    .digest(token.getBytes(java.nio.charset.StandardCharsets.UTF_8)));
+        } catch (NoSuchAlgorithmException exception) {
+            throw new IllegalStateException("SHA-256 is unavailable.", exception);
+        }
+    }
+
+    private static ResourceNotFoundException invalidOtp() {
+        return new ResourceNotFoundException("The one-time code is invalid or expired.");
+    }
+
+    private static int failedAttempts(OtpEntity otpEntity) {
+        return otpEntity.getFailedAttempts() == null ? 0 : otpEntity.getFailedAttempts();
+    }
+
     private static void checkOtpExpiration(OtpEntity otpEntity) {
-        if (otpEntity.getExpiresAt().isBefore(LocalDateTime.now())) {
-            log.debug("Email otp with token {} has expired.", otpEntity.getToken());
-            throw new ResourceNotFoundException("Email otp with token " + otpEntity.getToken() + " has expired.");
+        if (otpEntity.getExpiresAt() == null || otpEntity.getExpiresAt().isBefore(LocalDateTime.now())) {
+            throw invalidOtp();
         }
     }
 }

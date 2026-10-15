@@ -29,7 +29,7 @@ import static com.matteopaciolla.prbe.util.AuthenticationUtils.getUsername;
 import static com.matteopaciolla.prbe.util.AuthenticationUtils.isBotUser;
 
 @Tag(name = "Game", description = "Game move execution and move history APIs.")
-@SecurityRequirements({@SecurityRequirement(name = "basicAuth")})
+@SecurityRequirements({@SecurityRequirement(name = "bearerAuth")})
 @Slf4j
 @RestController
 @RequestMapping(Paths.GAME_PATH)

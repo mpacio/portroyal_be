@@ -6,6 +6,7 @@ import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestParam;
+import jakarta.servlet.http.HttpServletResponse;
 
 @Hidden
 @Controller
@@ -14,7 +15,12 @@ public class LoginController {
     @GetMapping("/login")
     public String login(@RequestParam(value = "logout", required = false) Boolean logout,
                         @RequestParam(value = "error", required = false) Boolean error,
-                        Model model) {
+                        Model model,
+                        HttpServletResponse response) {
+        response.setHeader("Content-Security-Policy",
+                "default-src 'self'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'; object-src 'none'");
+        response.setHeader("Cache-Control", "no-store");
+        response.setHeader("Referrer-Policy", "no-referrer");
         if (error != null && error) {
             model.addAttribute("error", "Invalid username or password");
         } else {

@@ -11,27 +11,30 @@ import io.swagger.v3.oas.annotations.security.SecurityScheme;
 import io.swagger.v3.oas.annotations.security.SecuritySchemes;
 import io.swagger.v3.oas.annotations.servers.Server;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.CommandLineRunner;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.context.annotation.Bean;
 import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.util.StringUtils;
 
 import java.util.List;
 
 @SecuritySchemes({
 		@SecurityScheme(
-				name = "basicAuth",
+				name = "bearerAuth",
 				type = SecuritySchemeType.HTTP,
-				scheme = "basic"
+				scheme = "bearer",
+				bearerFormat = "JWT"
 		)
 })
 @OpenAPIDefinition(
 		info = @Info(
 				title = "Port Royal Back End",
 				description = "Port Royal game backend API. The service exposes the game state, match lifecycle, authentication, user management and bot-mediated operations for the Port Royal game. " +
-					"JSON API endpoints under /api/v1 use HTTP Basic Authentication unless explicitly marked as public; HTML pages are outside this prefix. " +
-					"Bot integrations must send the mandatory tgId header when acting as the shaslabot technical account.",
+					"JSON API endpoints under /api/v1 use OAuth2 bearer access tokens unless explicitly marked as public. " +
+					"Human clients use OpenID Connect Authorization Code with PKCE; the Telegram bot uses client credentials and must send tgId when acting for a player.",
 				version = "1.0"
 		),
 		servers = {
@@ -50,43 +53,44 @@ public class Main {
 	@Bean
 	CommandLineRunner commandLineRunner(
 			PasswordEncoder passwordEncoder,
-			UserRepository userRepository
+			UserRepository userRepository,
+			@Value("${pr.auth.initial-admin-password:}") String initialAdminPassword,
+			@Value("${pr.auth.bootstrap-admin-enabled:false}") boolean bootstrapAdminEnabled
 	) {
 		return args -> {
-			log.info("Application started successfully");
+			UserEntity bot = userRepository.findByUsername("shaslabot")
+					.orElseGet(() -> new UserEntity("shaslabot", null, List.of(UserRole.BOT)));
+			bot.setPassword(null);
+			bot.setRoles(List.of(UserRole.BOT));
+			bot.setEnabled(true);
+			bot.setEmailConfirmed(true);
+			userRepository.save(bot);
 
-			String basePassword = "password";
-			String adminUsername = "admin";
-			String botUsername = "shaslabot";
+			UserEntity admin = userRepository.findByUsername("admin").orElse(null);
+			if (admin != null && admin.getPassword() != null
+					&& passwordEncoder.matches("password", admin.getPassword())) {
+				admin.setPassword(null);
+				admin.setEnabled(false);
+				userRepository.save(admin);
+				log.warn("Disabled the legacy default admin credential; provision a new password out of band.");
+			}
 
-			userRepository.findByUsername(adminUsername).ifPresentOrElse(
-					user -> log.debug("Admin user already registered"),
-					() -> {
-						log.info("Registering admin user");
-						// Register an admin user
-						UserEntity user = new UserEntity(
-								adminUsername,
-								passwordEncoder.encode(basePassword),
-								List.of(UserRole.ADMIN, UserRole.USER));
-						user.setEnabled(true);
-						user.setEmailConfirmed(true);
-						userRepository.save(user);
-					}
-			);
-			userRepository.findByUsername(botUsername).ifPresentOrElse(
-					user -> log.debug("Bot user already registered"),
-					() -> {
-						log.info("Registering bot user");
-						// Register a bot user
-						UserEntity user = new UserEntity(
-								botUsername,
-								passwordEncoder.encode(basePassword),
-								List.of(UserRole.BOT));
-						user.setEnabled(true);
-						user.setEmailConfirmed(true);
-						userRepository.save(user);
-					}
-			);
+			if (bootstrapAdminEnabled && StringUtils.hasText(initialAdminPassword)) {
+				if (admin == null) {
+					admin = new UserEntity("admin", passwordEncoder.encode(initialAdminPassword),
+							List.of(UserRole.ADMIN, UserRole.USER));
+				} else if (admin.getPassword() == null && !admin.isEnabled()) {
+					admin.setPassword(passwordEncoder.encode(initialAdminPassword));
+				} else {
+					admin = null;
+				}
+				if (admin != null) {
+					admin.setEnabled(true);
+					admin.setEmailConfirmed(true);
+					userRepository.save(admin);
+					log.info("Provisioned the initial administrator account.");
+				}
+			}
 		};
 	}
 }

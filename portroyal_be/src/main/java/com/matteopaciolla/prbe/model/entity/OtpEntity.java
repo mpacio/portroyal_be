@@ -17,6 +17,7 @@ public class OtpEntity {
     public enum FlowType {
         EMAIL_CONFIRMATION,
         TELEGRAM_UNIFICATION,
+        PASSWORD_RESET,
     }
 
     @Id

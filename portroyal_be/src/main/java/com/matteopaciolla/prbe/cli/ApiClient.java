@@ -10,7 +10,7 @@ import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
-import java.util.Base64;
+import java.util.Locale;
 import java.util.Map;
 
 public final class ApiClient {
@@ -24,14 +24,16 @@ public final class ApiClient {
     }
 
     public static Response execute(String baseUrl,
-                                  String username,
-                                  String password,
+                                  String accessToken,
                                   String method,
                                   String path,
                                   String body,
                                   Map<String, String> headers,
-                                  boolean basicAuthRequired) throws IOException, InterruptedException {
+                                  boolean bearerTokenRequired) throws IOException, InterruptedException {
         String target = buildTargetUrl(baseUrl, path);
+        if (bearerTokenRequired && !sameOrigin(baseUrl, target)) {
+            throw new IOException("Refusing to send an access token outside the configured API origin.");
+        }
         String normalizedMethod = method == null || method.isBlank() ? "GET" : method.trim().toUpperCase();
         HttpRequest.Builder requestBuilder = HttpRequest.newBuilder()
                 .uri(URI.create(target))
@@ -39,10 +41,8 @@ public final class ApiClient {
                         ? HttpRequest.BodyPublishers.noBody()
                         : HttpRequest.BodyPublishers.ofString(body, StandardCharsets.UTF_8));
 
-        if (basicAuthRequired && username != null && !username.isBlank()) {
-            String credentials = username + ":" + (password == null ? "" : password);
-            String encoded = Base64.getEncoder().encodeToString(credentials.getBytes(StandardCharsets.UTF_8));
-            requestBuilder.header("Authorization", "Basic " + encoded);
+        if (bearerTokenRequired && accessToken != null && !accessToken.isBlank()) {
+            requestBuilder.header("Authorization", "Bearer " + accessToken);
         }
         if (headers != null) {
             for (Map.Entry<String, String> entry : headers.entrySet()) {
@@ -65,7 +65,7 @@ public final class ApiClient {
             return baseUrl;
         }
         if (path.startsWith("http://") || path.startsWith("https://")) {
-            return path;
+            return URI.create(path).toASCIIString();
         }
         String normalizedBase = baseUrl == null || baseUrl.isBlank() ? "http://localhost:8080" : baseUrl.trim();
         if (!normalizedBase.endsWith("/")) {
@@ -74,12 +74,33 @@ public final class ApiClient {
         return normalizedBase + path.replaceFirst("^/", "");
     }
 
+    private static boolean sameOrigin(String baseUrl, String targetUrl) {
+        try {
+            URI base = URI.create(baseUrl);
+            URI target = URI.create(targetUrl);
+            return base.getScheme().equalsIgnoreCase(target.getScheme())
+                    && base.getHost().equalsIgnoreCase(target.getHost())
+                    && effectivePort(base) == effectivePort(target);
+        } catch (RuntimeException exception) {
+            return false;
+        }
+    }
+
+    private static int effectivePort(URI uri) {
+        if (uri.getPort() >= 0) {
+            return uri.getPort();
+        }
+        return "https".equalsIgnoreCase(uri.getScheme()) ? 443 : 80;
+    }
+
     public static boolean isPublicEndpoint(String path) {
         if (path == null || path.isBlank()) {
             return true;
         }
-        String lower = path.toLowerCase();
-        return lower.contains("/public/") || lower.contains("/public") || lower.startsWith("/login") || lower.startsWith("/perform-login");
+        String pathOnly = path.split("[?#]", 2)[0].toLowerCase(Locale.ROOT);
+        return pathOnly.equals("/api/v1/public")
+                || pathOnly.startsWith("/api/v1/public/")
+                || pathOnly.equals("/public/confirm-email");
     }
 
     public static String prettyPrint(String rawBody) {
