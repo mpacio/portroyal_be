@@ -28,6 +28,7 @@ correct order (the library is built/installed before the API, since `portroyal_b
 - [Database](#database)
 - [Build & run](#build--run)
 - [API overview](#api-overview)
+- [Production roadmap](PRODUCTION_ROADMAP.md)
 - [Game rules and API guide](GAME_RULES_AND_API.md)
 - [Client development guide](CLIENT_DEVELOPMENT_GUIDE.md)
 - [Testing](#testing)
@@ -283,6 +284,8 @@ standing up the full API/database stack.
 
 - For an end-to-end description of the rules, move payloads, and match workflow, see the
   [Game Rules and API Guide](GAME_RULES_AND_API.md).
+- For the planned production hardening, integrated OIDC/OAuth 2.0 architecture, and go-live
+  criteria, see the [Production Roadmap](PRODUCTION_ROADMAP.md).
 - Base path: `/api/v1`
 - Interactive docs: Swagger UI at `/swagger-ui/index.html`, raw OpenAPI spec at `/api/v1/api-docs`
   (see `springdoc.api-docs.path`).
