@@ -35,7 +35,7 @@ public class PublicController {
 
     @Operation(
         summary = "Register a new user",
-        description = "Creates a standard user account. Username, email, and a 15-128 character password are required; first and last names may be omitted and are generated automatically.",
+        description = "Creates a standard web/app account. Username, email, and password are required; first name and last name are optional and generated when omitted. Passwordless registration is available only through the BOT-only Telegram registration endpoint.",
         responses = {
             @ApiResponse(responseCode = "201", description = "User registered successfully",
                 content = @Content(mediaType = "application/json", schema = @Schema(implementation = UserResponse.class),

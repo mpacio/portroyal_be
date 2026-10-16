@@ -36,9 +36,10 @@ status codes and generally return an object with `status`, `error`, and `message
 
 ### Normal web or app client
 
-Each human player authenticates with their own username and password through the OIDC authorization
-server. Register an account through
-`POST /public/register`:
+Each human player authenticates with their own username and password. Register an account through
+`POST /public/register`. This public web/app endpoint requires `username`, `email`, and `password`;
+`firstName` and `lastName` are optional, and a `telegramId` is not required. Omitting the password
+is rejected.
 
 ```json
 {
@@ -130,7 +131,12 @@ Register a Telegram-only player with the bot account using `POST /user/register/
 ```
 
 This registration body contains the Telegram ID; it is distinct from the `tgId` header used on
-player actions.
+player actions. Unlike public web/app registration, this BOT-only endpoint does not require an
+email or password. The request must authenticate as the technical account with the `BOT` role, and
+its `tgId` header must match the `telegramId` in the body. If no password is supplied, the server
+stores a generated internal password that is not returned; Telegram players do not sign in with
+those credentials. They access player operations through the authenticated bot, which supplies their
+Telegram ID in `tgId`.
 
 ### Unifying web and Telegram accounts
 

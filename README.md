@@ -29,6 +29,7 @@ correct order (the library is built/installed before the API, since `portroyal_b
 - [Build & run](#build--run)
 - [Installation guide (Windows, Linux, Docker Compose, IntelliJ IDEA)](INSTALLATION_GUIDE.md)
 - [API overview](#api-overview)
+- [Production roadmap](PRODUCTION_ROADMAP.md)
 - [Game rules and API guide](GAME_RULES_AND_API.md)
 - [Client development guide](CLIENT_DEVELOPMENT_GUIDE.md)
 - [Testing](#testing)
@@ -82,8 +83,11 @@ authentication model.
   authorized as themselves at the domain level (moves/matches remain associated with the human
   player's `UserEntity`, not with the bot).
 - A player can be registered directly through the bot (`POST /api/v1/user/register/telegram`, `hasRole(BOT)`)
-  using only their Telegram id, or through a normal web/app registration
-  (`POST /api/v1/public/register`) using username/email/password.
+  using a username and Telegram id without an email or password, or through a normal web/app
+  registration (`POST /api/v1/public/register`) using username/email/password. For Telegram
+  registration, the authenticated BOT caller must send a `tgId` header matching the body's
+  `telegramId`; the server generates an internal password that is not returned, and the player uses
+  bot-mediated requests rather than signing in with that password.
 - The two identities can later be **unified**: a Telegram-only user requests a one-time code sent to
   an email address (`GET /api/v1/user/new-tg-unify-email-otp`, authenticated), then confirms the pairing through the bot
   (`POST /api/v1/user/unify`, `hasRole(BOT)`, backed by the OTP/`temporary_tokens` table). After unification,
@@ -345,6 +349,8 @@ standing up the full API/database stack.
 
 - For an end-to-end description of the rules, move payloads, and match workflow, see the
   [Game Rules and API Guide](GAME_RULES_AND_API.md).
+- For the planned production hardening, integrated OIDC/OAuth 2.0 architecture, and go-live
+  criteria, see the [Production Roadmap](PRODUCTION_ROADMAP.md).
 - Base path: `/api/v1`
 - Interactive docs: Swagger UI at `/swagger-ui/index.html`, raw OpenAPI spec at `/api/v1/api-docs`
   (see `springdoc.api-docs.path`).
