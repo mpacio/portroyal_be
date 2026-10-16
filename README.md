@@ -81,8 +81,11 @@ authentication model.
   authorized as themselves at the domain level (moves/matches remain associated with the human
   player's `UserEntity`, not with the bot).
 - A player can be registered directly through the bot (`POST /api/v1/user/register/telegram`, `hasRole(BOT)`)
-  using only their Telegram id, or through a normal web/app registration
-  (`POST /api/v1/public/register`) using username/email/password.
+  using a username and Telegram id without an email or password, or through a normal web/app
+  registration (`POST /api/v1/public/register`) using username/email/password. For Telegram
+  registration, the authenticated BOT caller must send a `tgId` header matching the body's
+  `telegramId`; the server generates an internal password that is not returned, and the player uses
+  bot-mediated requests rather than signing in with that password.
 - The two identities can later be **unified**: a Telegram-only user requests a one-time code sent to
   an email address (`GET /api/v1/user/new-tg-unify-email-otp`, authenticated), then confirms the pairing through the bot
   (`POST /api/v1/user/unify`, `hasRole(BOT)`, backed by the OTP/`temporary_tokens` table). After unification,

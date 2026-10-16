@@ -185,7 +185,7 @@ public class UserController {
 
     @Operation(
             summary = "Register a telegram player",
-            description = "Creates a Telegram-linked user account. Username and Telegram ID are required; first name and last name may be omitted and will be generated automatically. This endpoint is intended for bot-only use and requires the bot identity in the security context.",
+            description = "Creates a Telegram-linked user account. This endpoint requires BOT authentication and a tgId header matching the telegramId in the request body. Username and Telegram ID are required; email and password are not required. When omitted, the server assigns an internal random password that is not returned; the Telegram player uses the bot-mediated API and does not sign in with personal password credentials. First and last name are optional and generated when omitted.",
             responses = {
                     @ApiResponse(responseCode = "201", description = "Telegram user registered successfully",
                             content = @Content(mediaType = "application/json", schema = @Schema(implementation = UserResponse.class),
@@ -194,6 +194,7 @@ public class UserController {
     )
     @PostMapping(path = "/register/telegram")
     public ResponseEntity<UserResponse> registerTelegramPlayer(
+            @Parameter(description = "Telegram ID of the player being registered; must match telegramId in the request body.", required = true, example = "123456789")
             @RequestHeader(value = BH, required = true) String tgId,
             @Valid @RequestBody UserReqDto userReqDto) {
         if (tgId == null || tgId.isBlank()) {

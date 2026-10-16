@@ -18,7 +18,7 @@ public class UserReqDto {
     @Pattern(regexp = "^[a-zA-Z0-9\\-_]{5,30}$", message = "Username should be alphanumeric and between 5 and 30 characters, including -_")
     private String username;
 
-    @Schema(description = "Password for the account. Sent in clear text by the client and then hashed server-side.", example = "MyP@ssw0rd")
+    @Schema(description = "Required by the public web/app registration endpoint. Omit only when registering through the BOT-only Telegram endpoint; the server then generates an internal password that is not returned to the Telegram player.", example = "MyP@ssw0rd")
     @JsonInclude(JsonInclude.Include.NON_NULL)
     private String password;
 

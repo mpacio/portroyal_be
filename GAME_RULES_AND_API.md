@@ -219,8 +219,13 @@ Standard registration body:
 }
 ```
 
-Usernames must be 5-30 characters and contain letters, digits, `_`, or `-`. Telegram IDs are
-numeric strings. Bot registration requires a username and Telegram ID, for example:
+Usernames must be 5-30 characters and contain letters, digits, `_`, or `-`. The public
+`/public/register` endpoint requires `username`, `email`, and `password`; first and last names are
+optional, and a Telegram ID is not required. Telegram IDs are numeric strings. Bot registration
+requires BOT authentication, a username, a Telegram ID, and a `tgId` header matching the ID in the
+body. It does not require an email or password: the server generates an internal password that is
+not returned, and the player uses the bot-mediated API rather than signing in with personal
+credentials. For example:
 
 ```json
 {
