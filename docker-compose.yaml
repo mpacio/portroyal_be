@@ -1,0 +1,47 @@
+---
+services:
+  postgres:
+    image: postgres:16.3-bookworm
+    container_name: postgresc
+    restart: unless-stopped
+    # ports:
+    #   - "127.0.0.1:5432:5432"
+    # set shared memory limit when using docker-compose
+    shm_size: 128mb
+    environment:
+      - POSTGRES_USER=${POSTGRES_USER}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+      - POSTGRES_DB=${POSTGRES_DB}
+      - TZ=Europe/Rome
+      - PGTZ=Europe/Rome
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./portroyal_be/schema.sql:/docker-entrypoint-initdb.d/init.sql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  be_app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: portroyal-be-app
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/${POSTGRES_DB}
+      SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER}
+      SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD}
+    volumes:
+      - ~/appdata/portroyal-be-app/logs:/app/logs
+    ports:
+      - "8080:8080"
+networks:
+  default:
+    name: npm_main_net
+    external: true
+volumes:
+  postgres_data:
