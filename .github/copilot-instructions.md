@@ -21,6 +21,13 @@ rebase, or branch creation that writes repository history must be explicitly app
 before execution. Do not create commits as part of routine work, testing, or cleanup unless the user
 has clearly asked for it.
 
+## Language policy — mandatory
+
+**ALL comments and written documentation MUST BE IN ENGLISH.** This applies to every comment added
+or changed in source code and configuration, as well as all documentation added or changed,
+including Markdown files, README files, Javadocs, and examples. Do not write comments or
+documentation in any other language.
+
 ## Golden rule: rules live only in `portroyal_lib`
 
 **Never implement or duplicate game-rule logic inside `portroyal_be`.** The API only:
