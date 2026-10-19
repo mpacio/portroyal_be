@@ -72,8 +72,9 @@ The repository currently has:
 
 - Define supported client categories: browser SPA, native/mobile, CLI, Telegram BOT, and any
   server-to-server integration.
-- Define how public OAuth clients obtain a `client_id` and register exact redirect URIs. Start
-  with controlled client registration; do not enable unrestricted Dynamic Client Registration
+- Define how public OAuth clients obtain a `client_id` and register exact redirect URIs. As the
+  initial approach, consider controlled registration through a guided script that an authorized
+  operator invokes manually. Do not enable unrestricted Dynamic Client Registration
   without a documented abuse and support model.
 - Define the public API's acceptable-use rules, privacy notice, account/data deletion policy,
   support contact, and initial rate/usage limits.
