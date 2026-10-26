@@ -57,9 +57,14 @@ The repository currently has:
 4. Public clients never contain a client secret. Authorization Code with PKCE using `S256` is the
    interactive login flow for browser/native clients. Do not implement the deprecated Resource
    Owner Password Credentials grant.
-5. The Telegram integration remains one technical BOT client, not one API credential per Telegram
-   player. The API must resolve the human player from `tgId` only after authenticating the request
-   as BOT, and must retain the existing match/move ownership semantics.
+5. The Telegram integration remains one confidential OAuth BOT client, not one API credential per
+   Telegram player and not a technical `UserEntity`. The BOT authenticates with client credentials
+   and exchanges the Telegram sender ID for a short-lived delegated access token whose subject is
+   the linked human `UserEntity` and whose claims retain the BOT client as the actor. Normal game
+   API calls use this token and do not send `tgId`. The API trusts the authenticated BOT's
+   assertion of the Telegram sender ID; `tgId` is accepted only in the delegated-token exchange
+   and BOT-authorized account onboarding/linking flows. Preserve the existing match/move ownership
+   semantics.
 6. Authorization decisions are made by the server. Client-supplied roles or identity headers are
    never trusted as authentication. Every protected operation continues to enforce ownership and
    role requirements.
@@ -76,6 +81,13 @@ The repository currently has:
   initial approach, consider controlled registration through a guided script that an authorized
   operator invokes manually. Do not enable unrestricted Dynamic Client Registration
   without a documented abuse and support model.
+- Define the Telegram BOT delegated-token flow. The BOT first authenticates as a confidential
+  OAuth client, then exchanges the Telegram sender ID for a short-lived access token representing
+  the linked human account. The standard `client_credentials` grant alone represents only the
+  BOT client, so implement a narrowly scoped token-exchange/custom-grant flow. Accept `tgId` only
+  at this trusted exchange and at BOT-authorized account onboarding/linking endpoints, not on
+  ordinary game API calls. Under this trust model, the API relies on the authenticated BOT to
+  report the sender ID received from Telegram.
 - Define the public API's acceptable-use rules, privacy notice, account/data deletion policy,
   support contact, and initial rate/usage limits.
 - Publish the authentication and registration flows in the client guide and OpenAPI documentation.
@@ -87,17 +99,19 @@ redirect-URI, account-registration, and recovery policies are decided.
 
 - Move seeded accounts and development credentials behind a development-only profile. Production
   startup must not create an administrator or BOT account with a known password.
-- Provision the production administrator and BOT credentials through a controlled bootstrap
-  procedure or secret-management mechanism. Require high-entropy credentials, define rotation, and
-  do not store secrets in source control, images, or committed Compose files.
+- Provision the production administrator through a controlled bootstrap procedure. Provision the
+  Telegram BOT as a confidential OAuth client, not as a seeded `UserEntity`; keep its high-entropy
+  client secret in a secret-management mechanism, define rotation, and do not store secrets in
+  source control, images, or committed Compose files.
 - Remove or redact passwords, `Authorization` headers, access/refresh tokens, OTPs, email
   confirmation tokens, Telegram IDs, and other sensitive values from logs. Turn off TRACE-level
   HTTP logging in non-development environments; log event IDs and outcomes rather than secrets.
 - Keep client-visible errors useful but avoid disclosing whether a username or email exists where
   that enables account enumeration.
 - Confirm that registration behavior is explicit: web/app registration requires username, email,
-  and password; Telegram-only registration is BOT-only and uses the existing `tgId`/`telegramId`
-  checks. Never let the BOT-only passwordless path become a public registration bypass.
+  and password; Telegram-only registration is restricted to the authenticated BOT client and uses
+  the Telegram ID only in the onboarding flow. Never let the BOT-only passwordless path become a
+  public registration bypass.
 
 **Exit criteria:** a production-profile startup creates no predictable account; automated checks
 find no secrets in logs; public and BOT registration tests prove the intended required fields and
@@ -129,15 +143,24 @@ LAN test environment.
   environment; validate issuer, signature, expiry, and audience at the API.
 - Support Authorization Code + PKCE (`S256`) for public browser/native clients. Use exact
   registered redirect URIs. Do not issue client secrets to browser or mobile bundles.
-- Use client credentials for the confidential Telegram BOT integration. Give the BOT only the
-  authority required for bot-mediated operations; ensure it cannot acquire `ADMIN` or ordinary
-  user authority. Do not use the BOT grant for human clients.
+- Use client credentials for the confidential Telegram BOT integration. Since a client-credentials
+  token represents the client rather than a human, add a narrowly scoped token-exchange/custom
+  grant: after authenticating the BOT client, accept the Telegram sender ID, resolve the linked
+  `UserEntity`, and issue a short-lived delegated token with a stable human subject and the BOT
+  client recorded as its actor. The API trusts the authenticated BOT's assertion; `tgId` is not a
+  credential and must not be accepted as proof on its own. For first-time Telegram registration or
+  account linking, retain BOT-client-authorized onboarding/linking operations that accept the
+  Telegram ID; once the human account exists, normal API calls use its delegated token without a
+  `tgId` header. Give the BOT only the authority required for these flows and ensure it cannot
+  acquire `ADMIN` or unrestricted user authority. Do not use the BOT grant for human clients.
 - Preserve the domain identity model. Define a stable mapping from the authenticated OIDC subject
   to `UserEntity`; do not use mutable usernames as the permanent token subject. Preserve email
   confirmation, Telegram/email account unification, role boundaries, and `tgId` resolution.
-- Adapt `AuthenticationUtils` and controller/service resolution so a client-credentials BOT
-  principal is recognized as BOT, while an ordinary token cannot claim BOT by supplying a header
-  or role value.
+- Adapt authentication and controller/service resolution so delegated-token requests resolve the
+  acting `UserEntity` from the token's stable subject. Track the BOT client separately for
+  authorization and audit; do not use a synthetic BOT `UserEntity` or a `tgId` header to identify
+  the actor on ordinary game API calls. Ordinary tokens must not be able to claim BOT or select a
+  different user by supplying a header or role value.
 - Issue short-lived access tokens. Rotate refresh tokens, detect reuse where supported, and
   implement revocation/logout. Decide and document the access-token revocation trade-off: a
   self-contained JWT generally remains valid until expiry unless the API also checks revocation
@@ -154,10 +177,12 @@ LAN test environment.
   production clients exist, prefer a clean migration; if Basic is temporarily retained for
   development, keep it development-only and give it a removal condition.
 
-**Exit criteria:** public-client PKCE and BOT client-credentials flows work end to end; access
-tokens are accepted only by the intended issuer/audience; refresh rotation and revocation behave
-as documented; no production API route depends on Basic Auth or an API session; authorization state
-and signing keys survive restart and instance changes.
+**Exit criteria:** public-client PKCE, BOT client authentication, and delegated-token exchange work
+end to end; delegated tokens identify one linked human and retain the BOT client as actor; ordinary
+game API calls require no `tgId` header; access tokens are accepted only by the intended
+issuer/audience; refresh rotation and revocation behave as documented; no production API route
+depends on Basic Auth or an API session; authorization state and signing keys survive restart and
+instance changes.
 
 ### Phase 4 — Harden registration, account recovery, and API abuse controls
 
@@ -216,9 +241,9 @@ preflight and authenticated requests succeed only according to the documented CO
   events, and callback delivery failures.
 - Define alert thresholds and operational runbooks for database outage, failed email delivery,
   key rotation, credential compromise, and restore from backup.
-- Update OpenAPI to describe OIDC/OAuth2 Authorization Code + PKCE and bearer API authorization,
-  required scopes/roles, `401`/`403` responses, rate limits, token lifetimes, registration, recovery,
-  and BOT-only operations.
+- Update OpenAPI to describe OIDC/OAuth2 Authorization Code + PKCE, BOT client authentication and
+  delegated-token exchange, bearer API authorization, required scopes/roles, `401`/`403` responses,
+  rate limits, token lifetimes, registration, recovery, and BOT-authorized onboarding/linking.
 - Publish API versioning/deprecation policy, acceptable-use rules, privacy/retention details, and
   a contact path for security reports. Keep the public API documentation available without
   exposing internal operational details.
@@ -231,7 +256,11 @@ the published policy is reachable.
 
 - Add unit and integration coverage for Authorization Server configuration, login/registration,
   PKCE including verifier failures, issuer/audience/signature validation, expiry, refresh rotation,
-  refresh reuse/revocation, client registration boundaries, role checks, and BOT `tgId` behavior.
+  refresh reuse/revocation, client registration boundaries, role checks, and BOT delegated-token
+  exchange. Verify that only the authenticated BOT client can request a delegated token, that the
+  token subject resolves to the intended linked user and records the BOT actor, that an ordinary
+  client cannot select another subject, and that normal game API calls work without a `tgId`
+  header. Test Telegram onboarding/linking separately at the BOT-authorized boundary.
 - Test account confirmation, reset, Telegram/email unification, and credential changes with the
   email queue and PostgreSQL in the test deployment.
 - Test security-filter separation: API bearer requests are stateless; login/consent forms retain
