@@ -53,9 +53,9 @@ verified account-unification flow.
 ```
 
 Usernames must be 5-30 characters and contain only letters, digits, `_`, or `-`. Email must be a
-valid address of at most 254 characters. Passwords must not exceed 72 UTF-8 bytes (the current
-BCrypt password encoder's supported input limit); a minimum-length/strength policy is still pending
-approval. Optional first and last names may contain letters and spaces only and are limited to 30
+valid address of at most 254 characters. Passwords must contain at least 8 Unicode code points,
+have no required character classes, and not exceed 72 UTF-8 bytes (the current BCrypt password
+encoder's supported input limit). Optional first and last names may contain letters and spaces only and are limited to 30
 characters. Telegram IDs contain 1-20 digits. Email is used for account confirmation and Telegram
 identity-unification flows. Registration sends an email-confirmation link; the account must be
 confirmed before password sign-in. After confirmation, obtain an access token through the

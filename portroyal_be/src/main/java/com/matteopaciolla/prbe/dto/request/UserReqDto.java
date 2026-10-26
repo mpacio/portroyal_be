@@ -2,6 +2,8 @@ package com.matteopaciolla.prbe.dto.request;
 
 import com.fasterxml.jackson.annotation.JsonInclude;
 import com.matteopaciolla.prbe.annotation.MaxUtf8Bytes;
+import com.matteopaciolla.prbe.annotation.MinUnicodeCodePoints;
+import com.matteopaciolla.prbe.constants.PasswordPolicy;
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
@@ -19,9 +21,10 @@ public class UserReqDto {
     @Pattern(regexp = "^[a-zA-Z0-9\\-_]{5,30}$", message = "Username should be alphanumeric and between 5 and 30 characters, including -_")
     private String username;
 
-    @Schema(description = "Required by the public web/app registration endpoint. Omit only when registering through the BOT-only Telegram endpoint; the server then generates an internal password that is not returned to the Telegram player. Passwords are limited to 72 UTF-8 bytes.", example = "MyP@ssw0rd")
+    @Schema(description = "Required by the public web/app registration endpoint. Omit only when registering through the BOT-only Telegram endpoint; the server then generates an internal password that is not returned to the Telegram player. Passwords must contain at least 8 Unicode code points, have no required character classes, and not exceed 72 UTF-8 bytes.", example = "MyP@ssw0rd", minLength = 8)
     @JsonInclude(JsonInclude.Include.NON_NULL)
-    @MaxUtf8Bytes(value = 72, message = "Password must not exceed 72 UTF-8 bytes")
+    @MinUnicodeCodePoints(value = PasswordPolicy.MIN_CODE_POINTS, message = "Password must contain at least 8 characters")
+    @MaxUtf8Bytes(value = PasswordPolicy.MAX_UTF8_BYTES, message = "Password must not exceed 72 UTF-8 bytes")
     private String password;
 
     @Schema(description = "Optional first name.", example = "Alice")

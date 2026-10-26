@@ -221,7 +221,8 @@ Standard registration body:
 ```
 
 Usernames must be 5-30 characters and contain letters, digits, `_`, or `-`. Email addresses are
-limited to 254 characters and passwords to 72 UTF-8 bytes. The public `/public/register` endpoint
+limited to 254 characters. Passwords require at least 8 Unicode code points, no mandatory character
+classes, and no more than 72 UTF-8 bytes. The public `/public/register` endpoint
 requires `username`, `email`, and `password`; first and last names are optional, and a Telegram ID
 is not required. Email confirmation is required before password sign-in. Telegram IDs contain 1-20
 digits. Bot registration requires BOT `bot:onboard` authorization, a username, a Telegram ID, and a

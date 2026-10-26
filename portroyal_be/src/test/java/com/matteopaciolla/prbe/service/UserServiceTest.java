@@ -102,6 +102,19 @@ class UserServiceTest {
     }
 
     @Test
+    void registerWebUser_rejectsPasswordBelowMinimum() {
+        UserReqDto request = new UserReqDto();
+        request.setUsername("alice42");
+        request.setEmail("alice@example.com");
+        request.setPassword("short7");
+
+        assertThatThrownBy(() -> userService.registerUser(request, false))
+                .isInstanceOf(MandatoryParamException.class)
+                .extracting(exception -> ((MandatoryParamException) exception).getMissingParams())
+                .isEqualTo(java.util.List.of("password"));
+    }
+
+    @Test
     void registerWebUser_rejectsUnverifiedTelegramIdentity() {
         UserReqDto request = new UserReqDto();
         request.setUsername("alice42");
@@ -166,6 +179,14 @@ class UserServiceTest {
         userService.changePassword("alice42", "old-password", "new-password");
 
         verify(authorizationRevocationService).revokePrincipal("alice42");
+    }
+
+    @Test
+    void changePassword_rejectsPasswordBelowMinimum() {
+        assertThatThrownBy(() -> userService.changePassword("alice42", "old-password", "short7"))
+                .isInstanceOf(MandatoryParamException.class)
+                .extracting(exception -> ((MandatoryParamException) exception).getMissingParams())
+                .isEqualTo(java.util.List.of("newPassword"));
     }
 
     @Test

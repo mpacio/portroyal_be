@@ -1,6 +1,7 @@
 package com.matteopaciolla.prbe.service;
 
 import com.matteopaciolla.prbe.constants.FakeNames;
+import com.matteopaciolla.prbe.constants.PasswordPolicy;
 import com.matteopaciolla.prbe.constants.Paths;
 import com.matteopaciolla.prbe.constants.enums.UserRole;
 import com.matteopaciolla.prbe.converter.UserConverter;
@@ -89,6 +90,10 @@ public class UserService {
         if (userReqDto.getPassword() == null || userReqDto.getPassword().isBlank()) {
             missingParams.add("password");
             valid = false;
+        } else if (!PasswordPolicy.isValidNewPassword(userReqDto.getPassword())) {
+            throw new MandatoryParamException(
+                    "Password must contain at least 8 characters and must not exceed 72 UTF-8 bytes",
+                    List.of("password"));
         }
         if (userReqDto.getEmail() == null || userReqDto.getEmail().isBlank()) {
             missingParams.add("email");
@@ -239,6 +244,11 @@ public class UserService {
 
     @Transactional
     public void changePassword(String username, String oldPassword, String newPassword) {
+        if (!PasswordPolicy.isValidNewPassword(newPassword)) {
+            throw new MandatoryParamException(
+                    "Password must contain at least 8 characters and must not exceed 72 UTF-8 bytes",
+                    List.of("newPassword"));
+        }
         UserEntity user = getUserEntityByUsername(username);
         if (passwordEncoder.matches(oldPassword, user.getPassword())) {
             user.setPassword(passwordEncoder.encode(newPassword));

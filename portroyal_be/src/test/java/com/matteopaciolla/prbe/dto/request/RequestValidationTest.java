@@ -57,6 +57,23 @@ class RequestValidationTest {
     }
 
     @Test
+    void passwordsRequireAtLeastEightUnicodeCodePoints() {
+        UserReqDto registration = validUserRequest();
+        registration.setPassword("😀".repeat(7));
+        assertThat(validator.validate(registration))
+                .anyMatch(violation -> violation.getPropertyPath().toString().equals("password"));
+
+        registration.setPassword("😀".repeat(8));
+        assertThat(validator.validate(registration)).isEmpty();
+
+        ChangePasswordReqDto change = new ChangePasswordReqDto();
+        change.setOldPassword("current-password");
+        change.setNewPassword("short7");
+        assertThat(validator.validate(change))
+                .anyMatch(violation -> violation.getPropertyPath().toString().equals("newPassword"));
+    }
+
+    @Test
     void passwordChangeRequiresBothPasswordsAndEnforcesBcryptByteLimit() {
         ChangePasswordReqDto request = new ChangePasswordReqDto();
         request.setOldPassword("current-password");

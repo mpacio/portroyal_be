@@ -91,6 +91,9 @@ account exists.
 
 ## Recovery policy
 
+Web/app passwords must contain at least 8 Unicode code points and at most 72 UTF-8 bytes; no
+particular mix of character classes is required.
+
 The intended password-reset flow is available only for web/app accounts with a confirmed email.
 The public request returns a generic response regardless of whether the address belongs to an
 account. For an eligible account, the service sends a single-use reset token that expires after
