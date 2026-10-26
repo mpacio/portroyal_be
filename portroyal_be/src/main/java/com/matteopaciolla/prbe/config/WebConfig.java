@@ -16,9 +16,11 @@ import java.util.List;
 public class WebConfig implements WebMvcConfigurer {
 
     private final ObjectMapper objectMapper;
+    private final RateLimitInterceptor rateLimitInterceptor;
 
-    public WebConfig(ObjectMapper objectMapper) {
+    public WebConfig(ObjectMapper objectMapper, RateLimitInterceptor rateLimitInterceptor) {
         this.objectMapper = objectMapper;
+        this.rateLimitInterceptor = rateLimitInterceptor;
     }
 
     @Override
@@ -30,5 +32,10 @@ public class WebConfig implements WebMvcConfigurer {
     @Override
     public void extendMessageConverters(List<HttpMessageConverter<?>> converters) {
         converters.add(new ErrorResponseMessageConverter(objectMapper));
+    }
+
+    @Override
+    public void addInterceptors(org.springframework.web.servlet.config.annotation.InterceptorRegistry registry) {
+        registry.addInterceptor(rateLimitInterceptor);
     }
 }

@@ -31,6 +31,7 @@ correct order (the library is built/installed before the API, since `portroyal_b
 - [Production roadmap](docs/PRODUCTION_ROADMAP.md)
 - [OAuth client operations](docs/OAUTH_CLIENT_OPERATIONS.md)
 - [Operations runbook draft](docs/OPERATIONS_RUNBOOK.md)
+- [LAN acceptance checklist](docs/LAN_ACCEPTANCE_CHECKLIST.md)
 - [Operations runbook draft](docs/OPERATIONS_RUNBOOK.md)
 - [Game rules and API guide](docs/GAME_RULES_AND_API.md)
 - [Client development guide](docs/CLIENT_DEVELOPMENT_GUIDE.md)

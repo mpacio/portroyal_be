@@ -13,6 +13,7 @@ import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
+import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.security.SecurityRequirements;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -28,6 +29,10 @@ import java.util.List;
 
 @Tag(name = "Cards", description = "Card operations")
 @SecurityRequirements({@SecurityRequirement(name = "oauth2", scopes = {"game:play"})})
+@ApiResponses({
+        @ApiResponse(responseCode = "401", description = "Missing or invalid bearer token"),
+        @ApiResponse(responseCode = "403", description = "Insufficient scope")
+})
 @Slf4j
 @RestController
 @RequestMapping(Paths.CARD_PATH)

@@ -20,8 +20,10 @@ import com.matteopaciolla.prbe.model.entity.UserEntity;
 import com.matteopaciolla.prbe.repository.ConfigPropertyRepository;
 import com.matteopaciolla.prbe.repository.cachingproxy.MatchRetainer;
 import com.matteopaciolla.prbe.repository.MatchRepository;
+import com.matteopaciolla.prbe.repository.UserRepository;
 import com.matteopaciolla.prbe.util.Base36StringUtils;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
@@ -44,13 +46,15 @@ public class MatchService {
 
     private final MatchRetainer matchRetainer;
     private final GameService gameService;
+    private final UserRepository userRepository;
 
     public MatchService(MatchRepository matchRepository, ConfigPropertyRepository configPropertyRepository,
-                         MatchRetainer matchRetainer, GameService gameService) {
+                         MatchRetainer matchRetainer, GameService gameService, UserRepository userRepository) {
         this.matchRepository = matchRepository;
         this.configPropertyRepository = configPropertyRepository;
         this.matchRetainer = matchRetainer;
         this.gameService = gameService;
+        this.userRepository = userRepository;
     }
 
     public MatchDto getMatch(String keyCode) {
@@ -109,7 +113,9 @@ public class MatchService {
         return MatchConverter.toInfoDto(savedMatchEntity);
     }
 
+    @Transactional
     public MatchInfoDto hostMatch(UserEntity user, MatchConfigReqDto matchConfigReqDto) {
+        user = requireAccountAvailableForNewMatch(user.getId());
         if (matchConfigReqDto == null || matchConfigReqDto.getId() == null || matchConfigReqDto.getName() == null) {
             Integer defaultConfigId = 1;
             String defaultConfigName = "default";
@@ -137,7 +143,9 @@ public class MatchService {
         }
     }
 
+    @Transactional
     public void joinMatch(String keyCode, UserEntity user) {
+        user = requireAccountAvailableForNewMatch(user.getId());
         String username = user.getUsername();
         // check if the user is already in a match that is not ended
         Pageable pageable = PageRequest.of(0, 1, Sort.by(Sort.Order.desc("createdAt")));
@@ -162,6 +170,15 @@ public class MatchService {
         }
         matchEntity.getPlayers().add(user);
         matchRepository.save(matchEntity);
+    }
+
+    private UserEntity requireAccountAvailableForNewMatch(Long userId) {
+        UserEntity user = userRepository.findByIdForUpdate(userId)
+                .orElseThrow(() -> new ResourceNotFoundException("The requested user could not be found"));
+        if (!user.isEnabled() || user.getDeletionRequestedAt() != null) {
+            throw new MandatoryParamException("An account with a pending deletion cannot create or join a match");
+        }
+        return user;
     }
 
     public MatchDto startMatch(UserEntity user) {

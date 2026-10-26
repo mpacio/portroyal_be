@@ -37,8 +37,11 @@ public class UserPassAuthenticationProvider implements AuthenticationProvider {
         if (user != null && passwordEncoder.matches(password, user.getPassword())){
             user.setLastLogin(LocalDateTime.now());
             userRepository.save(user);
-            return new UsernamePasswordAuthenticationToken(
-                    user.getUsername(), null, getGrantedAuthorities(user.getRoles().stream().map(UserRole::toString).toList()));
+            UsernamePasswordAuthenticationToken authenticated = new UsernamePasswordAuthenticationToken(
+                    user.getUsername(), null,
+                    getGrantedAuthorities(user.getRoles().stream().map(UserRole::toString).toList()));
+            authenticated.setDetails(new CredentialVersion(user.getId(), user.getCredentialVersion()));
+            return authenticated;
         } else {
             throw new BadCredentialsException("Invalid credentials!");
         }

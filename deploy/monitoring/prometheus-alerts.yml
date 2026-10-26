@@ -1,0 +1,69 @@
+groups:
+  - name: portroyal-api
+    rules:
+      - alert: PortRoyalHighServerErrorRate
+        expr: |
+          sum(rate(http_server_requests_seconds_count{status=~"5.."}[5m]))
+          / clamp_min(sum(rate(http_server_requests_seconds_count[5m])), 0.001) > 0.05
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: Port Royal API server error rate is high
+          description: More than 5% of HTTP requests failed with 5xx responses for five minutes.
+
+      - alert: PortRoyalHighRequestLatency
+        expr: |
+          histogram_quantile(0.95,
+            sum(rate(http_server_requests_seconds_bucket[5m])) by (le)) > 2
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: Port Royal API p95 latency is high
+          description: API p95 request latency exceeded two seconds for ten minutes.
+
+      - alert: PortRoyalDatabasePoolSaturated
+        expr: hikaricp_connections_active / clamp_min(hikaricp_connections_max, 1) > 0.8
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: Port Royal database connection pool is saturated
+          description: More than 80% of the configured Hikari connections are active for five minutes.
+
+      - alert: PortRoyalEmailQueueBacklog
+        expr: portroyal_email_queue_pending > 50
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: Port Royal email queue is growing
+          description: More than 50 emails are waiting in the database queue for ten minutes.
+
+      - alert: PortRoyalCallbackDeliveryFailures
+        expr: rate(portroyal_callback_deliveries_total{result="failure"}[5m]) > 0.1
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: Port Royal callback deliveries are failing
+          description: Callback delivery failures exceeded six per minute for five minutes.
+
+      - alert: PortRoyalAuthenticationFailures
+        expr: rate(portroyal_authentication_failures_total[5m]) > 1
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: Port Royal authentication failures are elevated
+          description: Authentication failures exceeded one per second for five minutes.
+
+      - alert: PortRoyalRateLimitActivity
+        expr: rate(portroyal_rate_limit_exceeded_total[5m]) > 1
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: Port Royal rate limits are being triggered frequently
+          description: More than one application rate limit rejection per second occurred for five minutes.

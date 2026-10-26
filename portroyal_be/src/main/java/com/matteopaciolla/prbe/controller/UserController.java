@@ -16,16 +16,22 @@ import com.matteopaciolla.prbe.exceptions.user.TelegramAccountAlreadyUnifiedExce
 import com.matteopaciolla.prbe.model.entity.UserEntity;
 import com.matteopaciolla.prbe.repository.UserRepository;
 import com.matteopaciolla.prbe.service.UserService;
+import com.matteopaciolla.prbe.service.AccountDeletionService;
+import com.matteopaciolla.prbe.service.RateLimitService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.media.ExampleObject;
 import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
+import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.security.SecurityRequirements;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
+import jakarta.validation.constraints.Email;
+import jakarta.validation.constraints.Pattern;
+import jakarta.validation.constraints.Size;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
@@ -33,6 +39,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.web.bind.annotation.*;
+import jakarta.servlet.http.HttpServletRequest;
 
 import java.util.List;
 
@@ -41,6 +48,10 @@ import static com.matteopaciolla.prbe.util.AuthenticationUtils.isBotUser;
 
 @Tag(name = "User", description = "User profile management, identity queries and account security operations.")
 @SecurityRequirements({@SecurityRequirement(name = "oauth2", scopes = {"game:play"})})
+@ApiResponses({
+        @ApiResponse(responseCode = "401", description = "Missing or invalid bearer token"),
+        @ApiResponse(responseCode = "403", description = "Insufficient scope or account ownership")
+})
 @Slf4j
 @RestController
 @RequestMapping(Paths.USER_PATH)
@@ -56,6 +67,12 @@ public class UserController {
 
     @Autowired
     private UserService userService;
+
+    @Autowired
+    private AccountDeletionService accountDeletionService;
+
+    @Autowired
+    private RateLimitService rateLimitService;
 
     @Operation(
             summary = "Retrieve the current user",
@@ -96,11 +113,11 @@ public class UserController {
     @GetMapping(path = {"/retrieve", ""})
     public ResponseEntity<UserResponse> getUser(
             @Parameter(description = "Username to resolve. Highest priority among identifiers.", example = "alice", required = false)
-            @RequestParam(value = "username", required = false) String username,
+            @Size(max = 30) @RequestParam(value = "username", required = false) String username,
             @Parameter(name = "telegram_id", description = "Telegram id to resolve. Used when username is absent.", example = "123456789", required = false)
-            @RequestParam(value = "telegram_id", required = false) String telegramId,
+            @Pattern(regexp = "^[0-9]{1,20}$") @RequestParam(value = "telegram_id", required = false) String telegramId,
             @Parameter(description = "Email to resolve. Used when username and telegramId are absent.", example = "alice@example.com", required = false)
-            @RequestParam(value = "email", required = false) String email) {
+            @Email @Size(max = 254) @RequestParam(value = "email", required = false) String email) {
         if (username == null && telegramId == null && email == null) {
             throw new MandatoryParamException("At least one of these parameters must be provided", List.of("username", "telegram_id", "email"));
         }
@@ -119,18 +136,31 @@ public class UserController {
 
     @Operation(
             summary = "Delete a user",
-            description = "Legacy endpoint that immediately deletes the specified user. Admins can delete any user; regular users can only delete their own account. It does not yet implement the target self-service deletion policy (explicit confirmation, deferral while matches are active, and pseudonymized game history); public clients must not use it as that workflow until updated.",
+            description = "Requests deletion of the specified user. Explicit confirmation is required. The request is deferred while active matches exist; after they finish, identifying data is removed and match history is pseudonymized.",
             responses = {
-                    @ApiResponse(responseCode = "200", description = "User deleted successfully"),
+                    @ApiResponse(responseCode = "200", description = "Account data pseudonymized"),
+                    @ApiResponse(responseCode = "202", description = "Deletion deferred until active matches finish"),
+                    @ApiResponse(responseCode = "400", description = "Explicit confirmation required"),
                     @ApiResponse(responseCode = "403", description = "Forbidden for the current principal")
             }
     )
     @PreAuthorize("hasAuthority('ROLE_ADMIN') or #username == authentication.tokenAttributes['username']")
     @DeleteMapping(path = "/delete")
-    public ResponseEntity<VoidResponse> deleteUser(@Parameter(description = "Username to delete", required = true, example = "alice") @RequestParam String username) {
-        userService.deleteUser(username);
-        log.info("User account deleted");
-        return ResponseEntity.ok(new VoidResponse("User deleted successfully"));
+    public ResponseEntity<VoidResponse> deleteUser(
+            @Parameter(description = "Username to delete", required = true, example = "alice")
+            @Size(max = 30) @RequestParam String username,
+            @Parameter(description = "Must be true to confirm account deletion.", required = true, example = "true")
+            @RequestParam(value = "confirm") boolean confirmed) {
+        if (!confirmed) {
+            throw new MandatoryParamException("Set confirm=true to request account deletion");
+        }
+        AccountDeletionService.RequestStatus status = accountDeletionService.requestDeletion(username);
+        if (status == AccountDeletionService.RequestStatus.PENDING_MATCHES) {
+            return ResponseEntity.accepted()
+                    .body(new VoidResponse("Account deletion is queued until active matches finish"));
+        }
+        log.info("Account identifying data pseudonymized");
+        return ResponseEntity.ok(new VoidResponse("Account identifying data was removed"));
     }
 
     @Operation(
@@ -146,7 +176,7 @@ public class UserController {
     @PatchMapping(path = "/update")
     public ResponseEntity<UserResponse> updateUser(
             @Parameter(description = "Username of the user to update", required = true, example = "alice")
-            @RequestParam String username,
+            @Size(max = 30) @RequestParam String username,
             @Valid @RequestBody UserReqDto userDto) {
         if (username == null ||username.isBlank()) {
             throw new MandatoryParamException(List.of("username"));
@@ -175,9 +205,12 @@ public class UserController {
 
     @Operation(summary = "Request email confirmation OTP", description = "Sends an email containing the confirmation token required to activate the authenticated user's account.")
     @GetMapping("/new-email-confirmation")
-    public ResponseEntity<VoidResponse> requestEmailConfirmation() {
+    public ResponseEntity<VoidResponse> requestEmailConfirmation(HttpServletRequest request) {
         String username = getUsername();
         UserEntity user = userService.getUserEntityByUsername(username);
+        if (user.getEmail() != null) {
+            rateLimitService.enforceEmailSend(user.getEmail(), request.getRemoteAddr());
+        }
         userService.sendEmailConfirmationEmail(user);
         log.info("Email confirmation requested");
         return new ResponseEntity<>(new VoidResponse("Email confirmation sent"), HttpStatus.OK);
@@ -220,7 +253,8 @@ public class UserController {
     @PostMapping("/new-tg-unify-email-otp")
     public ResponseEntity<VoidResponse> requestTgUnifyEmailOtp(
             @RequestHeader(value = BH, required = false) String tgId,
-            @Valid @RequestBody EmailTelegramUnificationRequest request) {
+            @Valid @RequestBody EmailTelegramUnificationRequest request,
+            HttpServletRequest httpRequest) {
         String email = request.getEmail();
         String telegramId = null;
         UserEntity user;
@@ -249,6 +283,7 @@ public class UserController {
                 throw new EmailNotConfirmedException();
             }
         }
+        rateLimitService.enforceEmailSend(email, httpRequest.getRemoteAddr());
         userService.sendEmailTelegramUnification(user.getUsername(), email, telegramId);
         log.info("Telegram account unification OTP requested");
         return new ResponseEntity<>(new VoidResponse("Telegram unify email OTP sent"), HttpStatus.OK);

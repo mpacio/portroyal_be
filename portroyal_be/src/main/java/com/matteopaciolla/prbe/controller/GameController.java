@@ -13,12 +13,14 @@ import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.media.ExampleObject;
 import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
+import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.security.SecurityRequirements;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
+import jakarta.validation.constraints.Size;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Sort;
@@ -30,6 +32,10 @@ import static com.matteopaciolla.prbe.util.AuthenticationUtils.isBotUser;
 
 @Tag(name = "Game", description = "Game move execution and move history APIs.")
 @SecurityRequirements({@SecurityRequirement(name = "oauth2", scopes = {"game:play"})})
+@ApiResponses({
+        @ApiResponse(responseCode = "401", description = "Missing or invalid bearer token"),
+        @ApiResponse(responseCode = "403", description = "Insufficient scope or match ownership")
+})
 @Slf4j
 @RestController
 @RequestMapping(Paths.GAME_PATH)
@@ -51,6 +57,7 @@ public class GameController {
                     @ApiResponse(responseCode = "200", description = "Move executed successfully",
                             content = @Content(mediaType = "application/json", schema = @Schema(implementation = MoveResponse.class))),
                     @ApiResponse(responseCode = "400", description = "Move payload invalid or illegal for the current game state"),
+                    @ApiResponse(responseCode = "413", description = "Request body exceeds 2 MiB"),
                     @ApiResponse(responseCode = "401", description = "Authentication required")
             }
     )
@@ -73,9 +80,9 @@ public class GameController {
     @GetMapping("/move")
     public ResponseEntity<MoveResponse> getMove(
             @Parameter(name = "key_code", description = "Unique match key code", example = "ABC123", required = true)
-            @RequestParam("key_code") String keyCode,
+            @Size(max = 255) @RequestParam("key_code") String keyCode,
             @Parameter(name = "move_number", description = "Move number to retrieve", example = "12", required = true)
-            @RequestParam("move_number") int moveNumber) {
+            @Min(0) @RequestParam("move_number") int moveNumber) {
         return ResponseEntity.ok(gameService.getMove(keyCode, moveNumber));
     }
 
@@ -91,6 +98,7 @@ public class GameController {
     @GetMapping("/moves")
     public ResponseEntity<MovesPageResponse> getMoves(
           @Parameter(name = "key_code", description = "Unique match key code", example = "ABC123", required = true)
+          @Size(max = 255)
           @RequestParam("key_code") String keyCode,
           @Parameter(name = "page_number", description = "Zero-based page number; must be non-negative.", example = "0", required = false)
           @Min(0)

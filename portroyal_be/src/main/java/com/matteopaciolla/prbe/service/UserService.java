@@ -11,11 +11,14 @@ import com.matteopaciolla.prbe.exceptions.common.MandatoryParamException;
 import com.matteopaciolla.prbe.exceptions.common.ResourceNotFoundException;
 import com.matteopaciolla.prbe.exceptions.common.UniqueConstraintViolatedException;
 import com.matteopaciolla.prbe.exceptions.user.EmailAlreadyConfirmedException;
+import com.matteopaciolla.prbe.exceptions.user.InvalidTelegramUnificationTokenException;
 import com.matteopaciolla.prbe.exceptions.user.TelegramAccountAlreadyUnifiedException;
 import com.matteopaciolla.prbe.facade.EmailSenderFacade;
 import com.matteopaciolla.prbe.model.entity.UserEntity;
 import com.matteopaciolla.prbe.model.entity.OtpEntity;
 import com.matteopaciolla.prbe.repository.OtpRepository;
+import com.matteopaciolla.prbe.repository.MatchRepository;
+import com.matteopaciolla.prbe.repository.EmailRepository;
 import com.matteopaciolla.prbe.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -29,6 +32,8 @@ import java.util.*;
 import java.util.concurrent.ThreadLocalRandom;
 
 import static com.matteopaciolla.prbe.util.RandomUtils.*;
+import static com.matteopaciolla.prbe.util.PasswordResetToken.generate;
+import static com.matteopaciolla.prbe.util.PasswordResetToken.hash;
 
 @Slf4j
 @Service
@@ -42,8 +47,11 @@ public class UserService {
     private final OtpRepository otpRepository;
 
     private final EmailSenderFacade emailSenderFacade;
-
+    private final EmailRepository emailRepository;
     private final OAuth2AuthorizationRevocationService authorizationRevocationService;
+    private final MatchRepository matchRepository;
+    private final UserIdentityMergeService userIdentityMergeService;
+    private final SentinelService sentinelService;
 
     @Value("${be_app.baseurl}")
     private String APP_BASEURL;
@@ -152,13 +160,6 @@ public class UserService {
         return UserConverter.toDto(user);
     }
 
-    @Transactional
-    public void deleteUser(String username) {
-        UserEntity user = getUserEntityByUsername(username);
-        authorizationRevocationService.revokePrincipal(user.getUsername());
-        userRepository.delete(user);
-    }
-
     private UserEntity createUser(UserReqDto userReqDto, List<UserRole> roles) {
         UserEntity user = UserConverter.toEntity(userReqDto, roles);
         user.setEnabled(true);
@@ -252,6 +253,7 @@ public class UserService {
         UserEntity user = getUserEntityByUsername(username);
         if (passwordEncoder.matches(oldPassword, user.getPassword())) {
             user.setPassword(passwordEncoder.encode(newPassword));
+            user.setCredentialVersion(user.getCredentialVersion() + 1);
             userRepository.save(user);
             authorizationRevocationService.revokePrincipal(user.getUsername());
         } else {
@@ -260,7 +262,68 @@ public class UserService {
         }
     }
 
+    @Transactional
+    public void requestPasswordReset(String email) {
+        Optional<UserEntity> eligibleUser = userRepository.findByEmailAndEnabledAndEmailConfirmed(email, true, true)
+                .filter(user -> user.getDeletionRequestedAt() == null);
+        if (eligibleUser.isEmpty()) {
+            return;
+        }
+
+        UserEntity user = eligibleUser.get();
+        otpRepository.deleteAllByEmailAndFlowType(email, OtpEntity.FlowType.PASSWORD_RESET);
+        String resetToken = generate();
+        String storedToken = hash(resetToken);
+        LocalDateTime expiresAt = LocalDateTime.now().plusHours(1);
+        otpRepository.save(new OtpEntity(OtpEntity.FlowType.PASSWORD_RESET, email, storedToken, expiresAt));
+
+        String subject = "Password Reset";
+        String textBody = "Use this one-time password reset token to choose a new password: "
+                + resetToken + ". It expires in one hour. If you did not request this, ignore this email.";
+        String htmlBody = "<p>Use this one-time password reset token to choose a new password:</p><p><b>"
+                + resetToken + "</b></p><p>It expires in one hour. If you did not request this, ignore this email.</p>";
+        emailSenderFacade.sendEmail(email, user.getUsername(), subject, htmlBody, textBody);
+        log.info("Password reset email queued");
+    }
+
+    @Transactional
+    public void resetPassword(String resetToken, String newPassword) {
+        if (!PasswordPolicy.isValidNewPassword(newPassword)) {
+            throw new MandatoryParamException(
+                    "Password must contain at least 8 characters and must not exceed 72 UTF-8 bytes",
+                    List.of("newPassword"));
+        }
+        if (resetToken == null || resetToken.isBlank() || resetToken.length() > 128) {
+            throw new ResourceNotFoundException("The password reset could not be completed");
+        }
+
+        String storedToken = hash(resetToken);
+        OtpEntity reset = otpRepository.findFirstByTokenAndFlowTypeForUpdate(
+                        storedToken, OtpEntity.FlowType.PASSWORD_RESET)
+                .orElseThrow(() -> new ResourceNotFoundException("The password reset could not be completed"));
+        LocalDateTime now = LocalDateTime.now();
+        if (reset.getConfirmedAt() != null || reset.getExpiresAt() == null || !reset.getExpiresAt().isAfter(now)) {
+            throw new ResourceNotFoundException("The password reset could not be completed");
+        }
+
+        UserEntity user = userRepository.findByEmailAndEnabledAndEmailConfirmed(reset.getEmail(), true, true)
+                .orElseThrow(() -> new ResourceNotFoundException("The password reset could not be completed"));
+        reset.setConfirmedAt(now);
+        otpRepository.save(reset);
+        user.setPassword(passwordEncoder.encode(newPassword));
+        user.setCredentialVersion(user.getCredentialVersion() + 1);
+        userRepository.save(user);
+        authorizationRevocationService.revokePrincipal(user.getUsername());
+        log.info("Password reset completed");
+    }
+
     public void sendEmailConfirmationEmail(UserEntity user) {
+        if (user.getEmail() == null || user.getEmail().isBlank()) {
+            throw new MandatoryParamException("An email address is required for email confirmation");
+        }
+        if (user.getDeletionRequestedAt() != null) {
+            throw new MandatoryParamException("Email confirmation is unavailable while account deletion is pending");
+        }
         if (user.isEmailConfirmed()) {
             log.debug("Email confirmation is already complete");
             throw new EmailAlreadyConfirmedException();
@@ -274,21 +337,32 @@ public class UserService {
         otpRepository.deleteAllByEmailAndFlowType(email, OtpEntity.FlowType.EMAIL_CONFIRMATION);
         String token = java.util.UUID.randomUUID().toString();
         LocalDateTime expiresAt = LocalDateTime.now().plusHours(24);
-        OtpEntity emailAssent = new OtpEntity(OtpEntity.FlowType.EMAIL_CONFIRMATION, email, token, expiresAt);
+        OtpEntity emailAssent = new OtpEntity(
+                OtpEntity.FlowType.EMAIL_CONFIRMATION, email, hash(token), expiresAt);
         otpRepository.save(emailAssent);
         // send email
         String subject = "Email Confirmation";
-        String htmlBody = "<p>Click <a href=\"https://" + APP_BASEURL + Paths.PUBLIC_PATH + "/confirm-email?token=" + emailAssent.getToken() + "\">here</a> to confirm your email</p>" +
-                "<p>Or copy and paste the following code in the confirmation page: " + emailAssent.getToken() + "</p>";
-        String textBody = "Click the following link to confirm your email: https://" + APP_BASEURL + Paths.PUBLIC_PATH + "/confirm-email?token=" + emailAssent.getToken() +
-                " Or copy and paste the following code in the confirmation page: " + emailAssent.getToken();
+        String htmlBody = "<p>Click <a href=\"https://" + APP_BASEURL + Paths.PUBLIC_PATH + "/confirm-email?token=" + token + "\">here</a> to confirm your email</p>" +
+                "<p>Or copy and paste the following code in the confirmation page: " + token + "</p>";
+        String textBody = "Click the following link to confirm your email: https://" + APP_BASEURL + Paths.PUBLIC_PATH + "/confirm-email?token=" + token +
+                " Or copy and paste the following code in the confirmation page: " + token;
         log.info("Sending email confirmation");
         emailSenderFacade.sendEmail(email, user.getUsername(), subject, htmlBody, textBody);
     }
 
+    @Transactional
     public UserDto confirmEmail(String token) {
-        OtpEntity otpEntity = otpRepository.findFirstByTokenAndFlowTypeOrderByCreatedAtDesc(token, OtpEntity.FlowType.EMAIL_CONFIRMATION)
+        Optional<OtpEntity> tokenRecord = otpRepository.findFirstByTokenAndFlowTypeForUpdate(
+                hash(token), OtpEntity.FlowType.EMAIL_CONFIRMATION);
+        if (tokenRecord.isEmpty()) {
+            tokenRecord = otpRepository.findFirstByTokenAndFlowTypeForUpdate(
+                    token, OtpEntity.FlowType.EMAIL_CONFIRMATION);
+        }
+        OtpEntity otpEntity = tokenRecord
                 .orElseThrow(() -> new ResourceNotFoundException("Email confirmation could not be completed"));
+        if (otpEntity.getConfirmedAt() != null) {
+            throw new ResourceNotFoundException("Email confirmation could not be completed");
+        }
         checkOtpExpiration(otpEntity);
         otpEntity.setConfirmedAt(LocalDateTime.now());
         otpRepository.save(otpEntity);
@@ -309,7 +383,8 @@ public class UserService {
         otpRepository.deleteAllByEmailAndFlowType(email, OtpEntity.FlowType.TELEGRAM_UNIFICATION);
         String token = get4DigitRandomCode();
         LocalDateTime expiresAt = LocalDateTime.now().plusHours(24);
-        OtpEntity telegramAssent = new OtpEntity(OtpEntity.FlowType.TELEGRAM_UNIFICATION, email, telegramId, token, expiresAt);
+        OtpEntity telegramAssent = new OtpEntity(
+                OtpEntity.FlowType.TELEGRAM_UNIFICATION, email, telegramId, hash(token), expiresAt);
         otpRepository.save(telegramAssent);
         // send email
         String subject = "Telegram Account Unification";
@@ -319,26 +394,56 @@ public class UserService {
         emailSenderFacade.sendEmail(email, username, subject, htmlBody, textBody);
     }
 
-    @Transactional
+    @Transactional(noRollbackFor = InvalidTelegramUnificationTokenException.class)
     public UserDto unifyTelegramAndEmailAccounts(String email, String telegramId, String token) {
-        OtpEntity otpEntity = otpRepository.findFirstByEmailAndFlowTypeOrderByCreatedAtDesc(email, OtpEntity.FlowType.TELEGRAM_UNIFICATION)
+        OtpEntity otpEntity = otpRepository.findFirstByEmailAndFlowTypeForUpdate(email, OtpEntity.FlowType.TELEGRAM_UNIFICATION)
                 .orElseThrow(() -> new ResourceNotFoundException("Telegram account unification could not be completed"));
-        if (!otpEntity.getToken().equals(token)) {
-            throw new ResourceNotFoundException("Telegram account unification could not be completed");
+        if (otpEntity.getConfirmedAt() != null
+                || otpEntity.getFailedAttempts() != null
+                && otpEntity.getFailedAttempts() >= TELEGRAM_UNIFICATION_MAX_RETRIES) {
+            throw new InvalidTelegramUnificationTokenException();
+        }
+        if (!otpEntity.getToken().equals(hash(token)) && !otpEntity.getToken().equals(token)) {
+            int failedAttempts = otpEntity.getFailedAttempts() == null ? 1 : otpEntity.getFailedAttempts() + 1;
+            otpEntity.setFailedAttempts(failedAttempts);
+            otpRepository.save(otpEntity);
+            throw new InvalidTelegramUnificationTokenException();
         }
         checkOtpExpiration(otpEntity);
-        otpEntity.setConfirmedAt(LocalDateTime.now());
-        otpRepository.save(otpEntity);
-        userRepository.findByTelegramId(telegramId)
-                .filter(telegramUser -> telegramUser.getEmail() == null
-                        || !telegramUser.getEmail().equalsIgnoreCase(email))
-                .ifPresent(telegramUser -> authorizationRevocationService.revokePrincipal(telegramUser.getUsername()));
-        userRepository.deleteAllByTelegramId(telegramId);
-        UserEntity user = getUserEntityByEmail(email);
-        user.setTelegramId(telegramId);
-        userRepository.save(user);
+        UserEntity telegramUser = userRepository.findByTelegramId(telegramId)
+                .orElseThrow(() -> new ResourceNotFoundException("Telegram account unification could not be completed"));
+        UserEntity emailUser = getUserEntityByEmail(email);
+        if (!telegramUser.isEnabled()
+                || telegramUser.getEmail() != null
+                || !emailUser.isEnabled()
+                || !emailUser.isEmailConfirmed()
+                || emailUser.getTelegramId() != null && !emailUser.getTelegramId().equals(telegramId)) {
+            throw new MandatoryParamException("The accounts cannot be unified");
+        }
+        if (otpEntity.getTelegramId() != null && !otpEntity.getTelegramId().equals(telegramId)) {
+            int failedAttempts = otpEntity.getFailedAttempts() == null ? 1 : otpEntity.getFailedAttempts() + 1;
+            otpEntity.setFailedAttempts(failedAttempts);
+            otpRepository.save(otpEntity);
+            throw new InvalidTelegramUnificationTokenException();
+        }
+        if (matchRepository.hasOverlappingMatches(telegramUser.getId(), emailUser.getId())) {
+            throw new MandatoryParamException(
+                    "Accounts cannot be unified because both are associated with the same match");
+        }
+
+        authorizationRevocationService.revokePrincipal(telegramUser.getUsername());
+        authorizationRevocationService.revokePrincipalByUserId(telegramUser.getId().toString());
+        sentinelService.stopUserSubscriptions(telegramUser.getId());
+        userIdentityMergeService.transferHistory(
+                telegramUser.getId(), emailUser.getId(), telegramUser.getUsername(), emailUser.getUsername());
+        userRepository.delete(telegramUser);
+        emailRepository.deleteAllByRecipientName(telegramUser.getUsername());
+        otpRepository.deleteAllByEmailAndFlowType(email, OtpEntity.FlowType.TELEGRAM_UNIFICATION);
+        otpRepository.deleteAllByTelegramId(telegramId);
+        emailUser.setTelegramId(telegramId);
+        userRepository.save(emailUser);
         log.info("Telegram account unification completed");
-        return UserConverter.toDto(user);
+        return UserConverter.toDto(emailUser);
     }
 
     private static void checkOtpExpiration(OtpEntity otpEntity) {

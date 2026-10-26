@@ -1,6 +1,8 @@
 package com.matteopaciolla.prbe.dto.request;
 
 import io.swagger.v3.oas.annotations.media.Schema;
+import jakarta.validation.constraints.Positive;
+import jakarta.validation.constraints.Size;
 import lombok.Data;
 
 @Schema(name = "MatchConfigRequest", description = "Optional game configuration used when creating or hosting a match.")
@@ -8,9 +10,11 @@ import lombok.Data;
 public class MatchConfigReqDto {
 
     @Schema(description = "Configuration identifier to load from the available preset list.", example = "1")
+    @Positive(message = "Configuration ID must be positive")
     private Integer id;
 
     @Schema(description = "Human-readable configuration name.", example = "default")
+    @Size(max = 255, message = "Configuration name must not exceed 255 characters")
     private String name;
 
     @Schema(description = "Initial coin budget assigned to each player.", example = "6")

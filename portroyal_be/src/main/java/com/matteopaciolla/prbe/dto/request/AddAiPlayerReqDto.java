@@ -3,6 +3,7 @@ package com.matteopaciolla.prbe.dto.request;
 import com.matteopaciolla.portroyal.core.enums.BotDifficulty;
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Size;
 import lombok.Data;
 
 @Schema(name = "AddAiPlayerRequest", description = "Request payload used by the host to add an autonomous AI player to a not-yet-started match.")
@@ -14,5 +15,6 @@ public class AddAiPlayerReqDto {
     private BotDifficulty difficulty;
 
     @Schema(description = "Optional display name for the AI player. When omitted, a default name is generated.", example = "Rocco the Pirate")
+    @Size(max = 255, message = "AI display name must not exceed 255 characters")
     private String name;
 }

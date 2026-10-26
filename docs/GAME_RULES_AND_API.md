@@ -196,6 +196,8 @@ API paths below are relative to `BASE` (`/api/v1`).
 | Method and path                                           | Purpose                                                                                                        |
 |-----------------------------------------------------------|----------------------------------------------------------------------------------------------------------------|
 | `POST /public/register`                                   | Create a standard account; public.                                                                             |
+| `POST /public/password-reset`                             | Request password reset; always returns a generic response.                                                    |
+| `POST /public/password-reset/confirm`                     | Consume a single-use reset token and replace the password.                                                    |
 | `GET /user/new-email-confirmation`                            | Request email confirmation for the authenticated account.                                                      |
 | `POST /user/new-tg-unify-email-otp`                       | Request the email OTP as the human account, or as BOT with `bot:onboard` scope and `tgId`.                    |
 | `POST /user/register/telegram`                            | Create a Telegram-linked player; requires BOT `bot:onboard` scope and matching `tgId`.                         |
@@ -204,7 +206,7 @@ API paths below are relative to `BASE` (`/api/v1`).
 | `GET /user/retrieve?username=...`                         | Look up a user by username, Telegram ID, or email; use `telegram_id` when identifying by Telegram ID.          |
 | `PATCH /user/update?username=...`                         | Partially update the authenticated user's profile or, as an administrator, another user's profile.             |
 | `POST /user/change-psw`                                    | Change the authenticated user's password.                                                                      |
-| `DELETE /user/delete?username=...`                        | Legacy immediate deletion; admins may delete any account and users may delete their own.                       |
+| `DELETE /user/delete?username=...&confirm=true`           | Request deletion; admins may delete any account and users may delete their own.                                |
 
 The HTML email-confirmation page is served separately at `/public/confirm-email` from the server root.
 
@@ -244,13 +246,19 @@ the only supported confidential client and uses its custom delegation grant afte
 authentication. Generic server-to-server integrations, public Dynamic Client Registration, and
 the password grant are not supported.
 
-Password reset and account deletion have agreed target policies but are not yet implemented as
-end-user workflows. Password reset is planned for confirmed email accounts with a generic request
-response, one-hour single-use token, and revocation of existing tokens after success. Account
-deletion is planned to require the account's bearer token and explicit confirmation, defer while
-active matches exist, and remove identifiers within 30 days while retaining useful game history
-pseudonymized. The current `DELETE /user/delete` route performs immediate deletion and does not
-enforce those safeguards; do not use it as the public self-service deletion flow until updated.
+Password reset is implemented for confirmed email accounts: requests return a generic response,
+tokens are single-use and expire after one hour, and successful resets revoke existing
+authorizations. Actual email delivery depends on the configured email queue/worker. Account
+deletion requires the account's bearer token and `confirm=true`; it is deferred while active
+matches exist, then identifying fields and move-history names/notes are pseudonymized while the
+match relationships remain intact.
+
+Telegram/email unification is rejected if both accounts are associated with the same match, so a
+match never gains duplicate seats for one merged account. In that case the unification OTP is not
+consumed.
+
+JSON request bodies are limited to 2 MiB. Application rate-limit responses use HTTP 429 and
+`Retry-After`; NPM-side enforcement is still pending.
 
 After registering or linking the account, exchange the Telegram sender ID for a delegated human
 access token as described in [`OAUTH_CLIENT_OPERATIONS.md`](OAUTH_CLIENT_OPERATIONS.md). Use that
@@ -396,8 +404,11 @@ Choose a subscription transport to suit the client:
   the connection ends or reaches its timeout.
 - **Long polling** waits for one alert in the HTTP response, then completes. Issue another
   subscription after handling the alert; a timeout is returned as a `SUBSCRIPTION_TIMEOUT` alert.
-- **Callback** sends an HTTP POST to the registered URL for each alert. The callback subscription
-  is database-backed and works across API instances without sticky routing.
+- **Callback** sends an HTTPS POST to the registered URL for each alert. In production, the URL
+  must resolve only to publicly routable addresses; redirects are not followed and outbound
+  requests have bounded connect/read timeouts. HTTP and private/loopback targets are available only
+  in `dev` and `test`. The callback subscription is database-backed and works across API instances
+  without sticky routing.
 
 Long-polling and SSE subscriptions are held by the serving API instance, so deployments using
 multiple instances should use sticky routing for these connections. `DELETE` removes the

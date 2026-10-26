@@ -4,6 +4,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.matteopaciolla.prbe.dto.response.ErrorResponse;
 import com.matteopaciolla.prbe.exceptions.BaseInternalException;
+import com.matteopaciolla.prbe.exceptions.common.RateLimitExceededException;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.HttpRequestMethodNotSupportedException;
@@ -35,6 +36,16 @@ class GlobalExceptionHandlerTest {
         assertThat(response.getStatus()).isEqualTo(HttpStatus.INTERNAL_SERVER_ERROR.value());
         assertThat(response.getMessage()).contains("unexpected error").doesNotContain("database password");
         assertConsistentJsonShape(response);
+    }
+
+    @Test
+    void rateLimitErrorsIncludeRetryAfterHeaderAndConsistentBody() {
+        var response = handler.handleRateLimitExceededException(new RateLimitExceededException(45));
+
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.TOO_MANY_REQUESTS);
+        assertThat(response.getHeaders().getFirst("Retry-After")).isEqualTo("45");
+        assertThat(response.getBody()).isNotNull();
+        assertThat(response.getBody().getMessage()).contains("rate limit");
     }
 
     private void assertConsistentJsonShape(ErrorResponse response) throws Exception {

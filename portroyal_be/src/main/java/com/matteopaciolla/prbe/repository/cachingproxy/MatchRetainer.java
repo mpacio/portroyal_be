@@ -67,9 +67,13 @@ public class MatchRetainer {
         }
         String keyCode = matchEntity.getKeyCode();
         Match match = matchCache.get(keyCode);
-        // if match moves are not synchronized with the database, invalidate the cached match
-        if (matchEntity.getMoves().size() != match.getMovesCount()) {
-            log.warn("Match moves are not synchronized with the database, invalidating match with keyCode {}", keyCode);
+        List<String> persistedPlayerNames = matchEntity.getAllPlayerUsernames();
+        List<String> cachedPlayerNames = match.getPlayers().stream()
+                .map(player -> player.getName())
+                .toList();
+        if (matchEntity.getMoves().size() != match.getMovesCount()
+                || !persistedPlayerNames.equals(cachedPlayerNames)) {
+            log.warn("Match cache is not synchronized with persistent state, invalidating match with keyCode {}", keyCode);
             matchCache.invalidate(keyCode);
             return matchCache.get(keyCode);
         } else {

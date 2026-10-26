@@ -59,10 +59,10 @@ account data is to be removed within 30 days; historical match and move records 
 pseudonymized form for as long as they are useful to the service. Backup copies may persist for up
 to 30 days and must not be restored without reapplying deletions.
 
-This is a target policy, not the behavior currently enforced by the API. The existing deletion
-endpoint does not yet implement the confirmation, active-match deferral, or pseudonymization
-requirements. Do not present it as a compliant self-service deletion flow until the implementation
-is updated and verified.
+The API now requires explicit confirmation, defers requests while active matches exist, revokes
+authorizations, and pseudonymizes identifying account and move-history fields while retaining the
+match records. The cross-instance and restore behavior still needs LAN acceptance testing before
+this flow is described as production-ready.
 
 ## Support and security contact
 
@@ -72,17 +72,16 @@ publishing it.
 
 ## Initial usage and rate limits
 
-The following initial limits were selected for the proposed public policy. They are not yet
-enforced by the application or reverse proxy and must not be represented as active protections
-until Phase 4 implementation and deployment verification are complete. Rate-limit responses are
-intended to use HTTP 429 and `Retry-After`. Email-related responses must not reveal whether an
-account exists.
+The following initial limits were selected for the proposed public policy. Application-level
+limits use PostgreSQL-backed shared fixed-window buckets; reverse-proxy limits still require NPM
+configuration and LAN verification. Rate-limit responses use HTTP 429 and `Retry-After`.
+Email-related responses must not reveal whether an account exists.
 
 | Operation | Limit | Window and scope | Response |
 |---|---|---|---|
 | Registration | 5 requests | Per source IP, per hour | HTTP 429 with `Retry-After` |
 | Login and token issuance | 10 requests | Per source IP, per minute | HTTP 429 with `Retry-After` |
-| Token refresh | 10 requests | Per OAuth client and source IP, per minute | HTTP 429 with `Retry-After` |
+| Token refresh | 10 requests | Per OAuth client and source IP, per minute (also subject to token-issuance IP limit) | HTTP 429 with `Retry-After` |
 | Email confirmation, OTP, and password-reset sends | 3 sends | Per email address and source IP, per hour | HTTP 429 with `Retry-After`; generic response |
 | Numeric OTP verification | 3 failed attempts | Per token; invalidate after the third failure | Generic invalid/expired response |
 | Match creation | 10 requests | Per account, per minute | HTTP 429 with `Retry-After` |
@@ -94,11 +93,11 @@ account exists.
 Web/app passwords must contain at least 8 Unicode code points and at most 72 UTF-8 bytes; no
 particular mix of character classes is required.
 
-The intended password-reset flow is available only for web/app accounts with a confirmed email.
-The public request returns a generic response regardless of whether the address belongs to an
-account. For an eligible account, the service sends a single-use reset token that expires after
-one hour. A successful reset revokes the user's existing sessions and tokens. This flow is not
-implemented yet and must be described as planned until it is available and tested.
+The password-reset API is implemented for web/app accounts with a confirmed email. The public
+request returns a generic response regardless of whether the address belongs to an account. For an
+eligible account, a single-use reset token is queued to the confirmed email and expires after one
+hour. A successful reset revokes the user's existing sessions and tokens. Actual email delivery
+still depends on the email provider and queue worker being configured and tested.
 
 ## Approval and publication checklist
 
@@ -106,6 +105,8 @@ implemented yet and must be described as planned until it is available and teste
 - Select the outgoing email provider and confirm its processing region and contractual terms.
 - Verify that support@matteopaciolla.com is monitored for support and security reports.
 - Verify retention, backup expiry, and deletion reapplication operationally.
-- Implement the account recovery, deletion, and rate-limit controls before describing them as
-  available.
+- Complete NPM enforcement and LAN verification before describing the full rate-limit policy as
+  active.
+- Verify password-reset email delivery with the selected provider before enabling the flow in
+  production.
 - Approve the final notice and policy text before publication or production go-live.

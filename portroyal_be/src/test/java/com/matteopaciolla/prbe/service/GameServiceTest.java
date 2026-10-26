@@ -7,6 +7,7 @@ import com.matteopaciolla.portroyal.core.enums.BotDifficulty;
 import com.matteopaciolla.portroyal.core.enums.MoveAction;
 import com.matteopaciolla.prbe.constants.enums.SentinelAlertMessage;
 import com.matteopaciolla.prbe.constants.enums.UserRole;
+import com.matteopaciolla.prbe.exceptions.common.ResourceNotFoundException;
 import com.matteopaciolla.prbe.model.entity.AIPlayerEntity;
 import com.matteopaciolla.prbe.model.entity.MatchEntity;
 import com.matteopaciolla.prbe.model.entity.UserEntity;
@@ -24,6 +25,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.mock;
@@ -132,5 +134,17 @@ class GameServiceTest {
         gameService.autoPlayAiTurns(match, matchEntity);
 
         verify(moveRepository, times(500)).save(any());
+    }
+
+    @Test
+    void insertMoveRejectsUserNotAssociatedWithTheMatch() {
+        matchEntity.setPlayers(List.of(human));
+        UserEntity differentUser = new UserEntity("bob42", "encoded", List.of(UserRole.USER));
+
+        assertThatThrownBy(() -> gameService.insertMove(null, matchEntity, differentUser))
+                .isInstanceOf(ResourceNotFoundException.class);
+
+        verify(matchRetainer, never()).getMatch(any());
+        verify(moveRepository, never()).save(any());
     }
 }

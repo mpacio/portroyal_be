@@ -10,10 +10,11 @@ import com.matteopaciolla.prbe.model.entity.CallbackEntity;
 import com.matteopaciolla.prbe.model.entity.UserEntity;
 import com.matteopaciolla.prbe.repository.CallbackRepository;
 import com.matteopaciolla.prbe.repository.MatchRepository;
+import com.matteopaciolla.prbe.security.CallbackUrlValidator;
+import io.micrometer.core.instrument.MeterRegistry;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
-import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.ResourceAccessException;
 import org.springframework.web.client.RestClientException;
@@ -27,7 +28,7 @@ import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.time.format.DateTimeFormatter;
 import java.util.*;
-import java.util.concurrent.*;
+import java.util.concurrent.ConcurrentHashMap;
 
 @Slf4j
 @RequiredArgsConstructor
@@ -36,8 +37,9 @@ public class SentinelService {
 
     private final CallbackRepository callbackRepository;
     private final MatchRepository matchRepository;
-    private final ExecutorService executorService = Executors.newCachedThreadPool();
     private final RestTemplate restTemplate;
+    private final MeterRegistry meterRegistry;
+    private final CallbackUrlValidator callbackUrlValidator;
 
     private final Map<String, Set<SentinelSubscription>> matchSubsMap = new ConcurrentHashMap<>();
 
@@ -55,6 +57,7 @@ public class SentinelService {
     }
 
     public String addCallbackSentinel(Long userId, String keyCode, String url, String secret) {
+        callbackUrlValidator.validate(url);
         log.info("Requested callback sentinel");
         checkMatchExists(keyCode);
         Set<SentinelSubscription> subs = matchSubsMap.get(keyCode);
@@ -85,7 +88,9 @@ public class SentinelService {
     public DeferredResult<AlertDto> addLongPollingSentinel(UserEntity user, String keyCode, int secondsTimeout) {
         log.info("Adding long polling sentinel");
         checkMatchExists(keyCode);
-        DeferredResult<AlertDto> result = new DeferredResult<>();
+        DeferredResult<AlertDto> result = new DeferredResult<>(
+                secondsTimeout * 1000L,
+                new AlertDto(SentinelAlertMessage.SUBSCRIPTION_TIMEOUT, keyCode));
         Set<SentinelSubscription> clients = matchSubsMap.getOrDefault(keyCode, ConcurrentHashMap.newKeySet());
         SentinelSubscription subscription = new SentinelSubscription(user, keyCode, null, result);
         Optional<SentinelSubscription> existingSub = clients.stream()
@@ -99,21 +104,22 @@ public class SentinelService {
         clients.add(subscription);
         matchSubsMap.put(keyCode, clients);
 
-        executorService.execute(() -> {
-            try {
-                Thread.sleep(secondsTimeout * 1000L);
-                if (!result.hasResult()) {
-                    AlertDto alert = new AlertDto(SentinelAlertMessage.SUBSCRIPTION_TIMEOUT, keyCode);
-                    result.setResult(alert);
-                    subscription.stop();
-                    boolean found = clients.remove(subscription);
-                    log.debug("DeferredResult completed, removing subscription");
-                    logRemoving(found, clients.size());
-                    Thread.currentThread().interrupt();
-                }
-            } catch (InterruptedException e) {
-                log.warn("Long polling thread interrupted, stopping it");
-                Thread.currentThread().interrupt();
+        result.onTimeout(() -> {
+            boolean found = clients.remove(subscription);
+            log.debug("DeferredResult timed out, removing subscription");
+            logRemoving(found, clients.size());
+            if (clients.isEmpty()) {
+                matchSubsMap.remove(keyCode, clients);
+            }
+        });
+        result.onCompletion(() -> {
+            boolean found = clients.remove(subscription);
+            if (found) {
+                log.debug("DeferredResult completed, removing subscription");
+                logRemoving(true, clients.size());
+            }
+            if (clients.isEmpty()) {
+                matchSubsMap.remove(keyCode, clients);
             }
         });
         removeCallbackSubscription(user.getId(), keyCode);
@@ -218,26 +224,40 @@ public class SentinelService {
         }
     }
 
-    @Async
     private void sendCallbackUpdate(Set<CallbackRepository.UrlSecret> urlSecrets, String keyCode, String username, SentinelAlertMessage message) {
         urlSecrets.forEach(urlSecret -> {
             String url = urlSecret.getUrl();
             String secret = urlSecret.getSecret();
             try {
+                callbackUrlValidator.validate(url);
                 AlertDto alert = new AlertDto(message, keyCode);
                 AlertCallbackWrapperDto request = new AlertCallbackWrapperDto(username, alert, secret);
-                ResponseEntity<Object> response = restTemplate.postForEntity(url, request, Object.class);
-                log.debug("Callback notification completed with status {}", response.getStatusCode());
+                ResponseEntity<Void> response = restTemplate.postForEntity(url, request, Void.class);
+                if (response.getStatusCode().is2xxSuccessful()) {
+                    log.debug("Callback notification completed with status {}", response.getStatusCode());
+                    meterRegistry.counter("portroyal_callback_deliveries", "result", "success").increment();
+                } else {
+                    log.warn("Callback notification returned non-success status {}", response.getStatusCode());
+                    recordCallbackFailure();
+                }
             } catch (ResourceNotFoundException e) {
                 log.warn("Callback notification failed with ResourceNotFoundException");
+                recordCallbackFailure();
             } catch (ResourceAccessException e) {
                 log.warn("Callback notification failed with ResourceAccessException");
+                recordCallbackFailure();
             } catch (RestClientException e) {
                 log.warn("Callback notification failed with RestClientException");
+                recordCallbackFailure();
             } catch (Exception e) {
                 log.warn("Callback notification failed");
+                recordCallbackFailure();
             }
         });
+    }
+
+    private void recordCallbackFailure() {
+        meterRegistry.counter("portroyal_callback_deliveries", "result", "failure").increment();
     }
 
     public void removeSentinelSubscription(Long userId, String keyCode) {
@@ -256,6 +276,26 @@ public class SentinelService {
                 }
             }
         }
+    }
+
+    public void removeUserSubscriptions(Long userId) {
+        callbackRepository.deleteAllByUserId(userId);
+        stopUserSubscriptions(userId);
+    }
+
+    public void stopUserSubscriptions(Long userId) {
+        matchSubsMap.forEach((keyCode, subscriptions) -> {
+            subscriptions.removeIf(subscription -> {
+                if (subscription.getUser().getId().equals(userId)) {
+                    subscription.stop();
+                    return true;
+                }
+                return false;
+            });
+            if (subscriptions.isEmpty()) {
+                matchSubsMap.remove(keyCode, subscriptions);
+            }
+        });
     }
 
     private void sendSSEEvents(Long userId, String keyCode, SseEmitter sseEmitter, SentinelAlertMessage message) throws IOException {

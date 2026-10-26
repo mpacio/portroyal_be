@@ -6,6 +6,7 @@ import com.matteopaciolla.prbe.model.entity.UserEntity;
 import com.matteopaciolla.prbe.repository.UserRepository;
 import com.matteopaciolla.prbe.security.TelegramDelegationGrantAuthenticationConverter;
 import com.matteopaciolla.prbe.security.TelegramDelegationGrantAuthenticationProvider;
+import com.matteopaciolla.prbe.security.CredentialVersionFilter;
 import com.matteopaciolla.prbe.security.TelegramDelegationGrantAuthenticationToken;
 import com.matteopaciolla.prbe.security.TelegramIdentityBoundaryFilter;
 import com.matteopaciolla.prbe.service.OAuth2AuthorizationRevocationService;
@@ -73,6 +74,7 @@ import org.springframework.security.web.authentication.AuthenticationSuccessHand
 import org.springframework.security.web.authentication.LoginUrlAuthenticationEntryPoint;
 import org.springframework.security.web.authentication.logout.LogoutHandler;
 import org.springframework.security.web.authentication.logout.SecurityContextLogoutHandler;
+import org.springframework.security.web.context.SecurityContextHolderFilter;
 import org.springframework.security.web.util.matcher.MediaTypeRequestMatcher;
 import org.springframework.security.web.util.matcher.RequestMatcher;
 import org.springframework.security.web.util.matcher.AntPathRequestMatcher;
@@ -166,6 +168,7 @@ public class OAuth2SecurityConfiguration {
                         new LoginUrlAuthenticationEntryPoint("/login"),
                         new MediaTypeRequestMatcher(MediaType.TEXT_HTML)))
                 .apply(authorizationServerConfigurer);
+        http.addFilterAfter(new CredentialVersionFilter(userRepository), SecurityContextHolderFilter.class);
         return http.build();
     }
 
@@ -208,7 +211,8 @@ public class OAuth2SecurityConfiguration {
     @Order(3)
     SecurityFilterChain webSecurityFilterChain(
             HttpSecurity http,
-            OAuth2AuthorizationRevocationService revocationService) throws Exception {
+            OAuth2AuthorizationRevocationService revocationService,
+            UserRepository userRepository) throws Exception {
         LogoutHandler revokeAuthorizations = (request, response, authentication) -> {
             if (authentication != null && authentication.getName() != null) {
                 revocationService.revokePrincipal(authentication.getName());
@@ -232,6 +236,7 @@ public class OAuth2SecurityConfiguration {
                         .logoutSuccessUrl("/login?logout=true")
                         .invalidateHttpSession(true)
                         .permitAll());
+        http.addFilterAfter(new CredentialVersionFilter(userRepository), SecurityContextHolderFilter.class);
         return http.build();
     }
 

@@ -21,6 +21,7 @@ class WebSecurityConfigCorsTest {
                 .containsExactly("https://client.example.com", "https://mobile.example.com");
         assertThat(configuration.getAllowedHeaders())
                 .containsExactly("Authorization", "Content-Type", "Accept", "tgId");
+        assertThat(configuration.getExposedHeaders()).containsExactly("X-Request-ID", "Retry-After");
         assertThat(configuration.getAllowCredentials()).isFalse();
     }
 

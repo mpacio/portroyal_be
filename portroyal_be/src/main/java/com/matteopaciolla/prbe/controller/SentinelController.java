@@ -8,12 +8,16 @@ import com.matteopaciolla.prbe.model.entity.UserEntity;
 import com.matteopaciolla.prbe.service.SentinelService;
 import com.matteopaciolla.prbe.service.UserService;
 import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
+import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.security.SecurityRequirements;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.Min;
+import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.Size;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.MediaType;
@@ -26,6 +30,11 @@ import static com.matteopaciolla.prbe.util.AuthenticationUtils.getUsername;
 
 @Tag(name = "Sentinel", description = "Notification subscription APIs")
 @SecurityRequirements({@SecurityRequirement(name = "oauth2", scopes = {"game:play"})})
+@ApiResponses({
+        @ApiResponse(responseCode = "401", description = "Missing or invalid bearer token"),
+        @ApiResponse(responseCode = "403", description = "Insufficient scope or subscription ownership"),
+        @ApiResponse(responseCode = "429", description = "Subscription/read rate limit exceeded; see Retry-After")
+})
 @Slf4j
 @RestController
 @RequestMapping(Paths.SENTINEL_PATH)
@@ -49,7 +58,7 @@ The alerts refer to any match, that's why the matchKeyCode is required.""")
             @io.swagger.v3.oas.annotations.parameters.RequestBody(description = "Callback request body", required = true,
                     content = @io.swagger.v3.oas.annotations.media.Content(
                             schema = @io.swagger.v3.oas.annotations.media.Schema(implementation = CallbackSentinelRequest.class),
-                            examples = @io.swagger.v3.oas.annotations.media.ExampleObject(value = "{\"matchKeyCode\":\"xxxxxx\",\"url\":\"http://localhost:8080/callback\"}")))
+                            examples = @io.swagger.v3.oas.annotations.media.ExampleObject(value = "{\"matchKeyCode\":\"xxxxxx\",\"url\":\"https://callback.example.com/alerts\"}")))
             @Valid @RequestBody CallbackSentinelRequest request) {
         String username = getUsername();
         UserEntity user = userService.getUserEntityByUsername(username);
@@ -64,8 +73,12 @@ The alerts refer to any match, that's why the matchKeyCode is required.
 The alert will be sent only if the alert is available before the timeout.""")
     @GetMapping(path = "/long-polling/subscribe", produces = MediaType.APPLICATION_JSON_VALUE)
     public DeferredResult<AlertDto> addLongPollingSentinel(
-            @Valid @NotBlank(message = "key_code must not be blank") @RequestParam("key_code") String keyCode,
-            @Valid @Min(value = 10, message = "seconds must be greater or equal to 10") @RequestParam(defaultValue = "120") int seconds) {
+            @Valid @NotBlank(message = "key_code must not be blank")
+            @Size(max = 255, message = "key_code must not exceed 255 characters")
+            @RequestParam("key_code") String keyCode,
+            @Valid @Min(value = 10, message = "seconds must be greater or equal to 10")
+            @Max(value = 120, message = "seconds must not exceed 120")
+            @RequestParam(defaultValue = "120") int seconds) {
         String username = getUsername();
         UserEntity user = userService.getUserEntityByUsername(username);
         return sentinelService.addLongPollingSentinel(user, keyCode, seconds);
@@ -83,8 +96,12 @@ The alert will be sent only if the alert is available before the timeout.""",
                     schema = @io.swagger.v3.oas.annotations.media.Schema(implementation = AlertDto.class))),})
     @GetMapping(path = "/sse/subscribe", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
     public SseEmitter addSSESentinel(
-            @Valid @NotBlank(message = "key_code must not be blank") @RequestParam(value = "key_code") String keyCode,
-            @Valid @Min(value = 1, message = "seconds must be greater or equal to 1") @RequestParam(value = "seconds", defaultValue = "3600") int seconds) {
+            @Valid @NotBlank(message = "key_code must not be blank")
+            @Size(max = 255, message = "key_code must not exceed 255 characters")
+            @RequestParam(value = "key_code") String keyCode,
+            @Valid @Min(value = 1, message = "seconds must be greater or equal to 1")
+            @Max(value = 3600, message = "seconds must not exceed 3600")
+            @RequestParam(value = "seconds", defaultValue = "3600") int seconds) {
         String username = getUsername();
         UserEntity user = userService.getUserEntityByUsername(username);
         return sentinelService.addSSESentinel(user, keyCode, seconds * 1000L);
@@ -96,7 +113,9 @@ The subscription will be removed from the user's subscriptions.
 The subscription will not be available anymore.""")
     @DeleteMapping(path = "/subscription", produces = MediaType.APPLICATION_JSON_VALUE)
     public ResponseEntity<VoidResponse> removeSentinelSubscription(
-            @Valid @NotBlank(message = "key_code must not be blank") @RequestParam(value = "key_code") String keyCode) {
+            @Valid @NotBlank(message = "key_code must not be blank")
+            @Size(max = 255, message = "key_code must not exceed 255 characters")
+            @RequestParam(value = "key_code") String keyCode) {
         String username = getUsername();
         UserEntity user = userService.getUserEntityByUsername(username);
         sentinelService.removeSentinelSubscription(user.getId(), keyCode);

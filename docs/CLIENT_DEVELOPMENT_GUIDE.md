@@ -33,6 +33,13 @@ status codes and generally return an object with `status`, `error`, and `message
 | `/card/**`     | Human bearer token with `game:play` | Read the card and contract catalogs |
 | `/sentinel/**` | Human bearer token with `game:play` | Subscribe to match notifications |
 
+### API versioning and deprecation
+
+The `/api/v1` path identifies a major API version. Backward-compatible additions may ship within
+that version; incompatible request, response, or authorization changes require a new major path.
+Before removing a deprecated endpoint or behavior, the operator will announce the sunset date and
+provide at least six months' notice.
+
 ## 2. Choose an identity model
 
 ### Normal web or app client
@@ -66,6 +73,11 @@ unrestricted dynamic client registration.
 
 The match and move-history listing endpoints accept `page_number` values from zero upward and
 `page_size` values from 1 to 100.
+
+JSON request bodies are limited to 2 MiB. Application-level rate limits use HTTP 429 with a
+`Retry-After` header; the selected thresholds are listed in the policy draft. NPM-side enforcement
+and the LAN acceptance test are still pending. A generated `X-Request-ID` response header can be
+used to correlate support reports with server logs.
 
 ```sh
 curl -H "Authorization: Bearer $ACCESS_TOKEN" \
@@ -251,23 +263,42 @@ Content-Type: application/json
 The Telegram-only account must already be registered and not already linked. OTPs expire after
 24 hours; requesting another OTP for the same email replaces the previous one. The bot must keep
 its credentials server-side and must set `tgId` to the Telegram user represented by each request.
+Unification is rejected if both accounts already participate in the same match; the OTP remains
+usable until its normal expiry or replacement.
 
 ### Account recovery and deletion policies
 
-The planned password-reset flow is for accounts with a confirmed email. A reset request returns a
-generic response; an eligible account receives a single-use token valid for one hour, and a
-successful reset revokes existing sessions and tokens. Password reset is not implemented yet.
+Password reset is available for accounts with a confirmed email. Send a generic request to
+`POST /public/password-reset`; the response does not reveal whether an account exists. An eligible
+account receives a single-use token valid for one hour. Confirm it with
+`POST /public/password-reset/confirm` and the new password. Successful reset revokes the account's
+existing authorizations. Existing browser login sessions are rejected at the next authorization or
+consent request and require a fresh sign-in. The reset email is queued through the configured email
+delivery path.
 
-The target account-deletion policy requires the authenticated account's bearer token and explicit
-confirmation, but no email OTP. A request is deferred while the account has active matches. After
-those matches finish, identifying data is to be removed within 30 days while useful game history
-may remain pseudonymized. The existing `DELETE /user/delete` route deletes immediately and does
-not implement this policy; public clients must not use it as the self-service deletion flow until
-the route is updated.
+```json
+{
+  "email": "alice@example.com"
+}
+```
 
-Initial rate-limit thresholds are recorded in a non-publishable policy draft and are not yet
-enforced. Do not rely on HTTP 429 responses for those thresholds until Phase 4 implementation and
-deployment verification are complete.
+```json
+{
+  "token": "TOKEN_FROM_EMAIL",
+  "newPassword": "at-least-eight-characters"
+}
+```
+
+Account deletion requires the authenticated account's bearer token and explicit `confirm=true`;
+no email OTP is required. A request returns `202 Accepted` while the account has active matches.
+After those matches finish, identifying data is pseudonymized and access is revoked; useful game
+history is retained under a random pseudonym. Admins can also request deletion for another account.
+
+Initial rate-limit thresholds are recorded in a non-publishable policy draft. Application-level
+limits are enforced; NPM-side enforcement and deployment verification are still pending.
+
+Production callback subscriptions require HTTPS URLs whose DNS addresses are publicly routable.
+HTTP and private/loopback targets are available only in `dev` and `test`.
 
 ## 3. Typical match lifecycle
 
@@ -364,6 +395,9 @@ serving API instance; deployments with multiple instances need sticky routing fo
 connections. The callback subscription is database-backed and is the preferred option when
 notifications must work across instances.
 
+Production callback URLs must use HTTPS and resolve to publicly routable addresses. Localhost and
+private targets are permitted only in `dev` and `test`; redirects are not followed.
+
 Callback request body:
 
 ```json
@@ -403,6 +437,8 @@ is served at `/public/confirm-email` from the server root.
 | Method            | Path                                         | Notes                                                                                                        |
 |-------------------|----------------------------------------------|--------------------------------------------------------------------------------------------------------------|
 | `POST`            | `/public/register`                           | Register a standard username/password account; public                                                        |
+| `POST`            | `/public/password-reset`                     | Request a password reset; response does not reveal whether the email is registered                           |
+| `POST`            | `/public/password-reset/confirm`              | Consume a one-hour reset token and revoke existing authorizations                                             |
 | `GET`             | `/user/new-email-confirmation`               | Request an email confirmation for the authenticated account                                                   |
 | `GET`             | `SERVER_ROOT/public/confirm-email?token=...` | Confirm an email token; public browser flow                                                                  |
 | `POST`            | `/user/new-tg-unify-email-otp`               | Request an unification OTP as the human account, or as BOT with `bot:onboard` scope and `tgId`               |
@@ -412,7 +448,7 @@ is served at `/public/confirm-email` from the server root.
 | `POST`            | `/user/unify`                                | Complete unification; requires BOT `bot:onboard` scope and `tgId`                                           |
 | `PATCH`           | `/user/update?username=...`                   | Update the authenticated account or an account as an administrator                                           |
 | `POST`            | `/user/change-psw`                           | Change the authenticated account's password; current password required                                       |
-| `DELETE`          | `/user/delete?username=...`                  | Legacy immediate deletion route; does not implement the target self-service deletion policy                  |
+| `DELETE`          | `/user/delete?username=...&confirm=true`     | Request deletion; returns 202 while active matches remain, then pseudonymizes account identity               |
 | `POST`            | `/match/host`                                | Host a match                                                                                                 |
 | `POST`            | `/match/join?key_code=...`                   | Join a match before it starts                                                                                |
 | `POST`            | `/match/start`                               | Start the hosted match                                                                                       |

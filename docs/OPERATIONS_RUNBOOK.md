@@ -1,7 +1,7 @@
 # Operations runbook draft
 
-**Status: operational draft. Assign owners, alert thresholds, restore retention, and delivery
-channels before production go-live.**
+**Status: operational draft. Assign owners, alert thresholds, and alert-delivery channels before
+production go-live.**
 
 ## Health and metrics
 
@@ -10,6 +10,40 @@ channels before production go-live.**
 - `/actuator/prometheus` is protected by the `ADMIN` authority. Scraping credentials must be
   provisioned and stored outside the repository.
 - Do not publish actuator ports directly; reach the API through the configured reverse proxy.
+- Initial Prometheus alert expressions and thresholds are in
+  [`deploy/monitoring/prometheus-alerts.yml`](../deploy/monitoring/prometheus-alerts.yml). Review
+  them against LAN traffic before enabling paging; Alertmanager routing and delivery contacts are
+  not configured in this repository.
+- Every response includes a server-generated `X-Request-ID`; use it to correlate entries in the
+  application logs. Client-supplied request IDs are not trusted.
+
+## Request limits and NPM
+
+- The application enforces shared fixed-window limits from PostgreSQL. `429` responses include
+  `Retry-After`. The API body limit is 2 MiB; form bodies are also limited by the embedded Tomcat
+  connector.
+- Application bucket keys store hashes of operation/scope values, not raw IP addresses, email
+  addresses, or account identifiers. PostgreSQL server time defines the fixed-window boundaries.
+- NPM must apply source-IP rate limits to registration, login/authorization, and token endpoints.
+  Define `limit_req_zone` in the Nginx `http` context and apply `limit_req` to the corresponding
+  proxied routes with `limit_req_status 429`; provision the zones in NPM's HTTP-level custom
+  configuration, not inside a proxy-host `location` block. Cover registration (5/hour), login and
+  token issuance (10/minute), and email sends (3/hour per source IP as a coarse outer limit).
+- The application remains authoritative for per-account match/read limits and per-email limits;
+  NPM should provide an additional coarse IP shield. Preserve `Retry-After` and avoid caching
+  `429` responses.
+- Configure proxy read/send timeouts above the 120-second long-poll limit and 3600-second SSE
+  limit, and ensure NPM overwrites forwarded client/protocol headers rather than appending
+  untrusted values. Validate the actual NPM configuration in the LAN environment before production.
+- Callback delivery validates production callback hosts against private/loopback ranges, refuses
+  redirects, and has 5-second connect / 10-second read timeouts. Maintain an outbound network
+  policy that also blocks private and link-local destinations; application DNS checks alone do not
+  replace egress firewall controls.
+
+Selected values (per source IP unless stated otherwise): registration 5/hour; login and token
+issuance 10/minute; refresh 10 per OAuth client and IP/minute; email sends 3 per email and IP/hour;
+numeric OTPs 3 failed attempts per token; match creation and join 10 per account/minute each;
+resource-intensive reads 60 per account/minute.
 
 ## Database outage or migration failure
 
@@ -23,12 +57,17 @@ channels before production go-live.**
 
 ## Email queue backlog
 
-1. Check queue depth and the `EMAIL_SENDING_ENABLED`/provider configuration without printing
-   recipient addresses or message bodies.
-2. Confirm the email provider is reachable and that its credentials remain valid.
-3. After recovery, monitor queue progress and failed deliveries; do not delete queued messages
+The API stores outbound messages in the PostgreSQL `emails_queue`. No email delivery consumer or
+provider implementation is included in this repository, so queueing a message does not prove it was
+delivered.
+
+1. Check queue depth through `portroyal_email_queue_pending` without printing recipient addresses
+   or message bodies.
+2. Confirm the externally managed consumer and selected provider are reachable without exposing
+   credentials.
+3. After recovery, monitor queue progress and delivery failures; do not delete queued messages
    unless the service owner approves the data-loss impact.
-4. Alert threshold and escalation owner: **TBD**.
+4. Alert threshold and escalation owner: **proposed in the Prometheus rule file; delivery owner TBD**.
 
 ## OAuth key or client-secret compromise
 
@@ -44,6 +83,30 @@ channels before production go-live.**
 
 ## Backup and restore
 
-Backups must include PostgreSQL and be restorable to a separate database before any production
-promotion. Define backup frequency, encrypted storage, retention, restore ownership, and tested
-recovery objective: **TBD**. Do not use a live production database as a restore target.
+Backups are manual only, have a selected maximum retention of 30 days, and must include PostgreSQL.
+Create and verify a backup before migrations, maintenance, or other risky operations. Store backups
+encrypted, keep credentials outside command arguments and repository files, and reapply account
+deletions after a restore. A durable deletion ledger outside the backup set must be maintained for
+this reapplication; it is not automated yet. Manual backups provide no fixed recovery-point
+objective; storage location and restore ownership still need operational confirmation.
+Docker/pg_dump restore acceptance remains unverified in this environment. Never use a live
+production database as a restore target.
+
+The repository scripts use `PGPASSFILE` instead of placing database credentials in command
+arguments:
+
+```powershell
+.\scripts\backup-postgres.ps1 `
+  -BackupDirectory "E:\encrypted\portroyal-backups" `
+  -EncryptedTargetConfirmed
+
+.\scripts\restore-postgres.ps1 `
+  -BackupFile "E:\encrypted\portroyal-backups\portroyal-prdb-20261026-020000.dump" `
+  -TargetDatabase "prdb_restore_test" `
+  -ConfirmSeparateEmptyDatabase
+```
+
+Set `PGHOST`, `PGDATABASE`, `PGUSER`, and `PGPASSFILE` in the protected environment. The restore
+script refuses to use `PGDATABASE` as its target and does not drop existing objects; the operator
+must create a separate empty database. Reapply the durable account-deletion ledger before exposing
+the restored service.

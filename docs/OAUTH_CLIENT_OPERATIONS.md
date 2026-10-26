@@ -138,7 +138,8 @@ Access tokens are signed JWTs with a five-minute lifetime, the configured issuer
 `portroyal-api` audience. The API checks the signature, issuer, audience, expiry, and persisted
 authorization on every request; deleting the authorization row revokes a token immediately.
 Refresh tokens rotate on use and expire after 30 days. Password changes, account deletion, and
-browser-session logout revoke the user's persisted authorizations.
+browser-session logout revoke the user's persisted authorizations. Password changes and resets also
+invalidate existing browser login sessions at their next authorization or consent request.
 
 OAuth clients should also revoke tokens they no longer need through the Authorization Server's
 revocation endpoint before discarding their local token state. Public clients must use PKCE with

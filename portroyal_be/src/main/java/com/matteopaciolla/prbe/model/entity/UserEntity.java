@@ -58,6 +58,11 @@ public class UserEntity {
 
     private LocalDateTime lastLogin;
 
+    private LocalDateTime deletionRequestedAt;
+
+    @Column(nullable = false)
+    private long credentialVersion;
+
     @ManyToMany(fetch = FetchType.EAGER, cascade = {}, targetEntity = MatchEntity.class)
     @JoinTable(name = "match_user",
             joinColumns = @JoinColumn(name = "user_id", referencedColumnName = "id"),

@@ -3,7 +3,9 @@ package com.matteopaciolla.prbe.repository;
 import com.matteopaciolla.prbe.model.entity.CallbackEntity;
 import com.matteopaciolla.prbe.model.entity.CallbackEntityId;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 import java.util.Optional;
@@ -13,6 +15,10 @@ public interface CallbackRepository extends JpaRepository<CallbackEntity, Callba
 
     List<CallbackEntity> findByMatchKeyCode(String matchKeyCode);
     Optional<CallbackEntity> findByUserIdAndMatchKeyCode(Long userId, String matchKeyCode);
+
+    @Modifying
+    @Transactional
+    void deleteAllByUserId(Long userId);
 
     @Query("SELECT DISTINCT c.url FROM CallbackEntity c WHERE c.matchKeyCode = :keyCode")
     Set<String> findDistinctUrlsByMatchKeyCode(String keyCode);

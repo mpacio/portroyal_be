@@ -4,6 +4,7 @@ import com.matteopaciolla.prbe.dto.response.ErrorResponse;
 import com.matteopaciolla.prbe.exceptions.BaseClientCausedException;
 import com.matteopaciolla.prbe.exceptions.BaseInternalException;
 import com.matteopaciolla.prbe.exceptions.common.ResourceNotFoundException;
+import com.matteopaciolla.prbe.exceptions.common.RateLimitExceededException;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -43,6 +44,17 @@ public class GlobalExceptionHandler {
         log.debug("Captured MissingServletRequestParameterException");
         return response(HttpStatus.BAD_REQUEST,
                 "The required request parameter '" + e.getParameterName() + "' is missing.");
+    }
+
+    @ExceptionHandler(RateLimitExceededException.class)
+    public ResponseEntity<ErrorResponse> handleRateLimitExceededException(RateLimitExceededException e) {
+        log.debug("Request rate limit exceeded");
+        return ResponseEntity.status(HttpStatus.TOO_MANY_REQUESTS)
+                .header("Retry-After", Integer.toString(e.getRetryAfterSeconds()))
+                .body(new ErrorResponse(
+                        HttpStatus.TOO_MANY_REQUESTS.value(),
+                        HttpStatus.TOO_MANY_REQUESTS.getReasonPhrase(),
+                        "Request rate limit exceeded"));
     }
 
     @ExceptionHandler(MethodArgumentNotValidException.class)

@@ -12,6 +12,7 @@ import com.matteopaciolla.prbe.model.entity.MatchEntity;
 import com.matteopaciolla.prbe.model.entity.UserEntity;
 import com.matteopaciolla.prbe.repository.ConfigPropertyRepository;
 import com.matteopaciolla.prbe.repository.MatchRepository;
+import com.matteopaciolla.prbe.repository.UserRepository;
 import com.matteopaciolla.prbe.repository.cachingproxy.MatchRetainer;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -42,6 +43,8 @@ class MatchServiceTest {
     private MatchRetainer matchRetainer;
     @Mock
     private GameService gameService;
+    @Mock
+    private UserRepository userRepository;
 
     @InjectMocks
     private MatchService matchService;
@@ -149,5 +152,23 @@ class MatchServiceTest {
         assertThatThrownBy(() -> matchService.removeAiPlayer(host, "alice"))
                 .isInstanceOf(ResourceNotFoundException.class);
         verify(matchRepository, never()).save(any());
+    }
+
+    @Test
+    void hostMatchRejectsAccountWithPendingDeletion() {
+        host.setDeletionRequestedAt(java.time.LocalDateTime.now());
+        when(userRepository.findByIdForUpdate(host.getId())).thenReturn(Optional.of(host));
+
+        assertThatThrownBy(() -> matchService.hostMatch(host, null))
+                .isInstanceOf(com.matteopaciolla.prbe.exceptions.common.MandatoryParamException.class);
+    }
+
+    @Test
+    void joinMatchRejectsAccountWithPendingDeletion() {
+        host.setDeletionRequestedAt(java.time.LocalDateTime.now());
+        when(userRepository.findByIdForUpdate(host.getId())).thenReturn(Optional.of(host));
+
+        assertThatThrownBy(() -> matchService.joinMatch("ABC123", host))
+                .isInstanceOf(com.matteopaciolla.prbe.exceptions.common.MandatoryParamException.class);
     }
 }

@@ -16,12 +16,14 @@ import com.matteopaciolla.prbe.service.UserService;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
+import jakarta.validation.constraints.Size;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.media.ExampleObject;
 import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
+import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.security.SecurityRequirements;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -37,6 +39,10 @@ import static com.matteopaciolla.prbe.util.AuthenticationUtils.getUsername;
 
 @Tag(name = "Match", description = "Matches operations")
 @SecurityRequirements({@SecurityRequirement(name = "oauth2", scopes = {"game:play"})})
+@ApiResponses({
+        @ApiResponse(responseCode = "401", description = "Missing or invalid bearer token"),
+        @ApiResponse(responseCode = "403", description = "Insufficient scope or ownership")
+})
 @Slf4j
 @RestController
 @RequiredArgsConstructor
@@ -54,6 +60,7 @@ public class MatchController {
             responses = {
                     @ApiResponse(responseCode = "200", description = "Matches retrieved successfully",
                             content = @Content(mediaType = "application/json", schema = @Schema(implementation = MatchInfosPageResponse.class))),
+                    @ApiResponse(responseCode = "429", description = "Read limit exceeded; see Retry-After"),
                     @ApiResponse(responseCode = "401", description = "Authentication required")
             }
     )
@@ -73,7 +80,7 @@ public class MatchController {
             @Parameter(name = "sort_direction", description = "Sort order direction", example = "DESC", required = false)
             @RequestParam(value = "sort_direction", defaultValue = "DESC") Sort.Direction sortDirection,
             @Parameter(description = "Optional username filter used to retrieve matches for a specific player", example = "alice", required = false)
-            @RequestParam(required = false) String username) {
+            @Size(max = 30) @RequestParam(required = false) String username) {
         MatchInfosPageResponse matchDtoList = matchService.getMatchesByPlayer(
                 username, ended, pageNumber, pageSize, sortField, sortDirection);
         return ResponseEntity.ok(matchDtoList);
@@ -91,8 +98,9 @@ public class MatchController {
     @GetMapping(path = "/retrieve", produces = "application/json")
     public ResponseEntity<MatchResponse> getMatch(
             @Parameter(name = "key_code", description = "Unique match key code", example = "ABC123", required = true)
-            @RequestParam("key_code") String keyCode,
+            @Size(max = 255) @RequestParam("key_code") String keyCode,
             @Parameter(name = "move_number", description = "Last move count known by the client. If equal to the current movesCount, no new moves are available.", example = "14", required = false)
+            @Min(0)
             @RequestParam(value = "move_number", required = false) Integer moveNumber) {
         MatchDto matchDto = matchService.getMatch(keyCode);
         if (moveNumber != null && moveNumber.equals(matchDto.getMovesCount())) {
@@ -106,13 +114,14 @@ public class MatchController {
             description = "Joins an existing non-started match by key_code for the human subject represented by the bearer access token.",
             responses = {
                     @ApiResponse(responseCode = "200", description = "Match joined successfully"),
-                    @ApiResponse(responseCode = "400", description = "Match cannot be joined in the current state")
+                    @ApiResponse(responseCode = "400", description = "Match cannot be joined in the current state"),
+                    @ApiResponse(responseCode = "429", description = "Match-join limit exceeded; see Retry-After")
             }
     )
     @PostMapping(path = "/join", produces = "application/json")
     public ResponseEntity<VoidResponse> joinMatch(
             @Parameter(name = "key_code", description = "Unique match key code", example = "ABC123", required = true)
-            @RequestParam("key_code") String keyCode) {
+            @Size(max = 255) @RequestParam("key_code") String keyCode) {
         UserEntity user = getUserEntity();
         matchService.joinMatch(keyCode, user);
         log.info("Player joined a match");
@@ -129,12 +138,14 @@ public class MatchController {
             responses = {
                     @ApiResponse(responseCode = "200", description = "Match hosted successfully",
                             content = @Content(mediaType = "application/json", schema = @Schema(implementation = MatchInfoResponse.class))),
-                    @ApiResponse(responseCode = "409", description = "A match is already hosted by this user")
+                    @ApiResponse(responseCode = "409", description = "A match is already hosted by this user"),
+                    @ApiResponse(responseCode = "413", description = "Request body exceeds 2 MiB"),
+                    @ApiResponse(responseCode = "429", description = "Match-creation limit exceeded; see Retry-After")
             }
     )
     @PostMapping(path = "/host", produces = "application/json")
     public ResponseEntity<MatchInfoResponse> hostMatch(
-            @RequestBody(required = false) MatchConfigReqDto matchConfigReqDto) {
+            @Valid @RequestBody(required = false) MatchConfigReqDto matchConfigReqDto) {
         UserEntity user = getUserEntity();
         MatchDto matchDto = matchService.getHostedMatch(user.getUsername());
         if (matchDto != null) {
@@ -210,7 +221,7 @@ public class MatchController {
     @DeleteMapping(path = "/ai-player", produces = "application/json")
     public ResponseEntity<VoidResponse> removeAiPlayer(
             @Parameter(name = "ai_player_username", description = "Username of the AI player to remove", example = "ABC123-ai-1", required = true)
-            @RequestParam("ai_player_username") String aiPlayerUsername) {
+            @Size(max = 255) @RequestParam("ai_player_username") String aiPlayerUsername) {
         UserEntity host = getUserEntity();
         String keyCode = matchService.removeAiPlayer(host, aiPlayerUsername);
         log.info("Host removed an AI player from a match");
@@ -229,6 +240,7 @@ public class MatchController {
     @GetMapping(path = "/status", produces = "application/json")
     public ResponseEntity<MatchResponse> getMatchStatus(
             @Parameter(name = "move_number", description = "Last move count known by the client. If equal to the current movesCount, no new moves are available.", example = "14", required = false)
+            @Min(0)
             @RequestParam(value = "move_number", required = false) Integer moveNumber) {
         UserEntity user = getUserEntity();
         Optional<MatchDto> playingMatch = matchService.getPlayingMatch(user);

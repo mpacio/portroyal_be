@@ -2,6 +2,8 @@ package com.matteopaciolla.prbe.dto.request;
 
 import com.matteopaciolla.prbe.controller.GameController;
 import com.matteopaciolla.prbe.controller.MatchController;
+import com.matteopaciolla.prbe.dto.request.MatchConfigReqDto;
+import com.matteopaciolla.prbe.dto.request.AddAiPlayerReqDto;
 import com.matteopaciolla.prbe.repository.MatchRepository;
 import com.matteopaciolla.prbe.repository.MoveRepository;
 import jakarta.validation.Validation;
@@ -82,6 +84,37 @@ class RequestValidationTest {
         assertThat(validator.validate(request))
                 .extracting(violation -> violation.getPropertyPath().toString())
                 .containsExactly("newPassword");
+    }
+
+    @Test
+    void passwordResetPayloadsValidateEmailTokenAndNewPassword() {
+        PasswordResetRequestDto request = new PasswordResetRequestDto();
+        request.setEmail("invalid");
+        assertThat(validator.validate(request))
+                .anyMatch(violation -> violation.getPropertyPath().toString().equals("email"));
+
+        PasswordResetConfirmRequestDto confirm = new PasswordResetConfirmRequestDto();
+        confirm.setToken(" ");
+        confirm.setNewPassword("short7");
+        assertThat(validator.validate(confirm))
+                .extracting(violation -> violation.getPropertyPath().toString())
+                .contains("token", "newPassword");
+    }
+
+    @Test
+    void matchConfigurationAndAiNamesRespectStorageBounds() {
+        MatchConfigReqDto configuration = new MatchConfigReqDto();
+        configuration.setId(-1);
+        configuration.setName("x".repeat(256));
+        assertThat(validator.validate(configuration))
+                .extracting(violation -> violation.getPropertyPath().toString())
+                .contains("id", "name");
+
+        AddAiPlayerReqDto aiRequest = new AddAiPlayerReqDto();
+        aiRequest.setDifficulty(com.matteopaciolla.portroyal.core.enums.BotDifficulty.EASY);
+        aiRequest.setName("x".repeat(256));
+        assertThat(validator.validate(aiRequest))
+                .anyMatch(violation -> violation.getPropertyPath().toString().equals("name"));
     }
 
     @Test

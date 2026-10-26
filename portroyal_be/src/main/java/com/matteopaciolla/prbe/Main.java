@@ -12,6 +12,7 @@ import io.swagger.v3.oas.annotations.servers.Server;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
+import org.springframework.scheduling.annotation.EnableScheduling;
 
 @SecuritySchemes({
 		@SecurityScheme(
@@ -39,8 +40,8 @@ import org.springframework.boot.autoconfigure.SpringBootApplication;
 		info = @Info(
 				title = "Port Royal Back End",
 				description = "Port Royal game backend API. The service exposes the game state, match lifecycle, authentication, user management and bot-mediated operations for the Port Royal game. " +
-					"Protected JSON API endpoints under /api/v1 require OAuth 2.0 bearer access tokens. " +
-					"Telegram BOT operations use a confidential OAuth client; delegated tokens represent the linked human account and ordinary game requests do not accept tgId. Public clients are manually registered with exact redirect URIs. For client setup and flow details, see the client and OAuth operator guides.",
+					"Protected JSON API endpoints under /api/v1 require OAuth 2.0 bearer access tokens. Access tokens last five minutes; rotating refresh tokens last 30 days, and persisted authorization revocation is checked on every API request. " +
+					"Telegram BOT operations use a confidential OAuth client; delegated tokens represent the linked human account and ordinary game requests do not accept tgId. Public clients are manually registered with exact redirect URIs. JSON request bodies are limited to 2 MiB; application rate limits return HTTP 429 with Retry-After. The API uses path-based major versions and provides at least six months of notice before endpoint retirement. Password reset is available only for accounts with a confirmed email, and credential changes revoke persisted tokens and invalidate old browser sessions. For client setup and flow details, see the client and OAuth operator guides.",
 				version = "1.0"
 		),
 		servers = {
@@ -50,6 +51,7 @@ import org.springframework.boot.autoconfigure.SpringBootApplication;
 )
 @Slf4j
 @SpringBootApplication
+@EnableScheduling
 public class Main {
 
 	public static void main(String[] args) {

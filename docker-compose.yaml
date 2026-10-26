@@ -2,7 +2,6 @@
 services:
   postgres:
     image: postgres:16.3-bookworm
-    container_name: postgresc
     restart: unless-stopped
     shm_size: 128mb
     environment:
@@ -25,7 +24,6 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
-    container_name: portroyal-be-app
     depends_on:
       postgres:
         condition: service_healthy
@@ -42,7 +40,7 @@ services:
       OAUTH2_SIGNING_KEY_PASSWORD_FILE: /run/secrets/oauth2_signing_password
       OAUTH2_SIGNING_KEY_ALIAS: ${OAUTH2_SIGNING_KEY_ALIAS:-portroyal-signing}
     volumes:
-      - ~/appdata/portroyal-be-app/logs:/app/logs
+      - "${APP_LOG_DIRECTORY:-~/appdata/portroyal-be-app/logs}:/app/logs"
     secrets:
       - source: oauth2_signing_keystore
         target: oauth2_signing_keystore
@@ -53,7 +51,7 @@ services:
     networks:
       npm_main_net:
         aliases:
-          - portroyal-be-app
+          - "${BE_APP_NETWORK_ALIAS:-portroyal-be-app}"
       backend_internal:
 networks:
   npm_main_net:
