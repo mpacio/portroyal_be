@@ -17,7 +17,7 @@ import org.springframework.boot.autoconfigure.SpringBootApplication;
 		@SecurityScheme(
 				name = "oauth2",
 				type = SecuritySchemeType.OAUTH2,
-				description = "Public clients use Authorization Code with PKCE. The Telegram BOT uses client credentials for onboarding and a custom Telegram delegation grant for human game access.",
+				description = "Supported clients are browser SPAs, native/mobile apps, CLI clients, and one confidential Telegram BOT; generic server-to-server integrations are not supported. Public clients must be registered by an operator with exact redirect URIs and use Authorization Code with PKCE (S256), without client secrets. The Telegram BOT uses client_credentials only for bot:onboard account flows. Its custom urn:portroyal:grant-type:telegram-delegation grant accepts tgId only at the authenticated token-exchange endpoint and issues a short-lived token for the linked human. No password grant is supported.",
 				flows = @OAuthFlows(
 						authorizationCode = @OAuthFlow(
 								authorizationUrl = "/oauth2/authorize",
@@ -31,7 +31,7 @@ import org.springframework.boot.autoconfigure.SpringBootApplication;
 								tokenUrl = "/oauth2/token",
 								scopes = {
 										@OAuthScope(name = "bot:onboard", description = "BOT-authorized account onboarding and linking"),
-										@OAuthScope(name = "bot:delegate", description = "Request a Telegram delegated human token")
+										@OAuthScope(name = "bot:delegate", description = "Custom Telegram delegation grant only; not available through client_credentials")
 								}))
 		)
 })
@@ -40,7 +40,7 @@ import org.springframework.boot.autoconfigure.SpringBootApplication;
 				title = "Port Royal Back End",
 				description = "Port Royal game backend API. The service exposes the game state, match lifecycle, authentication, user management and bot-mediated operations for the Port Royal game. " +
 					"Protected JSON API endpoints under /api/v1 require OAuth 2.0 bearer access tokens. " +
-					"Telegram BOT operations use a confidential OAuth client; delegated tokens represent the linked human account.",
+					"Telegram BOT operations use a confidential OAuth client; delegated tokens represent the linked human account and ordinary game requests do not accept tgId. Public clients are manually registered with exact redirect URIs. For client setup and flow details, see the client and OAuth operator guides.",
 				version = "1.0"
 		),
 		servers = {

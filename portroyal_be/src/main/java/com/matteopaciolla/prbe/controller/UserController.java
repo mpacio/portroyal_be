@@ -119,7 +119,7 @@ public class UserController {
 
     @Operation(
             summary = "Delete a user",
-            description = "Deletes the specified user. Admins can delete any user; regular users can only delete their own account.",
+            description = "Legacy endpoint that immediately deletes the specified user. Admins can delete any user; regular users can only delete their own account. It does not yet implement the target self-service deletion policy (explicit confirmation, deferral while matches are active, and pseudonymized game history); public clients must not use it as that workflow until updated.",
             responses = {
                     @ApiResponse(responseCode = "200", description = "User deleted successfully"),
                     @ApiResponse(responseCode = "403", description = "Forbidden for the current principal")

@@ -196,15 +196,15 @@ API paths below are relative to `BASE` (`/api/v1`).
 | Method and path                                           | Purpose                                                                                                        |
 |-----------------------------------------------------------|----------------------------------------------------------------------------------------------------------------|
 | `POST /public/register`                                   | Create a standard account; public.                                                                             |
-| `GET /user/new-email-confirmation?email=...`                  | Request email confirmation; authentication required.                                                           |
+| `GET /user/new-email-confirmation`                            | Request email confirmation for the authenticated account.                                                      |
 | `POST /user/new-tg-unify-email-otp`                       | Request the email OTP as the human account, or as BOT with `bot:onboard` scope and `tgId`.                    |
 | `POST /user/register/telegram`                            | Create a Telegram-linked player; requires BOT `bot:onboard` scope and matching `tgId`.                         |
 | `POST /user/unify`                                        | Link the Telegram ID to the email account using the OTP; requires BOT `bot:onboard` scope and `tgId`.          |
 | `GET /user/me`                                            | Get the authenticated account.                                                                                 |
 | `GET /user/retrieve?username=...`                         | Look up a user by username, Telegram ID, or email; use `telegram_id` when identifying by Telegram ID.          |
-| `PATCH /user/update?username=...`                         | Partially update user profile; requires `ADMIN` or `BOT` authorization.                                        |
+| `PATCH /user/update?username=...`                         | Partially update the authenticated user's profile or, as an administrator, another user's profile.             |
 | `POST /user/change-psw`                                    | Change the authenticated user's password.                                                                      |
-| `DELETE /user/delete?username=...`                        | Delete a user; requires `ADMIN` authorization.                                                                 |
+| `DELETE /user/delete?username=...`                        | Legacy immediate deletion; admins may delete any account and users may delete their own.                       |
 
 The HTML email-confirmation page is served separately at `/public/confirm-email` from the server root.
 
@@ -220,12 +220,13 @@ Standard registration body:
 }
 ```
 
-Usernames must be 5-30 characters and contain letters, digits, `_`, or `-`. The public
-`/public/register` endpoint requires `username`, `email`, and `password`; first and last names are
-optional, and a Telegram ID is not required. Telegram IDs are numeric strings. Bot registration
-requires BOT `bot:onboard` authorization, a username, a Telegram ID, and a `tgId` header matching
-the ID in the body. It does not require an email or password: the server generates an internal
-password that is not returned. For example:
+Usernames must be 5-30 characters and contain letters, digits, `_`, or `-`. Email addresses are
+limited to 254 characters and passwords to 72 UTF-8 bytes. The public `/public/register` endpoint
+requires `username`, `email`, and `password`; first and last names are optional, and a Telegram ID
+is not required. Email confirmation is required before password sign-in. Telegram IDs contain 1-20
+digits. Bot registration requires BOT `bot:onboard` authorization, a username, a Telegram ID, and a
+`tgId` header matching the ID in the body. It does not require an email or password: the server
+generates an internal password that is not returned. For example:
 
 ```json
 {
@@ -235,6 +236,20 @@ password that is not returned. For example:
 ```
 
 Do not use development seed credentials in a deployed environment.
+
+Public clients are browser SPAs, native/mobile applications, and CLI clients using Authorization
+Code with PKCE (`S256`); each is registered manually with exact redirect URIs. The Telegram BOT is
+the only supported confidential client and uses its custom delegation grant after client
+authentication. Generic server-to-server integrations, public Dynamic Client Registration, and
+the password grant are not supported.
+
+Password reset and account deletion have agreed target policies but are not yet implemented as
+end-user workflows. Password reset is planned for confirmed email accounts with a generic request
+response, one-hour single-use token, and revocation of existing tokens after success. Account
+deletion is planned to require the account's bearer token and explicit confirmation, defer while
+active matches exist, and remove identifiers within 30 days while retaining useful game history
+pseudonymized. The current `DELETE /user/delete` route performs immediate deletion and does not
+enforce those safeguards; do not use it as the public self-service deletion flow until updated.
 
 After registering or linking the account, exchange the Telegram sender ID for a delegated human
 access token as described in [`OAUTH_CLIENT_OPERATIONS.md`](OAUTH_CLIENT_OPERATIONS.md). Use that

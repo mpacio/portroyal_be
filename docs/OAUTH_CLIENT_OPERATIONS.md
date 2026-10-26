@@ -4,6 +4,18 @@ This is an operator guide. Keep credentials and signing-key material out of sour
 container images, command arguments, and logs. The authorization tables must exist before using
 the registration tools.
 
+## Supported client types
+
+The initial public service supports browser SPAs, native/mobile applications, CLI clients, and one
+confidential Telegram BOT client. Browser, native/mobile, and CLI applications are public clients:
+register each manually with an operator-controlled `client_id` and exact redirect URIs, and use
+Authorization Code with PKCE (`S256`). CLI clients may use loopback redirects where appropriate.
+Public clients do not receive or store a client secret.
+
+The Telegram integration is the only supported confidential client in the initial service. Generic
+server-to-server integrations and unrestricted Dynamic Client Registration are not supported.
+The Resource Owner Password Credentials grant is not supported.
+
 ## Signing key
 
 Production requires a durable RSA private key in a PKCS#12 keystore. Create it outside the
@@ -57,6 +69,9 @@ mvn -pl portroyal_be exec:java `
 Public clients have no secret and require Authorization Code with PKCE. Register only redirect
 URIs controlled by the client owner.
 
+The guided registration command is an operator action, not a public registration endpoint. Add
+each exact callback URI separately; wildcard redirect URIs are not accepted.
+
 The Telegram BOT is one confidential OAuth client. Configure a unique
 `OAUTH2_BOT_CLIENT_ID` and high-entropy `OAUTH2_BOT_CLIENT_SECRET` in a protected operator
 environment, then run:
@@ -108,6 +123,14 @@ curl --user "$OAUTH2_BOT_CLIENT_ID" \
 The delegated access token has the linked human's stable database ID as `sub` and retains the BOT
 client in `client_id` and `actor_client_id`. Send it as `Authorization: Bearer <access-token>` for
 game and match requests. Do not send `tgId` on normal API calls.
+
+## Custom Telegram delegation grant
+
+The `urn:portroyal:grant-type:telegram-delegation` grant is a custom grant, not standard
+`client_credentials`: only the authenticated Telegram BOT may use it, and it accepts `tgId` only
+at this trusted token-exchange boundary. The API trusts the BOT's assertion of the Telegram sender
+ID. The delegated token represents the linked human and is short-lived; the BOT does not receive a
+refresh token.
 
 ## Token lifecycle
 

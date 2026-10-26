@@ -32,7 +32,7 @@ public class PublicController {
 
     @Operation(
         summary = "Register a new user",
-        description = "Creates a standard web/app account. Username, email, and password are required; first name and last name are optional and generated when omitted. Telegram identity linking must use the verified account-unification flow.",
+        description = "Creates a standard web/app account. Username, email, and password are required; first name and last name are optional and generated when omitted. Registration sends an email-confirmation link; the account must be confirmed before password sign-in. Telegram identity linking must use the verified account-unification flow.",
         responses = {
             @ApiResponse(responseCode = "201", description = "User registered successfully",
                 content = @Content(mediaType = "application/json", schema = @Schema(implementation = UserResponse.class),

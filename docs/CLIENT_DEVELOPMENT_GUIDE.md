@@ -1,8 +1,9 @@
 # Port Royal Client Development Guide
 
-This guide covers the REST API integration points shared by browser/mobile clients and a
-Telegram Bot. The API is frontend-agnostic: the server owns match state and rules, and every
-client reads the current match snapshot before deciding what to display or submit.
+This guide covers the REST API integration points for browser SPAs, native/mobile clients, CLI
+clients, and the Telegram Bot. Generic server-to-server integrations are not supported in the
+initial public service. The API is frontend-agnostic: the server owns match state and rules, and
+every client reads the current match snapshot before deciding what to display or submit.
 
 For game rules, move details, card behavior, and the full endpoint reference, see
 [`GAME_RULES_AND_API.md`](GAME_RULES_AND_API.md). While developing against a running server, use
@@ -56,10 +57,12 @@ valid address of at most 254 characters. Passwords must not exceed 72 UTF-8 byte
 BCrypt password encoder's supported input limit); a minimum-length/strength policy is still pending
 approval. Optional first and last names may contain letters and spaces only and are limited to 30
 characters. Telegram IDs contain 1-20 digits. Email is used for account confirmation and Telegram
-identity-unification flows. After registration and email
-confirmation, obtain an access token through the Authorization Server's OIDC discovery document
-and Authorization Code with PKCE. Public clients must be registered by an operator with exact
-redirect URIs; see [`OAUTH_CLIENT_OPERATIONS.md`](OAUTH_CLIENT_OPERATIONS.md).
+identity-unification flows. Registration sends an email-confirmation link; the account must be
+confirmed before password sign-in. After confirmation, obtain an access token through the
+Authorization Server's OIDC discovery document and Authorization Code with PKCE (`S256`). Public
+clients must be registered manually by an operator with exact redirect URIs; see
+[`OAUTH_CLIENT_OPERATIONS.md`](OAUTH_CLIENT_OPERATIONS.md). There is no public password grant or
+unrestricted dynamic client registration.
 
 The match and move-history listing endpoints accept `page_number` values from zero upward and
 `page_size` values from 1 to 100.
@@ -249,6 +252,23 @@ The Telegram-only account must already be registered and not already linked. OTP
 24 hours; requesting another OTP for the same email replaces the previous one. The bot must keep
 its credentials server-side and must set `tgId` to the Telegram user represented by each request.
 
+### Account recovery and deletion policies
+
+The planned password-reset flow is for accounts with a confirmed email. A reset request returns a
+generic response; an eligible account receives a single-use token valid for one hour, and a
+successful reset revokes existing sessions and tokens. Password reset is not implemented yet.
+
+The target account-deletion policy requires the authenticated account's bearer token and explicit
+confirmation, but no email OTP. A request is deferred while the account has active matches. After
+those matches finish, identifying data is to be removed within 30 days while useful game history
+may remain pseudonymized. The existing `DELETE /user/delete` route deletes immediately and does
+not implement this policy; public clients must not use it as the self-service deletion flow until
+the route is updated.
+
+Initial rate-limit thresholds are recorded in a non-publishable policy draft and are not yet
+enforced. Do not rely on HTTP 429 responses for those thresholds until Phase 4 implementation and
+deployment verification are complete.
+
 ## 3. Typical match lifecycle
 
 The host creates a match, other players join before it starts, and the host starts it. Each human
@@ -383,13 +403,16 @@ is served at `/public/confirm-email` from the server root.
 | Method            | Path                                         | Notes                                                                                                        |
 |-------------------|----------------------------------------------|--------------------------------------------------------------------------------------------------------------|
 | `POST`            | `/public/register`                           | Register a standard username/password account; public                                                        |
-| `GET`             | `/user/new-email-confirmation?email=...`     | Request an email confirmation; authentication required                                                       |
+| `GET`             | `/user/new-email-confirmation`               | Request an email confirmation for the authenticated account                                                   |
 | `GET`             | `SERVER_ROOT/public/confirm-email?token=...` | Confirm an email token; public browser flow                                                                  |
 | `POST`            | `/user/new-tg-unify-email-otp`               | Request an unification OTP as the human account, or as BOT with `bot:onboard` scope and `tgId`               |
 | `GET`             | `/user/me`                                   | Get the human account represented by the bearer token                                                        |
 | `GET`             | `/user/retrieve?username=...`                | Look up a user by username, Telegram ID, or email; use `telegram_id` for Telegram ID                         |
 | `POST`            | `/user/register/telegram`                    | Create a Telegram-linked user; requires BOT `bot:onboard` scope and matching `tgId`                          |
 | `POST`            | `/user/unify`                                | Complete unification; requires BOT `bot:onboard` scope and `tgId`                                           |
+| `PATCH`           | `/user/update?username=...`                   | Update the authenticated account or an account as an administrator                                           |
+| `POST`            | `/user/change-psw`                           | Change the authenticated account's password; current password required                                       |
+| `DELETE`          | `/user/delete?username=...`                  | Legacy immediate deletion route; does not implement the target self-service deletion policy                  |
 | `POST`            | `/match/host`                                | Host a match                                                                                                 |
 | `POST`            | `/match/join?key_code=...`                   | Join a match before it starts                                                                                |
 | `POST`            | `/match/start`                               | Start the hosted match                                                                                       |
