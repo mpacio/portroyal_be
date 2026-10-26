@@ -1,9 +1,10 @@
 package com.matteopaciolla.prbe.dto.request;
 
 import com.fasterxml.jackson.annotation.JsonInclude;
+import com.matteopaciolla.prbe.annotation.MaxUtf8Bytes;
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.Email;
-import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Size;
 import lombok.Data;
@@ -14,12 +15,13 @@ import lombok.Data;
 public class UserReqDto {
 
     @Schema(description = "Account username. Length 5-30, letters, digits, underscore and dash only.", example = "alice42", requiredMode = Schema.RequiredMode.REQUIRED)
-    @NotNull(message = "Username is mandatory")
+    @NotBlank(message = "Username is mandatory")
     @Pattern(regexp = "^[a-zA-Z0-9\\-_]{5,30}$", message = "Username should be alphanumeric and between 5 and 30 characters, including -_")
     private String username;
 
-    @Schema(description = "Required by the public web/app registration endpoint. Omit only when registering through the BOT-only Telegram endpoint; the server then generates an internal password that is not returned to the Telegram player.", example = "MyP@ssw0rd")
+    @Schema(description = "Required by the public web/app registration endpoint. Omit only when registering through the BOT-only Telegram endpoint; the server then generates an internal password that is not returned to the Telegram player. Passwords are limited to 72 UTF-8 bytes.", example = "MyP@ssw0rd")
     @JsonInclude(JsonInclude.Include.NON_NULL)
+    @MaxUtf8Bytes(value = 72, message = "Password must not exceed 72 UTF-8 bytes")
     private String password;
 
     @Schema(description = "Optional first name.", example = "Alice")
@@ -34,9 +36,10 @@ public class UserReqDto {
 
     @Schema(description = "Email address for account recovery and confirmation flows.", example = "alice@example.com")
     @Email(message = "Email should be valid")
+    @Size(max = 254, message = "Email must not exceed 254 characters")
     private String email;
 
-    @Schema(description = "Telegram numeric id. Accepted only for BOT-authorized Telegram registration; other accounts link Telegram through the verified account-unification flow.", example = "123456789")
-    @Pattern(regexp = "^[0-9]+$", message = "Telegram ID should be a sequence of digits")
+    @Schema(description = "Telegram numeric id containing 1-20 digits. Accepted only for BOT-authorized Telegram registration; other accounts link Telegram through the verified account-unification flow.", example = "123456789")
+    @Pattern(regexp = "^[0-9]{1,20}$", message = "Telegram ID should contain between 1 and 20 digits")
     private String telegramId;
 }

@@ -261,7 +261,7 @@ not an optional identity hint for game requests.
 | `GET /match/status?move_number=N`               | If `N` equals the current move count, returns "No new moves"; otherwise returns the current match snapshot.                           |
 | `GET /match/retrieve?key_code=...`              | Get the match snapshot.                                                                                                               |
 | `GET /match/retrieve?key_code=...&move_number=N` | If `N` equals the current move count, returns "No new moves"; otherwise returns the snapshot.                                         |
-| `GET /match/retrieve-all`                      | List matches; supports `username`, `ended`, `page_number`, `page_size`, `sort_field`, and `sort_direction`.                           |
+| `GET /match/retrieve-all`                      | List matches; supports `username`, `ended`, `page_number` (zero or greater), `page_size` (1-100), `sort_field`, and `sort_direction`. |
 
 Typical sequence:
 
@@ -342,8 +342,8 @@ observe them.
 
 `GET /game/move?key_code=ABC123&move_number=12` retrieves one move.
 `GET /game/moves?key_code=ABC123` retrieves paged history; optional parameters include
-`page_number` (0-based, default 0), `page_size` (default 10), `sort_field` (default `TIME_INDEX`),
-and `sort_direction` (`ASC` or `DESC`, default `ASC`).
+`page_number` (0-based, default 0; zero or greater), `page_size` (default 10; 1-100),
+`sort_field` (default `TIME_INDEX`), and `sort_direction` (`ASC` or `DESC`, default `ASC`).
 
 The successful `POST /game/move` response includes the submitted move's `mainEvent` and
 `sideEvents`, when generated. A human move may also trigger automatic AI turns; those AI moves are

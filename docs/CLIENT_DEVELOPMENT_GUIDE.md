@@ -51,11 +51,18 @@ verified account-unification flow.
 }
 ```
 
-Usernames must be 5-30 characters and contain only letters, digits, `_`, or `-`. Email is used for
-account confirmation and Telegram identity-unification flows. After registration and email
+Usernames must be 5-30 characters and contain only letters, digits, `_`, or `-`. Email must be a
+valid address of at most 254 characters. Passwords must not exceed 72 UTF-8 bytes (the current
+BCrypt password encoder's supported input limit); a minimum-length/strength policy is still pending
+approval. Optional first and last names may contain letters and spaces only and are limited to 30
+characters. Telegram IDs contain 1-20 digits. Email is used for account confirmation and Telegram
+identity-unification flows. After registration and email
 confirmation, obtain an access token through the Authorization Server's OIDC discovery document
 and Authorization Code with PKCE. Public clients must be registered by an operator with exact
 redirect URIs; see [`OAUTH_CLIENT_OPERATIONS.md`](OAUTH_CLIENT_OPERATIONS.md).
+
+The match and move-history listing endpoints accept `page_number` values from zero upward and
+`page_size` values from 1 to 100.
 
 ```sh
 curl -H "Authorization: Bearer $ACCESS_TOKEN" \

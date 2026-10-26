@@ -167,10 +167,7 @@ public class UserController {
             }
     )
     @PostMapping(path = "/change-psw")
-    public ResponseEntity<VoidResponse> changePassword(@RequestBody ChangePasswordReqDto cpd) {
-        if (cpd == null || cpd.getNewPassword() == null || cpd.getNewPassword().isBlank()) {
-            return ResponseEntity.badRequest().body(new VoidResponse("New password cannot be empty"));
-        }
+    public ResponseEntity<VoidResponse> changePassword(@Valid @RequestBody ChangePasswordReqDto cpd) {
         String username = getUsername();
         userService.changePassword(username,cpd.getOldPassword(), cpd.getNewPassword());
         return ResponseEntity.ok(new VoidResponse("Password changed successfully"));

@@ -8,12 +8,14 @@ import com.matteopaciolla.prbe.dto.request.AddAiPlayerReqDto;
 import com.matteopaciolla.prbe.dto.request.MatchConfigReqDto;
 import com.matteopaciolla.prbe.dto.response.*;
 import com.matteopaciolla.prbe.exceptions.match.MultipleHostingDemandException;
-import jakarta.validation.Valid;
 import com.matteopaciolla.prbe.model.entity.UserEntity;
 import com.matteopaciolla.prbe.repository.MatchRepository;
 import com.matteopaciolla.prbe.service.MatchService;
 import com.matteopaciolla.prbe.service.SentinelService;
 import com.matteopaciolla.prbe.service.UserService;
+import jakarta.validation.Valid;
+import jakarta.validation.constraints.Max;
+import jakarta.validation.constraints.Min;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.media.Content;
@@ -59,9 +61,12 @@ public class MatchController {
     public ResponseEntity<MatchInfosPageResponse> getAllMatches(
             @Parameter(description = "Filter by ended or active matches. If omitted, all match states are returned.", example = "false", required = false)
             @RequestParam(required = false) Boolean ended,
-            @Parameter(name = "page_number", description = "Zero-based page number", example = "0", required = false)
+            @Parameter(name = "page_number", description = "Zero-based page number; must be non-negative.", example = "0", required = false)
+            @Min(0)
             @RequestParam(value = "page_number", defaultValue = "0") Integer pageNumber,
-            @Parameter(name = "page_size", description = "Page size", example = "10", required = false)
+            @Parameter(name = "page_size", description = "Page size from 1 to 100.", example = "10", required = false)
+            @Min(1)
+            @Max(100)
             @RequestParam(value = "page_size", defaultValue = "10") Integer pageSize,
             @Parameter(name = "sort_field", description = "Field used to sort matches", example = "CREATED_AT", required = false)
             @RequestParam(value = "sort_field", defaultValue = "CREATED_AT") MatchRepository.SortField sortField,

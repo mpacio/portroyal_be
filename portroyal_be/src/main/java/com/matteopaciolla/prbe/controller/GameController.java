@@ -17,6 +17,8 @@ import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.security.SecurityRequirements;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
+import jakarta.validation.constraints.Max;
+import jakarta.validation.constraints.Min;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Sort;
@@ -90,9 +92,12 @@ public class GameController {
     public ResponseEntity<MovesPageResponse> getMoves(
           @Parameter(name = "key_code", description = "Unique match key code", example = "ABC123", required = true)
           @RequestParam("key_code") String keyCode,
-          @Parameter(name = "page_number", description = "Zero-based page number", example = "0", required = false)
+          @Parameter(name = "page_number", description = "Zero-based page number; must be non-negative.", example = "0", required = false)
+          @Min(0)
           @RequestParam(value = "page_number", defaultValue = "0") Integer pageNumber,
-          @Parameter(name = "page_size", description = "Page size", example = "10", required = false)
+          @Parameter(name = "page_size", description = "Page size from 1 to 100.", example = "10", required = false)
+          @Min(1)
+          @Max(100)
           @RequestParam(value = "page_size", defaultValue = "10") Integer pageSize,
           @Parameter(name = "sort_field", description = "Field used to sort move records", example = "TIME_INDEX", required = false)
           @RequestParam(value = "sort_field", defaultValue = "TIME_INDEX") MoveRepository.SortField sortField,
