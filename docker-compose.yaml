@@ -4,9 +4,6 @@ services:
     image: postgres:16.3-bookworm
     container_name: postgresc
     restart: unless-stopped
-    # ports:
-    #   - "127.0.0.1:5432:5432"
-    # set shared memory limit when using docker-compose
     shm_size: 128mb
     environment:
       - POSTGRES_USER=${POSTGRES_USER}
@@ -16,7 +13,8 @@ services:
       - PGTZ=Europe/Rome
     volumes:
       - postgres_data:/var/lib/postgresql/data
-      - ./portroyal_be/schema.sql:/docker-entrypoint-initdb.d/init.sql
+    networks:
+      - backend_internal
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
       interval: 10s
@@ -35,13 +33,38 @@ services:
       SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/${POSTGRES_DB}
       SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER}
       SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD}
+      SPRING_FLYWAY_BASELINE_ON_MIGRATE: ${SPRING_FLYWAY_BASELINE_ON_MIGRATE:-false}
+      APP_CORS_ALLOWED_ORIGINS: ${APP_CORS_ALLOWED_ORIGINS:-}
+      NPM_INTERNAL_PROXY_REGEX: ${NPM_INTERNAL_PROXY_REGEX:?Set NPM_INTERNAL_PROXY_REGEX to the trusted NPM address}
+      OAUTH2_ISSUER: ${OAUTH2_ISSUER:?Set OAUTH2_ISSUER}
+      OAUTH2_BOT_CLIENT_ID: ${OAUTH2_BOT_CLIENT_ID:?Set OAUTH2_BOT_CLIENT_ID}
+      OAUTH2_SIGNING_KEY_PATH: /run/secrets/oauth2_signing_keystore
+      OAUTH2_SIGNING_KEY_PASSWORD_FILE: /run/secrets/oauth2_signing_password
+      OAUTH2_SIGNING_KEY_ALIAS: ${OAUTH2_SIGNING_KEY_ALIAS:-portroyal-signing}
     volumes:
       - ~/appdata/portroyal-be-app/logs:/app/logs
-    ports:
-      - "8080:8080"
+    secrets:
+      - source: oauth2_signing_keystore
+        target: oauth2_signing_keystore
+      - source: oauth2_signing_password
+        target: oauth2_signing_password
+    expose:
+      - "8080"
+    networks:
+      npm_main_net:
+        aliases:
+          - portroyal-be-app
+      backend_internal:
 networks:
-  default:
+  npm_main_net:
     name: npm_main_net
     external: true
+  backend_internal:
+    internal: true
 volumes:
   postgres_data:
+secrets:
+  oauth2_signing_keystore:
+    file: ${OAUTH2_SIGNING_KEY_FILE:?Set OAUTH2_SIGNING_KEY_FILE}
+  oauth2_signing_password:
+    file: ${OAUTH2_SIGNING_KEY_PASSWORD_FILE:?Set OAUTH2_SIGNING_KEY_PASSWORD_FILE}

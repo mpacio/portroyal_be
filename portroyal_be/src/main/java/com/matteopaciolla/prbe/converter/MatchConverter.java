@@ -17,7 +17,7 @@ import static com.matteopaciolla.prbe.constants.Formats.DATE_TIME_FORMATTER;
 
 public class MatchConverter {
 
-    public static MatchDto toDto(MatchEntity matchEntity, Match match, boolean includeTgId) {
+    public static MatchDto toDto(MatchEntity matchEntity, Match match) {
         MatchDto matchDto = new MatchDto();
         boolean notNull = false;
         if (matchEntity != null) {
@@ -27,8 +27,8 @@ public class MatchConverter {
             matchDto.setLastMoveAt(matchEntity.getLastMoveAt() != null ? matchEntity.getLastMoveAt().format(DATE_TIME_FORMATTER) : null);
             matchDto.setCreatedAt(matchEntity.getCreatedAt() != null ? matchEntity.getCreatedAt().format(DATE_TIME_FORMATTER) : null);
             matchDto.setConfigurationId(matchEntity.getConfigurationId());
-            matchDto.setPlayerUsers(toCombinedPlayerDtos(matchEntity, includeTgId));
-            matchDto.setHostUser(UserConverter.toDtoLight(matchEntity.getHostUser(), includeTgId));
+            matchDto.setPlayerUsers(toCombinedPlayerDtos(matchEntity));
+            matchDto.setHostUser(UserConverter.toDtoLight(matchEntity.getHostUser()));
             matchDto.setWinnerUser(matchEntity.getWinner() != null ? UserConverter.toDto(matchEntity.getWinner()) : null);
             matchDto.setEnded(matchEntity.getEnded());
             matchDto.setEndedAt(matchEntity.getEndedAt() != null ? matchEntity.getEndedAt().format(DATE_TIME_FORMATTER) : null);
@@ -68,7 +68,7 @@ public class MatchConverter {
         matchInfoDto.setCreatedAt(match.getCreatedAt() != null ? match.getCreatedAt().format(DATE_TIME_FORMATTER) : null);
         matchInfoDto.setConfigurationId(match.getConfigurationId());
         matchInfoDto.setPlayerUsernames(match.getAllPlayerUsernames());
-        matchInfoDto.setPlayers(toCombinedPlayerDtos(match, false));
+        matchInfoDto.setPlayers(toCombinedPlayerDtos(match));
         matchInfoDto.setHostUsername(match.getHostUser() != null ? match.getHostUser().getUsername() : null);
         matchInfoDto.setWinnerUsername(match.getWinner() != null ? match.getWinner().getUsername() : null);
         matchInfoDto.setEnded(match.getEnded());
@@ -87,10 +87,10 @@ public class MatchConverter {
      * API consumers can display the full lobby/roster without needing to know how each kind of
      * player is persisted.
      */
-    private static List<UserDto> toCombinedPlayerDtos(MatchEntity matchEntity, boolean includeTgId) {
+    private static List<UserDto> toCombinedPlayerDtos(MatchEntity matchEntity) {
         List<UserDto> combined = new LinkedList<>();
         if (matchEntity.getPlayers() != null) {
-            matchEntity.getPlayers().forEach(player -> combined.add(UserConverter.toDtoLight(player, includeTgId)));
+            matchEntity.getPlayers().forEach(player -> combined.add(UserConverter.toDtoLight(player)));
         }
         if (matchEntity.getAiPlayers() != null) {
             matchEntity.getAiPlayers().forEach(aiPlayer -> combined.add(AIPlayerConverter.toDtoLight(aiPlayer)));

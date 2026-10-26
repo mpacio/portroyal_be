@@ -53,15 +53,15 @@ public class MatchService {
         this.gameService = gameService;
     }
 
-    public MatchDto getMatch(String keyCode, boolean fromBot) {
+    public MatchDto getMatch(String keyCode) {
         MatchDto res;
         MatchEntity matchEntity = matchRepository.findByKeyCode(keyCode)
                 .orElseThrow(() -> new ResourceNotFoundException("Match not found with keyCode " + keyCode));
         if (!matchEntity.getStarted()) {
-            res = MatchConverter.toDto(matchEntity, null, fromBot);
+            res = MatchConverter.toDto(matchEntity, null);
         } else {
             Match match = matchRetainer.getMatch(matchEntity);
-            res = MatchConverter.toDto(matchEntity, match, fromBot);
+            res = MatchConverter.toDto(matchEntity, match);
         }
         return res;
     }
@@ -90,17 +90,10 @@ public class MatchService {
                 sortField.getFieldName(), sortDirection.name(), MatchConverter.toListInfoDto(matches.getContent()));
     }
 
-    public MatchDto getHostedMatch(String username, String telegramId) {
-        Optional<MatchEntity> firstOpenMatch;
-        if (telegramId != null) {
-            firstOpenMatch = matchRepository.findFirstByHostUserTelegramIdAndEnded(telegramId, false);
-            return firstOpenMatch.map(matchEntity -> MatchConverter.toDto(matchEntity, null,true)).orElse(null);
-        } else if (username != null) {
-            firstOpenMatch = matchRepository.findFirstByHostUserUsernameAndEnded(username, false);
-            return firstOpenMatch.map(matchEntity -> MatchConverter.toDto(matchEntity, null, false)).orElse(null);
-        } else {
-            throw new MandatoryParamException("username or telegramId must be provided");
-        }
+    public MatchDto getHostedMatch(String username) {
+        return matchRepository.findFirstByHostUserUsernameAndEnded(username, false)
+                .map(matchEntity -> MatchConverter.toDto(matchEntity, null))
+                .orElse(null);
     }
 
     private MatchInfoDto saveNewMatch(UserEntity hostUser, Integer configurationId) {
@@ -171,10 +164,10 @@ public class MatchService {
         matchRepository.save(matchEntity);
     }
 
-    public MatchDto startMatch(UserEntity user, boolean includeTgIds) {
+    public MatchDto startMatch(UserEntity user) {
         String username = user.getUsername();
         MatchEntity matchEntity = matchRepository.findFirstByHostUserUsernameAndEnded(username, false)
-                .orElseThrow(() -> new ResourceNotFoundException("Match not found with username " + username));
+                .orElseThrow(() -> new ResourceNotFoundException("No matching match was found"));
         if (matchEntity.getStarted() == null || matchEntity.getStarted()) {
             throw new MultipleMatchStartAttemptException(matchEntity.getKeyCode());
         }
@@ -188,7 +181,7 @@ public class MatchService {
         // the first active player is chosen randomly by the library, so it may already be an AI player:
         // play out any leading AI turns before returning the match state to the caller.
         gameService.autoPlayAiTurns(match, matchEntity);
-        return MatchConverter.toDto(matchEntity, match, includeTgIds);
+        return MatchConverter.toDto(matchEntity, match);
     }
 
     public MatchInfoDto addAiPlayer(UserEntity host, AddAiPlayerReqDto addAiPlayerReqDto) {
@@ -207,7 +200,7 @@ public class MatchService {
         AIPlayerEntity aiPlayer = new AIPlayerEntity(aiPlayerUsername, displayName, addAiPlayerReqDto.getDifficulty());
         matchEntity.addAiPlayer(aiPlayer);
         MatchEntity savedMatchEntity = matchRepository.save(matchEntity);
-        log.info("AI player {} (difficulty {}) added to match with keyCode {}", aiPlayerUsername, addAiPlayerReqDto.getDifficulty(), savedMatchEntity.getKeyCode());
+        log.info("AI player added to a match (difficulty={})", addAiPlayerReqDto.getDifficulty());
         return MatchConverter.toInfoDto(savedMatchEntity);
     }
 
@@ -223,7 +216,7 @@ public class MatchService {
                         "AI player with username " + aiPlayerUsername + " not found in match with keyCode " + matchEntity.getKeyCode()));
         matchEntity.getAiPlayers().remove(aiPlayer);
         matchRepository.save(matchEntity);
-        log.info("AI player {} removed from match with keyCode {}", aiPlayerUsername, matchEntity.getKeyCode());
+        log.info("AI player removed from a match");
         return matchEntity.getKeyCode();
     }
 
@@ -232,7 +225,7 @@ public class MatchService {
                 .orElseThrow(() -> new ResourceNotFoundException("No open match hosted by user " + hostUsername));
     }
 
-    public Optional<MatchDto> getPlayingMatch(UserEntity user, boolean includeTgIds) {
+    public Optional<MatchDto> getPlayingMatch(UserEntity user) {
         String username = user.getUsername();
         Pageable pageable = PageRequest.of(0, 1, Sort.by(Sort.Order.desc("createdAt")));
         Page<MatchEntity> matches = matchRepository.findByPlayersUsernameAndEnded(username, false, pageable);
@@ -243,9 +236,9 @@ public class MatchService {
             // check if the match is started
             if (matchEntity.getStarted() != null && matchEntity.getStarted()) {
                 Match match = matchRetainer.getMatch(matchEntity);
-                return Optional.ofNullable(MatchConverter.toDto(matchEntity, match, includeTgIds));
+                return Optional.ofNullable(MatchConverter.toDto(matchEntity, match));
             } else {
-                return Optional.ofNullable(MatchConverter.toDto(matchEntity, null, includeTgIds));
+                return Optional.ofNullable(MatchConverter.toDto(matchEntity, null));
             }
         }
     }

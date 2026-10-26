@@ -10,7 +10,6 @@ import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
-import java.util.Base64;
 import java.util.Map;
 
 public final class ApiClient {
@@ -24,13 +23,12 @@ public final class ApiClient {
     }
 
     public static Response execute(String baseUrl,
-                                  String username,
-                                  String password,
+                                  String accessToken,
                                   String method,
                                   String path,
                                   String body,
                                   Map<String, String> headers,
-                                  boolean basicAuthRequired) throws IOException, InterruptedException {
+                                  boolean bearerTokenRequired) throws IOException, InterruptedException {
         String target = buildTargetUrl(baseUrl, path);
         String normalizedMethod = method == null || method.isBlank() ? "GET" : method.trim().toUpperCase();
         HttpRequest.Builder requestBuilder = HttpRequest.newBuilder()
@@ -39,10 +37,8 @@ public final class ApiClient {
                         ? HttpRequest.BodyPublishers.noBody()
                         : HttpRequest.BodyPublishers.ofString(body, StandardCharsets.UTF_8));
 
-        if (basicAuthRequired && username != null && !username.isBlank()) {
-            String credentials = username + ":" + (password == null ? "" : password);
-            String encoded = Base64.getEncoder().encodeToString(credentials.getBytes(StandardCharsets.UTF_8));
-            requestBuilder.header("Authorization", "Basic " + encoded);
+        if (bearerTokenRequired && accessToken != null && !accessToken.isBlank()) {
+            requestBuilder.header("Authorization", "Bearer " + accessToken.trim());
         }
         if (headers != null) {
             for (Map.Entry<String, String> entry : headers.entrySet()) {

@@ -26,7 +26,7 @@ public class PublicPagesController {
 
     @RequestMapping("/confirm-email")
     public ModelAndView confirmEmail(@RequestParam String token, ModelMap model) {
-        log.info("Confirming email with token: {}", token);
+        log.info("Processing email confirmation");
         UserDto userDto = userService.confirmEmail(token);
         log.info("Email confirmed successfully");
         ResourceBundle bundle = ResourceBundle.getBundle("labels", Locale.ITALY);

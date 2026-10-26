@@ -18,13 +18,14 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
-import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.context.request.async.DeferredResult;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
+import static com.matteopaciolla.prbe.util.AuthenticationUtils.getUsername;
+
 @Tag(name = "Sentinel", description = "Notification subscription APIs")
-@SecurityRequirements({@SecurityRequirement(name = "basicAuth")})
+@SecurityRequirements({@SecurityRequirement(name = "oauth2", scopes = {"game:play"})})
 @Slf4j
 @RestController
 @RequestMapping(Paths.SENTINEL_PATH)
@@ -50,7 +51,7 @@ The alerts refer to any match, that's why the matchKeyCode is required.""")
                             schema = @io.swagger.v3.oas.annotations.media.Schema(implementation = CallbackSentinelRequest.class),
                             examples = @io.swagger.v3.oas.annotations.media.ExampleObject(value = "{\"matchKeyCode\":\"xxxxxx\",\"url\":\"http://localhost:8080/callback\"}")))
             @Valid @RequestBody CallbackSentinelRequest request) {
-        String username = SecurityContextHolder.getContext().getAuthentication().getName();
+        String username = getUsername();
         UserEntity user = userService.getUserEntityByUsername(username);
         return ResponseEntity.ok(new VoidResponse(sentinelService.addCallbackSentinel(user.getId(), request.getMatchKeyCode(), request.getUrl(), request.getSecret())));
     }
@@ -65,7 +66,7 @@ The alert will be sent only if the alert is available before the timeout.""")
     public DeferredResult<AlertDto> addLongPollingSentinel(
             @Valid @NotBlank(message = "key_code must not be blank") @RequestParam("key_code") String keyCode,
             @Valid @Min(value = 10, message = "seconds must be greater or equal to 10") @RequestParam(defaultValue = "120") int seconds) {
-        String username = SecurityContextHolder.getContext().getAuthentication().getName();
+        String username = getUsername();
         UserEntity user = userService.getUserEntityByUsername(username);
         return sentinelService.addLongPollingSentinel(user, keyCode, seconds);
     }
@@ -84,7 +85,7 @@ The alert will be sent only if the alert is available before the timeout.""",
     public SseEmitter addSSESentinel(
             @Valid @NotBlank(message = "key_code must not be blank") @RequestParam(value = "key_code") String keyCode,
             @Valid @Min(value = 1, message = "seconds must be greater or equal to 1") @RequestParam(value = "seconds", defaultValue = "3600") int seconds) {
-        String username = SecurityContextHolder.getContext().getAuthentication().getName();
+        String username = getUsername();
         UserEntity user = userService.getUserEntityByUsername(username);
         return sentinelService.addSSESentinel(user, keyCode, seconds * 1000L);
     }
@@ -96,7 +97,7 @@ The subscription will not be available anymore.""")
     @DeleteMapping(path = "/subscription", produces = MediaType.APPLICATION_JSON_VALUE)
     public ResponseEntity<VoidResponse> removeSentinelSubscription(
             @Valid @NotBlank(message = "key_code must not be blank") @RequestParam(value = "key_code") String keyCode) {
-        String username = SecurityContextHolder.getContext().getAuthentication().getName();
+        String username = getUsername();
         UserEntity user = userService.getUserEntityByUsername(username);
         sentinelService.removeSentinelSubscription(user.getId(), keyCode);
         return ResponseEntity.ok(new VoidResponse("Subscription removed"));

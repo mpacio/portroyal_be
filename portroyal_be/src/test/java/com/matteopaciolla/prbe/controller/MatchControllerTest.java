@@ -58,9 +58,9 @@ class MatchControllerTest {
     void getMatchStatus_whenMoveNumberMatchesCurrentCount_returnsNoNewMoves() {
         MatchDto matchDto = new MatchDto();
         matchDto.setMovesCount(5);
-        when(matchService.getPlayingMatch(user, false)).thenReturn(Optional.of(matchDto));
+        when(matchService.getPlayingMatch(user)).thenReturn(Optional.of(matchDto));
 
-        ResponseEntity<MatchResponse> response = matchController.getMatchStatus(null, 5);
+        ResponseEntity<MatchResponse> response = matchController.getMatchStatus(5);
 
         assertThat(response.getBody().getMessage()).isEqualTo("No new moves");
         assertThat(response.getBody().getData()).isNull();
@@ -70,9 +70,9 @@ class MatchControllerTest {
     void getMatchStatus_whenMoveNumberDiffers_returnsCurrentMatch() {
         MatchDto matchDto = new MatchDto();
         matchDto.setMovesCount(5);
-        when(matchService.getPlayingMatch(user, false)).thenReturn(Optional.of(matchDto));
+        when(matchService.getPlayingMatch(user)).thenReturn(Optional.of(matchDto));
 
-        ResponseEntity<MatchResponse> response = matchController.getMatchStatus(null, 4);
+        ResponseEntity<MatchResponse> response = matchController.getMatchStatus(4);
 
         assertThat(response.getBody().getData()).isSameAs(matchDto);
     }

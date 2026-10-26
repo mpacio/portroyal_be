@@ -1,6 +1,5 @@
 package com.matteopaciolla.prbe.controller;
 
-import com.matteopaciolla.prbe.constants.CommonConstants;
 import com.matteopaciolla.prbe.constants.Paths;
 import com.matteopaciolla.prbe.constants.enums.SentinelAlertMessage;
 import com.matteopaciolla.prbe.dto.MatchDto;
@@ -8,7 +7,6 @@ import com.matteopaciolla.prbe.dto.MatchInfoDto;
 import com.matteopaciolla.prbe.dto.request.AddAiPlayerReqDto;
 import com.matteopaciolla.prbe.dto.request.MatchConfigReqDto;
 import com.matteopaciolla.prbe.dto.response.*;
-import com.matteopaciolla.prbe.exceptions.common.MandatoryBotParamException;
 import com.matteopaciolla.prbe.exceptions.match.MultipleHostingDemandException;
 import jakarta.validation.Valid;
 import com.matteopaciolla.prbe.model.entity.UserEntity;
@@ -18,7 +16,6 @@ import com.matteopaciolla.prbe.service.SentinelService;
 import com.matteopaciolla.prbe.service.UserService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
-import io.swagger.v3.oas.annotations.enums.ParameterIn;
 import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.media.ExampleObject;
 import io.swagger.v3.oas.annotations.media.Schema;
@@ -35,17 +32,14 @@ import org.springframework.web.bind.annotation.*;
 import java.util.Optional;
 
 import static com.matteopaciolla.prbe.util.AuthenticationUtils.getUsername;
-import static com.matteopaciolla.prbe.util.AuthenticationUtils.isBotUser;
 
 @Tag(name = "Match", description = "Matches operations")
-@SecurityRequirements({@SecurityRequirement(name = "basicAuth")})
+@SecurityRequirements({@SecurityRequirement(name = "oauth2", scopes = {"game:play"})})
 @Slf4j
 @RestController
 @RequiredArgsConstructor
 @RequestMapping(Paths.MATCH_PATH)
 public class MatchController {
-
-    private static final String BH = CommonConstants.BOT_MANDATORY_HEADER;
 
     private final MatchService matchService;
     private final UserService userService;
@@ -95,7 +89,7 @@ public class MatchController {
             @RequestParam("key_code") String keyCode,
             @Parameter(name = "move_number", description = "Last move count known by the client. If equal to the current movesCount, no new moves are available.", example = "14", required = false)
             @RequestParam(value = "move_number", required = false) Integer moveNumber) {
-        MatchDto matchDto = matchService.getMatch(keyCode, isBotUser());
+        MatchDto matchDto = matchService.getMatch(keyCode);
         if (moveNumber != null && moveNumber.equals(matchDto.getMovesCount())) {
             return ResponseEntity.ok(new MatchResponse("No new moves", null));
         }
@@ -104,7 +98,7 @@ public class MatchController {
 
     @Operation(
             summary = "Join a match",
-            description = "Joins an existing non-started match by key_code. If called by a bot, the tgId header identifies the user represented by the bot.",
+            description = "Joins an existing non-started match by key_code for the human subject represented by the bearer access token.",
             responses = {
                     @ApiResponse(responseCode = "200", description = "Match joined successfully"),
                     @ApiResponse(responseCode = "400", description = "Match cannot be joined in the current state")
@@ -113,22 +107,17 @@ public class MatchController {
     @PostMapping(path = "/join", produces = "application/json")
     public ResponseEntity<VoidResponse> joinMatch(
             @Parameter(name = "key_code", description = "Unique match key code", example = "ABC123", required = true)
-            @RequestParam("key_code") String keyCode,
-            @Parameter(name = BH, description = "Mandatory only for bot-mediated requests; identifies the real acting user.", required = false, schema = @Schema(type = "string"), in = ParameterIn.HEADER)
-            @RequestHeader(value = BH, required = false) String tgId) {
-        UserEntity user = getUserEntity(tgId);
+            @RequestParam("key_code") String keyCode) {
+        UserEntity user = getUserEntity();
         matchService.joinMatch(keyCode, user);
-        log.info("User {} joined the match with keyCode = {}", user.getUsername(), keyCode);
+        log.info("Player joined a match");
         sentinelService.sendUpdate(keyCode, user.getUsername(), SentinelAlertMessage.PLAYER_JOINED);
         return ResponseEntity.ok(new VoidResponse("Match joined successfully"));
     }
 
     @Operation(
             summary = "Host a match",
-            description = "Hosts a new match for the authenticated user, optionally using a specific game configuration. For bot users, tgId identifies the real acting user.",
-            parameters = {
-                    @Parameter(name = BH, description = "Mandatory only for bot-mediated requests; identifies the real acting user.", required = false, schema = @Schema(type = "string"), in = ParameterIn.HEADER)
-            },
+            description = "Hosts a new match for the human subject represented by the bearer access token, optionally using a specific game configuration.",
             requestBody = @io.swagger.v3.oas.annotations.parameters.RequestBody(description = "Optional match configuration", required = false,
                     content = @Content(mediaType = "application/json", schema = @Schema(implementation = MatchConfigReqDto.class),
                             examples = @ExampleObject(value = "{\"id\":1, \"name\":\"default\"}"))),
@@ -140,15 +129,14 @@ public class MatchController {
     )
     @PostMapping(path = "/host", produces = "application/json")
     public ResponseEntity<MatchInfoResponse> hostMatch(
-            @RequestHeader(value = BH, required = false) String tgId,
             @RequestBody(required = false) MatchConfigReqDto matchConfigReqDto) {
-        UserEntity user = getUserEntity(tgId);
-        MatchDto matchDto = matchService.getHostedMatch(user.getUsername(), tgId);
+        UserEntity user = getUserEntity();
+        MatchDto matchDto = matchService.getHostedMatch(user.getUsername());
         if (matchDto != null) {
             throw new MultipleHostingDemandException(matchDto.getKeyCode(), user.getUsername());
         }
         MatchInfoDto matchInfoDto = matchService.hostMatch(user, matchConfigReqDto);
-        log.info("User {} hosted a match with keyCode = {}", user.getUsername(), matchInfoDto.getKeyCode());
+        log.info("Player hosted a match");
         return ResponseEntity.ok(new MatchInfoResponse(matchInfoDto));
     }
 
@@ -161,12 +149,10 @@ public class MatchController {
             }
     )
     @PostMapping(path = "/close", produces = "application/json")
-    public ResponseEntity<VoidResponse> closeMatch(
-            @Parameter(name = BH, description = "Mandatory only for bot-mediated requests; identifies the real acting user.", required = false, schema = @Schema(type = "string"), in = ParameterIn.HEADER)
-            @RequestHeader(value = BH, required = false) String tgId) {
-        UserEntity user = getUserEntity(tgId);
+    public ResponseEntity<VoidResponse> closeMatch() {
+        UserEntity user = getUserEntity();
         String keyCode = matchService.closeMatch(user);
-        log.info("User {} closed the match with keyCode = {}", user.getUsername(), keyCode);
+        log.info("Player closed a match");
         sentinelService.sendUpdate(keyCode, user.getUsername(), SentinelAlertMessage.MATCH_CLOSED);
         return ResponseEntity.ok(new VoidResponse("Match closed successfully"));
     }
@@ -181,12 +167,10 @@ public class MatchController {
             }
     )
     @PostMapping(path = "/start", produces = "application/json")
-    public ResponseEntity<MatchResponse> startMatch(
-            @Parameter(name = BH, description = "Mandatory only for bot-mediated requests; identifies the real acting user.", required = false, schema = @Schema(type = "string"), in = ParameterIn.HEADER)
-            @RequestHeader(value = BH, required = false) String tgId) {
-        UserEntity user = getUserEntity(tgId);
-        MatchDto matchDto = matchService.startMatch(user, tgId != null);
-        log.info("User {} started the match with keyCode = {}", user.getUsername(), matchDto.getKeyCode());
+    public ResponseEntity<MatchResponse> startMatch() {
+        UserEntity user = getUserEntity();
+        MatchDto matchDto = matchService.startMatch(user);
+        log.info("Player started a match");
         sentinelService.sendUpdate(matchDto.getKeyCode(), user.getUsername(), SentinelAlertMessage.MATCH_STARTED);
         return ResponseEntity.ok(new MatchResponse("Match started successfully. Time to insert moves", matchDto));
     }
@@ -194,9 +178,6 @@ public class MatchController {
     @Operation(
             summary = "Add an AI player",
             description = "Adds an autonomous AI player, at the given difficulty, to the not-yet-started match hosted by the authenticated user. The backend plays the AI player's turns automatically once the match starts.",
-            parameters = {
-                    @Parameter(name = BH, description = "Mandatory only for bot-mediated requests; identifies the real acting user.", required = false, schema = @Schema(type = "string"), in = ParameterIn.HEADER)
-            },
             responses = {
                     @ApiResponse(responseCode = "200", description = "AI player added successfully",
                             content = @Content(mediaType = "application/json", schema = @Schema(implementation = MatchInfoResponse.class))),
@@ -205,12 +186,10 @@ public class MatchController {
     )
     @PostMapping(path = "/ai-player", produces = "application/json")
     public ResponseEntity<MatchInfoResponse> addAiPlayer(
-            @Parameter(name = BH, description = "Mandatory only for bot-mediated requests; identifies the real acting user.", required = false, schema = @Schema(type = "string"), in = ParameterIn.HEADER)
-            @RequestHeader(value = BH, required = false) String tgId,
             @Valid @RequestBody AddAiPlayerReqDto addAiPlayerReqDto) {
-        UserEntity host = getUserEntity(tgId);
+        UserEntity host = getUserEntity();
         MatchInfoDto matchInfoDto = matchService.addAiPlayer(host, addAiPlayerReqDto);
-        log.info("Host {} added an AI player to the match with keyCode = {}", host.getUsername(), matchInfoDto.getKeyCode());
+        log.info("Host added an AI player to a match");
         sentinelService.sendUpdate(matchInfoDto.getKeyCode(), host.getUsername(), SentinelAlertMessage.PLAYER_JOINED);
         return ResponseEntity.ok(new MatchInfoResponse(matchInfoDto));
     }
@@ -218,9 +197,6 @@ public class MatchController {
     @Operation(
             summary = "Remove an AI player",
             description = "Removes a previously added AI player from the not-yet-started match hosted by the authenticated user.",
-            parameters = {
-                    @Parameter(name = BH, description = "Mandatory only for bot-mediated requests; identifies the real acting user.", required = false, schema = @Schema(type = "string"), in = ParameterIn.HEADER)
-            },
             responses = {
                     @ApiResponse(responseCode = "200", description = "AI player removed successfully"),
                     @ApiResponse(responseCode = "400", description = "Match is already started, not hosted by the authenticated user, or the given username is not an AI player in this match")
@@ -228,13 +204,11 @@ public class MatchController {
     )
     @DeleteMapping(path = "/ai-player", produces = "application/json")
     public ResponseEntity<VoidResponse> removeAiPlayer(
-            @Parameter(name = BH, description = "Mandatory only for bot-mediated requests; identifies the real acting user.", required = false, schema = @Schema(type = "string"), in = ParameterIn.HEADER)
-            @RequestHeader(value = BH, required = false) String tgId,
             @Parameter(name = "ai_player_username", description = "Username of the AI player to remove", example = "ABC123-ai-1", required = true)
             @RequestParam("ai_player_username") String aiPlayerUsername) {
-        UserEntity host = getUserEntity(tgId);
+        UserEntity host = getUserEntity();
         String keyCode = matchService.removeAiPlayer(host, aiPlayerUsername);
-        log.info("Host {} removed AI player {} from the match with keyCode = {}", host.getUsername(), aiPlayerUsername, keyCode);
+        log.info("Host removed an AI player from a match");
         sentinelService.sendUpdate(keyCode, aiPlayerUsername, SentinelAlertMessage.PLAYER_LEFT);
         return ResponseEntity.ok(new VoidResponse("AI player removed successfully"));
     }
@@ -249,12 +223,10 @@ public class MatchController {
     )
     @GetMapping(path = "/status", produces = "application/json")
     public ResponseEntity<MatchResponse> getMatchStatus(
-            @Parameter(name = BH, description = "Mandatory only for bot-mediated requests; identifies the real acting user.", required = false, schema = @Schema(type = "string"), in = ParameterIn.HEADER)
-            @RequestHeader(value = BH, required = false) String tgId,
             @Parameter(name = "move_number", description = "Last move count known by the client. If equal to the current movesCount, no new moves are available.", example = "14", required = false)
             @RequestParam(value = "move_number", required = false) Integer moveNumber) {
-        UserEntity user = getUserEntity(tgId);
-        Optional<MatchDto> playingMatch = matchService.getPlayingMatch(user, tgId != null);
+        UserEntity user = getUserEntity();
+        Optional<MatchDto> playingMatch = matchService.getPlayingMatch(user);
         if (playingMatch.isEmpty()) {
             String message = String.format("No match is currently being played by %s", user.getUsername());
             return ResponseEntity.ok(new MatchResponse(message, null));
@@ -267,14 +239,7 @@ public class MatchController {
         }
     }
 
-    private UserEntity getUserEntity(String tgId) {
-        if (isBotUser()) {
-            if (tgId == null || tgId.isEmpty()) {
-                throw new MandatoryBotParamException();
-            }
-            return userService.getUserEntityByTelegramId(tgId);
-        } else {
-            return userService.getUserEntityByUsername(getUsername());
-        }
+    private UserEntity getUserEntity() {
+        return userService.getUserEntityByUsername(getUsername());
     }
 }

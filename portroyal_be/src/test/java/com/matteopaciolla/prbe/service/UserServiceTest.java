@@ -4,6 +4,7 @@ import com.matteopaciolla.prbe.constants.FakeNames;
 import com.matteopaciolla.prbe.dto.UserDto;
 import com.matteopaciolla.prbe.dto.request.UserReqDto;
 import com.matteopaciolla.prbe.exceptions.common.MandatoryParamException;
+import com.matteopaciolla.prbe.exceptions.common.UniqueConstraintViolatedException;
 import com.matteopaciolla.prbe.facade.EmailSenderFacade;
 import com.matteopaciolla.prbe.model.entity.OtpEntity;
 import com.matteopaciolla.prbe.model.entity.UserEntity;
@@ -36,6 +37,8 @@ class UserServiceTest {
     private OtpRepository otpRepository;
     @Mock
     private EmailSenderFacade emailSenderFacade;
+    @Mock
+    private OAuth2AuthorizationRevocationService authorizationRevocationService;
 
     @InjectMocks
     private UserService userService;
@@ -47,10 +50,11 @@ class UserServiceTest {
     }
 
     @Test
-    void registerWebUser_requiresUsernameAndEmailButNotPassword() {
+    void registerWebUser_requiresUsernameEmailAndPassword() {
         UserReqDto request = new UserReqDto();
         request.setUsername("alice42");
         request.setEmail("alice@example.com");
+        request.setPassword("valid-password");
         when(userRepository.findByUsernameOrEmailOrTelegramId("alice42", "alice@example.com", ""))
                 .thenReturn(Optional.empty());
         when(passwordEncoder.encode(any())).thenReturn("encoded-password");
@@ -89,11 +93,54 @@ class UserServiceTest {
     void registerWebUser_reportsEmailAsRequired() {
         UserReqDto request = new UserReqDto();
         request.setUsername("alice42");
+        request.setPassword("valid-password");
 
         assertThatThrownBy(() -> userService.registerUser(request, false))
                 .isInstanceOf(MandatoryParamException.class)
                 .extracting(exception -> ((MandatoryParamException) exception).getMissingParams())
                 .isEqualTo(java.util.List.of("email"));
+    }
+
+    @Test
+    void registerWebUser_rejectsUnverifiedTelegramIdentity() {
+        UserReqDto request = new UserReqDto();
+        request.setUsername("alice42");
+        request.setEmail("alice@example.com");
+        request.setPassword("valid-password");
+        request.setTelegramId("123456789");
+
+        assertThatThrownBy(() -> userService.registerUser(request, false))
+                .isInstanceOf(MandatoryParamException.class)
+                .extracting(exception -> ((MandatoryParamException) exception).getDescription())
+                .isEqualTo("Telegram identity must be linked through the authorized account flow");
+    }
+
+    @Test
+    void registerBotUser_rejectsEmailAndPasswordFields() {
+        UserReqDto request = new UserReqDto();
+        request.setUsername("pirate42");
+        request.setTelegramId("123456789");
+        request.setEmail("pirate@example.com");
+
+        assertThatThrownBy(() -> userService.registerUser(request, true))
+                .isInstanceOf(MandatoryParamException.class)
+                .extracting(exception -> ((MandatoryParamException) exception).getDescription())
+                .isEqualTo("Telegram registration must not provide email or password");
+    }
+
+    @Test
+    void registerWebUser_doesNotRevealWhichIdentifierAlreadyExists() {
+        UserReqDto request = new UserReqDto();
+        request.setUsername("alice42");
+        request.setEmail("alice@example.com");
+        request.setPassword("valid-password");
+        when(userRepository.findByUsernameOrEmailOrTelegramId("alice42", "alice@example.com", ""))
+                .thenReturn(Optional.of(new UserEntity()));
+
+        assertThatThrownBy(() -> userService.registerUser(request, false))
+                .isInstanceOf(UniqueConstraintViolatedException.class)
+                .extracting(exception -> ((UniqueConstraintViolatedException) exception).getDescription())
+                .isEqualTo("Registration could not be completed");
     }
 
     @Test
@@ -105,6 +152,20 @@ class UserServiceTest {
                 .isInstanceOf(MandatoryParamException.class)
                 .extracting(exception -> ((MandatoryParamException) exception).getMissingParams())
                 .isEqualTo(java.util.List.of("telegramId"));
+    }
+
+    @Test
+    void changePassword_revokesAuthorizationsForTheUser() {
+        UserEntity user = new UserEntity("alice42", "old-encoded", java.util.List.of(
+                com.matteopaciolla.prbe.constants.enums.UserRole.USER));
+        when(userRepository.findByUsername("alice42")).thenReturn(Optional.of(user));
+        when(passwordEncoder.matches("old-password", "old-encoded")).thenReturn(true);
+        when(passwordEncoder.encode("new-password")).thenReturn("new-encoded");
+        when(userRepository.save(any(UserEntity.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        userService.changePassword("alice42", "old-password", "new-password");
+
+        verify(authorizationRevocationService).revokePrincipal("alice42");
     }
 
     @Test

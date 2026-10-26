@@ -55,13 +55,13 @@ public class SentinelService {
     }
 
     public String addCallbackSentinel(Long userId, String keyCode, String url, String secret) {
-        log.info("Requested callback sentinel for match: {}", keyCode);
+        log.info("Requested callback sentinel");
         checkMatchExists(keyCode);
         Set<SentinelSubscription> subs = matchSubsMap.get(keyCode);
         if (subs != null) {
             subs.forEach(sub -> {
                 if (sub.getUser().getId().equals(userId)) {
-                    log.warn("Subscription already exists for user: {}, updating it with a callback", sub.getUser().getUsername());
+                    log.warn("Replacing existing callback subscription");
                     sub.stop();
                     boolean found = subs.remove(sub);
                     logRemoving(found, subs.size());
@@ -83,7 +83,7 @@ public class SentinelService {
     }
 
     public DeferredResult<AlertDto> addLongPollingSentinel(UserEntity user, String keyCode, int secondsTimeout) {
-        log.info("Adding long polling sentinel for keyCode: {}", keyCode);
+        log.info("Adding long polling sentinel");
         checkMatchExists(keyCode);
         DeferredResult<AlertDto> result = new DeferredResult<>();
         Set<SentinelSubscription> clients = matchSubsMap.getOrDefault(keyCode, ConcurrentHashMap.newKeySet());
@@ -91,7 +91,7 @@ public class SentinelService {
         Optional<SentinelSubscription> existingSub = clients.stream()
                 .filter(sub -> sub.equals(subscription)).findFirst();
         if (existingSub.isPresent()) {
-            log.warn("Subscription already exists for user: {}, updating it with a long polling", user.getUsername());
+            log.warn("Replacing existing long polling subscription");
             existingSub.get().stop();
             boolean found = clients.remove(existingSub.get());
             logRemoving(found, clients.size());
@@ -107,12 +107,12 @@ public class SentinelService {
                     result.setResult(alert);
                     subscription.stop();
                     boolean found = clients.remove(subscription);
-                    log.debug("DeferredResult completed, removing from list. subscription: {}", subscription);
+                    log.debug("DeferredResult completed, removing subscription");
                     logRemoving(found, clients.size());
                     Thread.currentThread().interrupt();
                 }
             } catch (InterruptedException e) {
-                log.warn("Long Polling Thread interrupted, stopping it. subscription: {}", subscription);
+                log.warn("Long polling thread interrupted, stopping it");
                 Thread.currentThread().interrupt();
             }
         });
@@ -121,7 +121,7 @@ public class SentinelService {
     }
 
     public SseEmitter addSSESentinel(UserEntity user, String keyCode, long timeout) {
-        log.info("Subscribing to events for keyCode: {}", keyCode);
+        log.info("Subscribing to match events");
         checkMatchExists(keyCode);
         SseEmitter emitter = new SseEmitter(timeout);
         Set<SentinelSubscription> clients = matchSubsMap.getOrDefault(keyCode, ConcurrentHashMap.newKeySet());
@@ -129,7 +129,7 @@ public class SentinelService {
         Optional<SentinelSubscription> existingSub = clients.stream()
                 .filter(sub -> sub.equals(subscription)).findFirst();
         if (existingSub.isPresent()) {
-            log.warn("Subscription already exists for user: {}, updating it with a SSE", user.getUsername());
+            log.warn("Replacing existing server-sent event subscription");
             existingSub.get().stop();
             clients.remove(existingSub.get());
         }
@@ -149,7 +149,7 @@ public class SentinelService {
             });
             emitter.onError(throwable -> {
                 boolean found = clients.removeIf(sub -> sub.getEmitter() == emitter);
-                log.debug("SSE Emitter failed with error: {}, removed from list", throwable.getMessage());
+                log.debug("SSE emitter failed; removed subscription");
                 logRemoving(found, clients.size());
             });
             // just for testing
@@ -195,10 +195,10 @@ public class SentinelService {
                         sendSSEEvents(sub.getUser().getId(), keyCode, sub.getEmitter(), message);
                     } catch (IOException e) {
                         toBeRemoved = true;
-                        log.warn("IOException encountered. Removing emitter for user: {}", sub.getUser().getUsername());
+                        log.warn("IOException encountered; removing emitter");
                     } catch (Exception e) {
                         toBeRemoved = true;
-                        log.debug("Failed to send event to emitter, removing it: {}", e.getMessage());
+                        log.debug("Failed to send event to emitter; removing it");
                     }
                 }
                 if (sub.getDeferredResult() != null) {
@@ -211,7 +211,7 @@ public class SentinelService {
             });
             log.trace("After update sending subs size: {}", subs.size());
         } else {
-            log.trace("No subscriptions found for keyCode: {}", keyCode);
+            log.trace("No subscriptions found for match");
         }
         if (lastMessage) {
             removeAllMatchSubscriptions(keyCode);
@@ -223,20 +223,19 @@ public class SentinelService {
         urlSecrets.forEach(urlSecret -> {
             String url = urlSecret.getUrl();
             String secret = urlSecret.getSecret();
-            log.debug("Sending notification to {}", url);
             try {
                 AlertDto alert = new AlertDto(message, keyCode);
                 AlertCallbackWrapperDto request = new AlertCallbackWrapperDto(username, alert, secret);
                 ResponseEntity<Object> response = restTemplate.postForEntity(url, request, Object.class);
-                log.debug("Notification sent to {} with status code {}", url, response.getStatusCode());
+                log.debug("Callback notification completed with status {}", response.getStatusCode());
             } catch (ResourceNotFoundException e) {
-                log.warn("Error sending notification to {} because of ResourceNotFoundException {}", url, e.getMessage());
+                log.warn("Callback notification failed with ResourceNotFoundException");
             } catch (ResourceAccessException e) {
-                log.warn("Error sending notification to {} because of ResourceAccessException {}", url, e.getMessage());
+                log.warn("Callback notification failed with ResourceAccessException");
             } catch (RestClientException e) {
-                log.warn("Error sending notification to {} because of RestClientException {}", url, e.getMessage());
+                log.warn("Callback notification failed with RestClientException");
             } catch (Exception e) {
-                log.warn("Error sending notification to {} with message {}", url, e.getMessage());
+                log.warn("Callback notification failed");
             }
         });
     }
@@ -252,7 +251,7 @@ public class SentinelService {
                 if (sub.getUser().getId().equals(userId)) {
                     sub.stop();
                     iterator.remove();
-                    log.debug("Subscription removed for user: {}", sub.getUser().getUsername());
+                    log.debug("Subscription removed");
                     logRemoving(true, subs.size());
                 }
             }
@@ -269,7 +268,7 @@ public class SentinelService {
                 .name("alert")
                 .id(id)
                 .data(alert));
-        log.debug("Event with id: {} sent to user: {}", id, userId);
+        log.debug("Server-sent event delivered");
     }
 
     private void sendLongPollingEvents(DeferredResult<AlertDto> deferredResult, String keyCode, SentinelAlertMessage message) {
@@ -294,7 +293,7 @@ public class SentinelService {
         if (subs != null) {
             subs.forEach(SentinelSubscription::stop);
             matchSubsMap.remove(keyCode);
-            log.debug("Removed all subscriptions for keyCode: {}", keyCode);
+            log.debug("Removed all match subscriptions");
         }
     }
 }

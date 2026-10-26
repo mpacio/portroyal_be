@@ -48,6 +48,10 @@ build/
 # Project specific
 HELP.md
 logs/**
+/.env
+/secrets/
+*.p12
+*.pfx
 /create-schema.sql
 /drop-schema.sql
 .editorconfig

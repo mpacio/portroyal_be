@@ -1,10 +1,8 @@
 package com.matteopaciolla.prbe.controller;
 
-import com.matteopaciolla.prbe.constants.CommonConstants;
 import com.matteopaciolla.prbe.constants.Paths;
 import com.matteopaciolla.prbe.dto.request.MoveReqDto;
 import com.matteopaciolla.prbe.dto.response.*;
-import com.matteopaciolla.prbe.exceptions.common.MandatoryBotParamException;
 import com.matteopaciolla.prbe.repository.MoveRepository;
 import com.matteopaciolla.prbe.service.GameService;
 import com.matteopaciolla.prbe.service.MatchService;
@@ -29,13 +27,11 @@ import static com.matteopaciolla.prbe.util.AuthenticationUtils.getUsername;
 import static com.matteopaciolla.prbe.util.AuthenticationUtils.isBotUser;
 
 @Tag(name = "Game", description = "Game move execution and move history APIs.")
-@SecurityRequirements({@SecurityRequirement(name = "basicAuth")})
+@SecurityRequirements({@SecurityRequirement(name = "oauth2", scopes = {"game:play"})})
 @Slf4j
 @RestController
 @RequestMapping(Paths.GAME_PATH)
 public class GameController {
-
-    private static final String BH = CommonConstants.BOT_MANDATORY_HEADER;
 
     @Autowired
     private GameService gameService;
@@ -45,10 +41,7 @@ public class GameController {
 
     @Operation(
             summary = "Insert a move",
-            description = "Executes a legal move in the current match. When the caller is a bot, the tgId header identifies the real acting player behind the technical account.",
-            parameters = {
-                    @Parameter(name = BH, description = "Mandatory only for bot-mediated requests; identifies the real acting player.", required = false, schema = @Schema(type = "string"), in = ParameterIn.HEADER)
-            },
+            description = "Executes a legal move in the current match for the human subject represented by the bearer access token.",
             requestBody = @io.swagger.v3.oas.annotations.parameters.RequestBody(description = "Move payload to execute", required = true,
                     content = @Content(mediaType = "application/json", schema = @Schema(implementation = MoveReqDto.class),
                             examples = @ExampleObject(value = "{\"move\":\"COMMIT_EXPEDITION\",\"parameterIndex\":0,\"pickPlayerIndex\":-1,\"expeditionEmployeesList\":[\"CAPTAIN\",\"CAPTAIN\",\"SETTLER\"]}"))),
@@ -61,17 +54,8 @@ public class GameController {
     )
     @PostMapping(path = "/move", consumes = "application/json", produces = "application/json")
     public ResponseEntity<MoveResponse> move(
-            @RequestHeader(value = BH, required = false) String tgId,
             @Valid @RequestBody MoveReqDto moveReqDto) {
-        MoveResponse moveResponse;
-        if (isBotUser()) {
-            if (tgId == null) {
-                throw new MandatoryBotParamException();
-            }
-            moveResponse = gameService.insertMoveWithTelegramId(tgId, moveReqDto);
-        } else {
-            moveResponse = gameService.insertMoveWithUsername(getUsername(), moveReqDto);
-        }
+        MoveResponse moveResponse = gameService.insertMoveWithUsername(getUsername(), moveReqDto);
         return ResponseEntity.ok(moveResponse);
     }
 

@@ -70,20 +70,7 @@ public class GameService {
         Pageable pageable = PageRequest.of(0, 1, Sort.by(Sort.Order.desc("createdAt")));
         Page<MatchEntity> matches = matchRepository.findByPlayersUsernameAndEnded(username, false, pageable);
         if (matches.isEmpty()) {
-            throw new ResourceNotFoundException("The user with username " + username + " is not in any match");
-        } else {
-            MatchEntity matchEntity = matches.getContent().getFirst();
-            return insertMove(moveReqDto, matchEntity, user);
-        }
-    }
-
-    public MoveResponse insertMoveWithTelegramId(String telegramId, MoveReqDto moveReqDto) {
-        UserEntity user = userRepository.findByTelegramId(telegramId)
-                .orElseThrow(() -> new ResourceNotFoundException("User not found"));
-        Pageable pageable = PageRequest.of(0, 1, Sort.by(Sort.Order.desc("createdAt")));
-        Page<MatchEntity> matches = matchRepository.findByPlayersTelegramIdAndEnded(telegramId, false, pageable);
-        if (matches.isEmpty()) {
-            throw new ResourceNotFoundException("The user with telegramId " + telegramId + " is not in any match");
+            throw new ResourceNotFoundException("The requested user is not in a match");
         } else {
             MatchEntity matchEntity = matches.getContent().getFirst();
             return insertMove(moveReqDto, matchEntity, user);
@@ -165,14 +152,14 @@ public class GameService {
                 break;
             }
             if (++iterations > MAX_AUTO_AI_MOVES_PER_TURN_LOOP) {
-                log.error("AI auto-play safety cap reached for match {}, stopping the auto-play loop", keyCode);
+                log.error("AI auto-play safety cap reached; stopping the loop");
                 break;
             }
             MoveRecord aiMove;
             try {
                 aiMove = match.calculateNextMoveRecord(aiPlayer.get().getDifficulty());
             } catch (RuntimeException e) {
-                log.error("AI player {} failed to compute a move in match {}", runningPlayerName, keyCode, e);
+                log.error("AI player failed to compute a move", e);
                 break;
             }
             if (aiMove == null) {
@@ -180,10 +167,8 @@ public class GameService {
             }
             anyAiMovePlayed = true;
             lastActingAiPlayerUsername = aiPlayer.get().getUsername();
-            log.info("AI player {} executed move {} in match {} (difficulty={}, timeIndex={}, choiceIndex={}, pickPlayerIndex={})",
-                    lastActingAiPlayerUsername,
+            log.info("AI move completed (move={}, difficulty={}, timeIndex={}, choiceIndex={}, pickPlayerIndex={})",
                     aiMove.getMove(),
-                    keyCode,
                     aiPlayer.get().getDifficulty(),
                     aiMove.getTimeIndex(),
                     aiMove.getChoiceIndex(),

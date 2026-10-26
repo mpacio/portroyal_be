@@ -18,11 +18,9 @@ public class PortRoyalCli {
 
     private static final ObjectMapper MAPPER = new ObjectMapper();
     private static final String DEFAULT_URL = "http://localhost:8080";
-    private static final String DEFAULT_USERNAME = "admin";
-    private static final String DEFAULT_PASSWORD = "password";
 
     public static void main(String[] args) {
-        Session session = new Session(DEFAULT_URL, DEFAULT_USERNAME, DEFAULT_PASSWORD, null);
+        Session session = new Session(DEFAULT_URL, null, null, false);
         try (Scanner scanner = new Scanner(System.in)) {
             printBanner();
             while (true) {
@@ -62,26 +60,27 @@ public class PortRoyalCli {
             session.baseUrl = baseUrl;
         }
 
-        System.out.print("Username [" + session.username + "]: ");
-        String username = scanner.nextLine().trim();
-        if (!username.isBlank()) {
-            session.username = username;
-        }
+        System.out.print("OAuth 2.0 bearer access token (blank to clear): ");
+        String accessToken = scanner.nextLine().trim();
+        session.accessToken = accessToken.isBlank() ? null : accessToken;
 
-        System.out.print("Password [" + session.password + "]: ");
-        String password = scanner.nextLine();
-        if (!password.isBlank()) {
-            session.password = password;
-        }
+        System.out.print("Token is for the confidential Telegram BOT client? [y/N]: ");
+        String botClient = scanner.nextLine().trim();
+        session.botClient = botClient.equalsIgnoreCase("y") || botClient.equalsIgnoreCase("yes");
 
-        System.out.print("tgId for bot flows (blank to disable): ");
-        String tgId = scanner.nextLine().trim();
-        session.tgId = tgId.isBlank() ? null : tgId;
+        if (session.botClient) {
+            System.out.print("Telegram ID for authorized onboarding/linking flows (blank to clear): ");
+            String tgId = scanner.nextLine().trim();
+            session.tgId = tgId.isBlank() ? null : tgId;
+        } else {
+            session.tgId = null;
+        }
 
         System.out.println("Connection configured.");
         System.out.println("Base URL: " + session.baseUrl);
-        System.out.println("Username: " + session.username);
-        System.out.println("Bot tgId: " + (session.tgId == null ? "disabled" : session.tgId));
+        System.out.println("Bearer token: " + (session.accessToken == null ? "not configured" : "configured"));
+        System.out.println("BOT client mode: " + session.botClient);
+        System.out.println("Telegram ID: " + (session.tgId == null ? "not configured" : "configured"));
     }
 
     private static void showCurrentUser(Session session, Scanner scanner) {
@@ -90,35 +89,16 @@ public class PortRoyalCli {
     }
 
     private static void registerUser(Session session, Scanner scanner) {
-        ApiClient.Response currentUserResponse = call(session, "GET", "/api/v1/user/me", null, null);
-        boolean botUser;
-        if (currentUserResponse.statusCode() == 401) {
-            botUser = false;
-        } else if (currentUserResponse.statusCode() >= 400) {
-            printResponse(currentUserResponse);
-            return;
-        } else {
-            try {
-                JsonNode responseBody = MAPPER.readTree(currentUserResponse.body());
-                JsonNode roles = responseBody == null ? null : responseBody.path("data").path("roles");
-                if (roles == null || !roles.isArray()) {
-                    printResponse(currentUserResponse);
-                    System.out.println("Unable to determine the authenticated user's role.");
-                    return;
-                }
-                botUser = false;
-                for (JsonNode role : roles) {
-                    if ("BOT".equalsIgnoreCase(role.asText())) {
-                        botUser = true;
-                        break;
-                    }
-                }
-            } catch (IOException e) {
-                System.out.println("Unable to determine the authenticated user's role: " + e.getMessage());
+        boolean botUser = session.botClient;
+        if (!botUser) {
+            ApiClient.Response currentUserResponse = call(session, "GET", "/api/v1/user/me", null, null);
+            if (currentUserResponse.statusCode() >= 400 && currentUserResponse.statusCode() != 401) {
+                printResponse(currentUserResponse);
                 return;
             }
+        } else {
+            System.out.println("Using BOT-authorized Telegram onboarding.");
         }
-
         if (botUser && (session.tgId == null || session.tgId.isBlank())) {
             System.out.println("Configure the Telegram user's tgId before registering from a bot account.");
             return;
@@ -175,13 +155,15 @@ public class PortRoyalCli {
 
         Map<String, Object> payload = new LinkedHashMap<>();
         payload.put("email", email);
-        Map<String, String> headers = session.tgId == null ? null : Map.of("tgId", session.tgId);
+        Map<String, String> headers = session.botClient && session.tgId != null
+                ? Map.of("tgId", session.tgId)
+                : null;
         ApiClient.Response response = call(session, "POST", "/api/v1/user/new-tg-unify-email-otp", payload, headers);
         printResponse(response);
     }
 
     private static void unifyAccounts(Session session, Scanner scanner) {
-        if (session.tgId == null || session.tgId.isBlank()) {
+        if (!session.botClient || session.tgId == null || session.tgId.isBlank()) {
             System.out.println("Configure the bot account and its tgId before unifying accounts.");
             return;
         }
@@ -242,7 +224,7 @@ public class PortRoyalCli {
                 return;
             }
         }
-        ApiClient.Response response = call(session, "POST", "/api/v1/match/host", config, session.tgId == null ? null : Map.of("tgId", session.tgId));
+        ApiClient.Response response = call(session, "POST", "/api/v1/match/host", config, null);
         printResponse(response);
     }
 
@@ -254,7 +236,7 @@ public class PortRoyalCli {
             return;
         }
         String path = "/api/v1/match/join?key_code=" + urlEncode(keyCode);
-        ApiClient.Response response = call(session, "POST", path, null, session.tgId == null ? null : Map.of("tgId", session.tgId));
+        ApiClient.Response response = call(session, "POST", path, null, null);
         printResponse(response);
     }
 
@@ -273,7 +255,7 @@ public class PortRoyalCli {
         if (!name.isBlank()) {
             payload.put("name", name);
         }
-        ApiClient.Response response = call(session, "POST", "/api/v1/match/ai-player", payload, session.tgId == null ? null : Map.of("tgId", session.tgId));
+        ApiClient.Response response = call(session, "POST", "/api/v1/match/ai-player", payload, null);
         printResponse(response);
     }
 
@@ -285,12 +267,12 @@ public class PortRoyalCli {
             return;
         }
         String path = "/api/v1/match/ai-player?ai_player_username=" + urlEncode(aiPlayerUsername);
-        ApiClient.Response response = call(session, "DELETE", path, null, session.tgId == null ? null : Map.of("tgId", session.tgId));
+        ApiClient.Response response = call(session, "DELETE", path, null, null);
         printResponse(response);
     }
 
     private static void startMatch(Session session, Scanner scanner) {
-        ApiClient.Response response = call(session, "POST", "/api/v1/match/start", null, session.tgId == null ? null : Map.of("tgId", session.tgId));
+        ApiClient.Response response = call(session, "POST", "/api/v1/match/start", null, null);
         printResponse(response);
     }
 
@@ -385,7 +367,7 @@ public class PortRoyalCli {
                     payload.put("expeditionEmployeesList", Collections.emptyList());
                 }
 
-                ApiClient.Response moveResponse = call(session, "POST", "/api/v1/game/move", payload, session.tgId == null ? null : Map.of("tgId", session.tgId));
+                ApiClient.Response moveResponse = call(session, "POST", "/api/v1/game/move", payload, null);
                 printResponse(moveResponse);
                 if (moveResponse.statusCode() >= 400) {
                     continue;
@@ -417,12 +399,14 @@ public class PortRoyalCli {
         String rawBody = scanner.nextLine();
         String body = rawBody == null || rawBody.isBlank() ? null : rawBody;
         Map<String, String> headers = new HashMap<>();
-        if (session.tgId != null && !session.tgId.isBlank()) {
+        if (session.botClient && session.tgId != null && !session.tgId.isBlank()
+                && isBotOnboardingPath(method, path)) {
             headers.put("tgId", session.tgId);
         }
-        boolean basicAuthRequired = !ApiClient.isPublicEndpoint(path);
+        boolean bearerTokenRequired = !ApiClient.isPublicEndpoint(path);
         try {
-            ApiClient.Response response = ApiClient.execute(session.baseUrl, session.username, session.password, method, path, body, headers, basicAuthRequired);
+            ApiClient.Response response = ApiClient.execute(session.baseUrl, session.accessToken,
+                    method, path, body, headers, bearerTokenRequired);
             printResponse(response);
         } catch (IOException | InterruptedException e) {
             System.out.println("Request failed: " + e.getMessage());
@@ -431,14 +415,23 @@ public class PortRoyalCli {
 
     private static void printQuickGuide() {
         System.out.println("Quick guide:");
-        System.out.println("- Default credentials: admin / password");
+        System.out.println("- Configure an OAuth 2.0 bearer access token from a registered client");
         System.out.println("- Default base URL: http://localhost:8080");
-        System.out.println("- The app calls the running Spring Boot instance via HTTP Basic Auth");
-        System.out.println("- For Bot flows, set a tgId in the connection config and the CLI will include the tgId header");
-        System.out.println("- Request an account-unification OTP while authenticated as the email account, then configure Bot credentials and tgId to unify");
+        System.out.println("- Browser and native clients use Authorization Code with PKCE (S256)");
+        System.out.println("- Telegram BOT calls use a delegated human access token; tgId is reserved for BOT onboarding/linking");
+        System.out.println("- Request an account-unification OTP with the human token, then use BOT onboarding mode to confirm it");
         System.out.println("- To play a match, host it, join it, start it, then use the interactive move menu");
         System.out.println("- To mix in autonomous players, host a match, use 'Add AI player' (EASY/MEDIUM/HARD) before starting it");
         System.out.println("- AI turns are auto-played by the backend; poll 'View a match' to see their moves as they happen");
+    }
+
+    private static boolean isBotOnboardingPath(String method, String path) {
+        String route = path == null ? "" : path.split("\\?", 2)[0];
+        String normalizedMethod = method == null ? "" : method.toUpperCase(Locale.ROOT);
+        return normalizedMethod.equals("POST")
+                && (route.equals("/api/v1/user/register/telegram")
+                || route.equals("/api/v1/user/unify")
+                || route.equals("/api/v1/user/new-tg-unify-email-otp"));
     }
 
     private static ApiClient.Response call(Session session, String method, String path, Object payload, Map<String, String> headers) {
@@ -451,7 +444,8 @@ public class PortRoyalCli {
             }
         }
         try {
-            return ApiClient.execute(session.baseUrl, session.username, session.password, method, path, body, headers, !ApiClient.isPublicEndpoint(path));
+            return ApiClient.execute(session.baseUrl, session.accessToken,
+                    method, path, body, headers, !ApiClient.isPublicEndpoint(path));
         } catch (IOException | InterruptedException e) {
             throw new IllegalStateException("Request failed: " + e.getMessage(), e);
         }
@@ -576,15 +570,15 @@ public class PortRoyalCli {
 
     private static final class Session {
         private String baseUrl;
-        private String username;
-        private String password;
+        private String accessToken;
         private String tgId;
+        private boolean botClient;
 
-        private Session(String baseUrl, String username, String password, String tgId) {
+        private Session(String baseUrl, String accessToken, String tgId, boolean botClient) {
             this.baseUrl = baseUrl;
-            this.username = username;
-            this.password = password;
+            this.accessToken = accessToken;
             this.tgId = tgId;
+            this.botClient = botClient;
         }
     }
 }

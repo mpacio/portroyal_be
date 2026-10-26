@@ -37,17 +37,11 @@ public interface MatchRepository extends JpaRepository<MatchEntity, Long> {
 
     List<MatchEntity> findByHostUserUsernameAndEnded(String username, boolean ended);
 
-    List<MatchEntity> findByHostUserTelegramIdAndEnded(String username, boolean ended);
-
     Optional<MatchEntity> findFirstByHostUserUsernameAndEnded(String username, boolean ended);
-
-    Optional<MatchEntity> findFirstByHostUserTelegramIdAndEnded(String username, boolean ended);
 
     Page<MatchEntity> findByPlayersUsername(String username, Pageable pageable);
 
     Page<MatchEntity> findByPlayersUsernameAndEnded(String username, boolean ended, Pageable pageable);
-
-    Page<MatchEntity> findByPlayersTelegramIdAndEnded(String telegramId, boolean ended, Pageable pageable);
 
     List<MatchEntity> findByWinnerUsername(String username);
 

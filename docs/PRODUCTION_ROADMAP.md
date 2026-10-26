@@ -25,7 +25,10 @@ All game rules remain in `portroyal_lib`. This roadmap changes no game behavior:
 continues to authenticate callers, resolve the domain `UserEntity`, orchestrate operations, and
 persist accepted moves in PostgreSQL.
 
-## Current baseline
+## Initial baseline
+
+The following is a snapshot from before implementation began in this working tree. The status of
+changes made against it is summarized in [Implementation status](#implementation-status).
 
 The repository currently has:
 
@@ -77,9 +80,9 @@ The repository currently has:
 
 - Define supported client categories: browser SPA, native/mobile, CLI, Telegram BOT, and any
   server-to-server integration.
-- Define how public OAuth clients obtain a `client_id` and register exact redirect URIs. As the
-  initial approach, consider controlled registration through a guided script that an authorized
-  operator invokes manually. Do not enable unrestricted Dynamic Client Registration
+- Define how public OAuth clients obtain a `client_id` and register exact redirect URIs. Use
+  controlled registration through a guided script that an authorized operator invokes manually.
+  Do not enable unrestricted Dynamic Client Registration
   without a documented abuse and support model.
 - Define the Telegram BOT delegated-token flow. The BOT first authenticates as a confidential
   OAuth client, then exchanges the Telegram sender ID for a short-lived access token representing
@@ -89,7 +92,9 @@ The repository currently has:
   ordinary game API calls. Under this trust model, the API relies on the authenticated BOT to
   report the sender ID received from Telegram.
 - Define the public API's acceptable-use rules, privacy notice, account/data deletion policy,
-  support contact, and initial rate/usage limits.
+  support contact, and initial rate/usage limits. Track unapproved content in
+  [`PUBLIC_API_POLICIES_DRAFT.md`](PUBLIC_API_POLICIES_DRAFT.md); this draft must not be published,
+  and production go-live remains blocked until its TBD values and text are approved.
 - Publish the authentication and registration flows in the client guide and OpenAPI documentation.
 
 **Exit criteria:** each client type has a documented grant/flow, and client registration,
@@ -162,10 +167,9 @@ LAN test environment.
   the actor on ordinary game API calls. Ordinary tokens must not be able to claim BOT or select a
   different user by supplying a header or role value.
 - Issue short-lived access tokens. Rotate refresh tokens, detect reuse where supported, and
-  implement revocation/logout. Decide and document the access-token revocation trade-off: a
-  self-contained JWT generally remains valid until expiry unless the API also checks revocation
-  state; use opaque/introspected tokens or another deliberate mechanism if immediate revocation is
-  required.
+  implement revocation/logout. Access-token revocation must take effect immediately, including
+  after logout or credential changes; the Resource Server must check persisted authorization state
+  on each request rather than relying on JWT expiry alone.
 - Persist registered client definitions, authorization/refresh state, and consent as needed in
   PostgreSQL. Use a durable signing-key source with access controls and a documented rotation
   process; never generate a new production signing key on every start or store it only in a
@@ -294,3 +298,16 @@ The dependency order is:
 
 Phases may overlap when work is independent, but a phase's exit criteria must pass before its
 dependent production behavior is enabled.
+
+## Implementation status
+
+| Phase | Status |
+|---|---|
+| 0 — Public service contract | In progress. Controlled client registration and immediate token revocation are selected. `PUBLIC_API_POLICIES_DRAFT.md` intentionally contains TBD policy text and limits; publication and go-live are blocked until approved. |
+| 1 — Development security hazards | Implemented in source: development-only admin seeding, one-time admin bootstrap, no BOT `UserEntity` seed, redacted request/response logs, and generic public registration conflicts. Backend unit tests pass. |
+| 2 — Versioned database changes | Flyway V1 baseline and V2 Authorization Server tables are present. The existing PostgreSQL schema was baselined at V1, V2 applied, and Hibernate schema validation succeeded. A separate empty schema also migrated through V1/V2 and passed validation. Backup/restore verification remains. |
+| 3 — Authorization and resource servers | Authorization Server/Resource Server chains, PKCE client registration, durable rotating JWK source, Telegram delegation grant, stable human subjects, per-request authorization revocation checks, and bearer-only game routes are implemented. A PostgreSQL-backed BOT onboarding/delegation/revocation smoke flow passed; public PKCE consent/refresh and multi-instance key-rotation acceptance remain. |
+| 4 — Lifecycle and abuse controls | Not complete. Password-change/deletion revocation is wired as part of token lifecycle; request limits, reset flows, comprehensive boundary validation, and negative authorization coverage remain. |
+| 5 — Proxy and container deployment | Partial. Exact-origin non-credentialed CORS, private PostgreSQL networking, no published API port, mounted signing-key secrets, and a configurable trusted-proxy address are configured. NPM must use the reserved trusted address and overwrite forwarded headers; HTTPS/security-header configuration and LAN verification remain. |
+| 6 — Operations and governance | Partial. Minimal health/readiness probes, an ADMIN-protected Prometheus endpoint, and a runbook draft are present. Correlation IDs, alert delivery/thresholds, approved policies, and full OpenAPI governance remain. |
+| 7 — LAN acceptance and go-live | Not complete. No production promotion is authorized; all preceding gates and acceptance checks must pass first. |

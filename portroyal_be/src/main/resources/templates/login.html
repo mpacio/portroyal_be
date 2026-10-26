@@ -12,6 +12,7 @@
 <body>
 <div class="container">
     <form class="form-signin" method="post" action="/perform-login">
+        <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}">
         <h2 class="form-signin-heading">Welcome back</h2>
         <p>
             <label for="username" class="sr-only">Username</label>

@@ -31,7 +31,6 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
-import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.web.bind.annotation.*;
 
@@ -41,7 +40,7 @@ import static com.matteopaciolla.prbe.util.AuthenticationUtils.getUsername;
 import static com.matteopaciolla.prbe.util.AuthenticationUtils.isBotUser;
 
 @Tag(name = "User", description = "User profile management, identity queries and account security operations.")
-@SecurityRequirements({@SecurityRequirement(name = "basicAuth")})
+@SecurityRequirements({@SecurityRequirement(name = "oauth2", scopes = {"game:play"})})
 @Slf4j
 @RestController
 @RequestMapping(Paths.USER_PATH)
@@ -60,7 +59,7 @@ public class UserController {
 
     @Operation(
             summary = "Retrieve the current user",
-            description = "Returns the authenticated user profile. The identity is resolved from the HTTP Basic principal currently in the security context.",
+            description = "Returns the authenticated user profile resolved from the stable subject in the access token.",
             responses = {
                     @ApiResponse(responseCode = "200", description = "Current user retrieved successfully",
                             content = @Content(mediaType = "application/json", schema = @Schema(implementation = UserResponse.class),
@@ -70,7 +69,7 @@ public class UserController {
     )
     @GetMapping(path = "/me")
     public ResponseEntity<UserResponse> getCurrentUser() {
-        String username = SecurityContextHolder.getContext().getAuthentication().getName();
+        String username = getUsername();
         UserDto userDto = userService.getUserByUsername(username);
         return ResponseEntity.ok(new UserResponse(userDto));
     }
@@ -126,30 +125,34 @@ public class UserController {
                     @ApiResponse(responseCode = "403", description = "Forbidden for the current principal")
             }
     )
-    @PreAuthorize("hasAuthority('ROLE_ADMIN') or #username == authentication.name")
+    @PreAuthorize("hasAuthority('ROLE_ADMIN') or #username == authentication.tokenAttributes['username']")
     @DeleteMapping(path = "/delete")
     public ResponseEntity<VoidResponse> deleteUser(@Parameter(description = "Username to delete", required = true, example = "alice") @RequestParam String username) {
         userService.deleteUser(username);
-        log.info("User {} deleted successfully", username);
+        log.info("User account deleted");
         return ResponseEntity.ok(new VoidResponse("User deleted successfully"));
     }
 
     @Operation(
             summary = "Update a user",
-            description = "Partially updates the profile data for the specified user. The username in query string identifies the subject; include only the profile values to change in the body.",
+            description = "Partially updates first and last name for the authenticated user or an administrator. Password, email, and Telegram identity changes use dedicated account flows.",
             responses = {
                     @ApiResponse(responseCode = "200", description = "User updated successfully",
                             content = @Content(mediaType = "application/json", schema = @Schema(implementation = UserResponse.class))),
                     @ApiResponse(responseCode = "400", description = "Validation error")
             }
     )
+    @PreAuthorize("hasAuthority('ROLE_ADMIN') or #username == authentication.tokenAttributes['username']")
     @PatchMapping(path = "/update")
     public ResponseEntity<UserResponse> updateUser(
             @Parameter(description = "Username of the user to update", required = true, example = "alice")
             @RequestParam String username,
-            @RequestBody UserReqDto userDto) {
+            @Valid @RequestBody UserReqDto userDto) {
         if (username == null ||username.isBlank()) {
             throw new MandatoryParamException(List.of("username"));
+        }
+        if (!username.equals(userDto.getUsername())) {
+            throw new MandatoryParamException("The username in the path and request body must match");
         }
         UserDto updatedUser = userService.updateUser(userDto);
         return ResponseEntity.ok(new UserResponse(updatedUser));
@@ -168,7 +171,7 @@ public class UserController {
         if (cpd == null || cpd.getNewPassword() == null || cpd.getNewPassword().isBlank()) {
             return ResponseEntity.badRequest().body(new VoidResponse("New password cannot be empty"));
         }
-        String username = SecurityContextHolder.getContext().getAuthentication().getName();
+        String username = getUsername();
         userService.changePassword(username,cpd.getOldPassword(), cpd.getNewPassword());
         return ResponseEntity.ok(new VoidResponse("Password changed successfully"));
     }
@@ -176,16 +179,17 @@ public class UserController {
     @Operation(summary = "Request email confirmation OTP", description = "Sends an email containing the confirmation token required to activate the authenticated user's account.")
     @GetMapping("/new-email-confirmation")
     public ResponseEntity<VoidResponse> requestEmailConfirmation() {
-        String username = SecurityContextHolder.getContext().getAuthentication().getName();
+        String username = getUsername();
         UserEntity user = userService.getUserEntityByUsername(username);
         userService.sendEmailConfirmationEmail(user);
-        log.info("Email confirmation requested for user {}", username);
+        log.info("Email confirmation requested");
         return new ResponseEntity<>(new VoidResponse("Email confirmation sent"), HttpStatus.OK);
     }
 
     @Operation(
             summary = "Register a telegram player",
             description = "Creates a Telegram-linked user account. This endpoint requires BOT authentication and a tgId header matching the telegramId in the request body. Username and Telegram ID are required; email and password are not required. When omitted, the server assigns an internal random password that is not returned; the Telegram player uses the bot-mediated API and does not sign in with personal password credentials. First and last name are optional and generated when omitted.",
+            security = @SecurityRequirement(name = "oauth2", scopes = {"bot:onboard"}),
             responses = {
                     @ApiResponse(responseCode = "201", description = "Telegram user registered successfully",
                             content = @Content(mediaType = "application/json", schema = @Schema(implementation = UserResponse.class),
@@ -204,12 +208,18 @@ public class UserController {
             throw new MandatoryParamException("Telegram ID in header and body must match");
         }
         UserDto savedUserDto = userService.registerUser(userReqDto, true);
-        log.info("User {} registered successfully by bot with id {}", savedUserDto.getUsername(), savedUserDto.getId());
+        log.info("Telegram player registered successfully");
         UserResponse res = new UserResponse(HttpStatus.CREATED.value(), "User registered successfully by the bot", savedUserDto);
         return new ResponseEntity<>(res, HttpStatus.CREATED);
     }
 
-    @Operation(summary = "Request Telegram unification OTP", description = "Sends a one-time token to the user email so that a Telegram-only account can be merged with an email account.")
+    @Operation(
+            summary = "Request Telegram unification OTP",
+            description = "Sends a one-time token to the user email so that a Telegram-only account can be merged with an email account.",
+            security = {
+                    @SecurityRequirement(name = "oauth2", scopes = {"game:play"}),
+                    @SecurityRequirement(name = "oauth2", scopes = {"bot:onboard"})
+            })
     @PostMapping("/new-tg-unify-email-otp")
     public ResponseEntity<VoidResponse> requestTgUnifyEmailOtp(
             @RequestHeader(value = BH, required = false) String tgId,
@@ -227,6 +237,9 @@ public class UserController {
             }
             telegramId = tgId;
         } else {
+            if (tgId != null) {
+                throw new MandatoryParamException("tgId is accepted only for BOT-authorized account linking");
+            }
             String username = getUsername();
             user = userService.getUserEntityByUsername(username);
             if (!user.getEmail().equals(email)) {
@@ -240,13 +253,14 @@ public class UserController {
             }
         }
         userService.sendEmailTelegramUnification(user.getUsername(), email, telegramId);
-        log.info("Telegram unify email OTP requested for email {}", email);
+        log.info("Telegram account unification OTP requested");
         return new ResponseEntity<>(new VoidResponse("Telegram unify email OTP sent"), HttpStatus.OK);
     }
 
     @Operation(
             summary = "Unify Telegram and email accounts",
             description = "Merges a Telegram-only account with an email-based account through an OTP validation token.",
+            security = @SecurityRequirement(name = "oauth2", scopes = {"bot:onboard"}),
             responses = {
                     @ApiResponse(responseCode = "200", description = "Accounts unified successfully",
                             content = @Content(mediaType = "application/json", schema = @Schema(implementation = UserResponse.class))),

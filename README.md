@@ -29,6 +29,9 @@ correct order (the library is built/installed before the API, since `portroyal_b
 - [Build & run](#build--run)
 - [API overview](#api-overview)
 - [Production roadmap](docs/PRODUCTION_ROADMAP.md)
+- [OAuth client operations](docs/OAUTH_CLIENT_OPERATIONS.md)
+- [Operations runbook draft](docs/OPERATIONS_RUNBOOK.md)
+- [Operations runbook draft](docs/OPERATIONS_RUNBOOK.md)
 - [Game rules and API guide](docs/GAME_RULES_AND_API.md)
 - [Client development guide](docs/CLIENT_DEVELOPMENT_GUIDE.md)
 - [Testing](#testing)
@@ -67,29 +70,22 @@ same time and consistently, from **N different kinds of clients** — a JS/mobil
 scripting client, and, notably, a **Telegram Bot**. This isn't an afterthought: it's baked into the
 authentication model.
 
-- There's a first-class `BOT` role (`UserRole.BOT`) alongside `USER` and `ADMIN`. A Telegram Bot
-  process authenticates against the API with **its own single technical account** (an example is
-  seeded at startup as `shaslabot`, see [Development notes](#development-notes)) — it does not
-  create one BE account per Telegram user.
-- Instead, the bot **mediates**: every request it makes on behalf of a human player carries a
-  mandatory `tgId` header (see `CommonConstants.BOT_MANDATORY_HEADER`) containing *that player's*
-  Telegram id. Server-side, `AuthenticationUtils.isBotUser()` detects that the caller authenticated
-  as the bot account, and the controllers/services then resolve the actual acting user via
-  `userService.getUserEntityByTelegramId(tgId)` instead of via the authenticated principal — see
-  `MatchController#getUserEntity`, `GameController#move` (`insertMoveWithTelegramId`), and the
-  corresponding `MatchService`/`GameService` methods. In other words: **one bot identity, credentialed
-  once, safely drives moves and matches for many different real players**, each still tracked and
-  authorized as themselves at the domain level (moves/matches remain associated with the human
-  player's `UserEntity`, not with the bot).
-- A player can be registered directly through the bot (`POST /api/v1/user/register/telegram`, `hasRole(BOT)`)
+- The Telegram integration uses **one confidential OAuth client** for the BOT, not a technical
+  `UserEntity` and not one backend account per Telegram player.
+- The BOT authenticates with its client credentials for narrowly scoped account onboarding/linking.
+  To act as a linked human, it exchanges the Telegram sender ID at the custom Telegram delegation
+  grant. The resulting bearer token has the human's stable database ID as `sub` and records the BOT
+  client as `actor_client_id`.
+- Ordinary match and game requests use that delegated bearer token and do not send `tgId`. The
+  backend resolves the acting human from the token subject, and persisted matches/moves remain
+  associated with that human `UserEntity`.
+- A player can be registered directly through the bot (`POST /api/v1/user/register/telegram`, BOT onboarding scope)
   using a username and Telegram id without an email or password, or through a normal web/app
-  registration (`POST /api/v1/public/register`) using username/email/password. For Telegram
-  registration, the authenticated BOT caller must send a `tgId` header matching the body's
-  `telegramId`; the server generates an internal password that is not returned, and the player uses
-  bot-mediated requests rather than signing in with that password.
+  registration (`POST /api/v1/public/register`) using username/email/password. Telegram onboarding
+  requires a BOT-authorized access token and matching `tgId` header and `telegramId` body values.
 - The two identities can later be **unified**: a Telegram-only user requests a one-time code sent to
-  an email address (`GET /api/v1/user/new-tg-unify-email-otp`, authenticated), then confirms the pairing through the bot
-  (`POST /api/v1/user/unify`, `hasRole(BOT)`, backed by the OTP/`temporary_tokens` table). After unification,
+  an email address (`POST /api/v1/user/new-tg-unify-email-otp`), then confirms the pairing through
+  the BOT onboarding scope (`POST /api/v1/user/unify`, backed by the OTP/`temporary_tokens` table). After unification,
   the same physical player can keep playing the very same match indifferently from the web front end
   or from Telegram — the API always resolves to the same `UserEntity` regardless of which channel is
   used to reach it.
@@ -101,10 +97,9 @@ handling required on the API side.
 ### Autonomous (AI) players
 
 A match host can also fill empty seats with autonomous, backend-controlled AI players so humans and
-AI players can play side by side. This is a distinct concept from the single Telegram `BOT`
-technical account described above: that `BOT` role identifies one authenticated proxy account that
-mediates real human users, while an AI player is a per-match, never-authenticating participant
-computed by the backend.
+AI players can play side by side. This is distinct from the confidential Telegram OAuth client,
+which represents a server-side integration; an AI player is a per-match, never-authenticating
+participant computed by the backend.
 
 - AI players are **not** stored in the `users` table. Each one is an `AIPlayerEntity` row in a
   dedicated `ai_players` table, owned by its `MatchEntity` (`ON DELETE CASCADE`-style cascading:
@@ -148,11 +143,10 @@ This works because of a specific design:
      the match) and their next request lands on instance B, instance B independently reconstructs the
      exact same match state from the database and will keep it consistent going forward — no
      shared cache, sticky sessions or distributed lock is required for the core game/match API.
-3. **Authentication is per-request, not session-based, for the API itself.** All game/match/user API
-   endpoints use HTTP Basic Auth (`httpBasic()` in `WebSecurityConfig`), which is verified against
-   the database on every call — there is no server-side session state a load balancer would need to
-   pin a client to. (The small Thymeleaf web login pages under `/login` do use a servlet session for
-   the browser UI experience, which is unrelated to the JSON API.)
+3. **API requests are stateless bearer-token requests.** The Resource Server verifies the signed
+   access token and its issuer, audience, expiry, and persisted authorization on every call.
+   Authorization Code with PKCE is used by public clients; only the authorization/login pages use a
+   browser session.
 4. **Outbound side effects are queued/derived from the DB, not kept in memory.** For example emails
    are written to an `emails_queue` table (`EmailSenderFacade`) rather than sent synchronously from
    request-handling memory, keeping request handling itself stateless.
@@ -188,6 +182,17 @@ Spring `application-*.properties`/`application.yml` override) when running the s
 | `SPRING_DATASOURCE_URL`                        | yes      | —                                                                                                      | JDBC URL of the PostgreSQL database, e.g. `jdbc:postgresql://host:5432/prdb`                                                                                                         |
 | `SPRING_DATASOURCE_USERNAME`                   | yes      | —                                                                                                      | Database user                                                                                                                                                                        |
 | `SPRING_DATASOURCE_PASSWORD`                   | yes      | —                                                                                                      | Database password                                                                                                                                                                    |
+| `APP_CORS_ALLOWED_ORIGINS`                     | no       | empty (no cross-origin access)                                                                          | Comma-separated exact origins allowed by CORS, for example `https://client.example.com`; credentials are not allowed                                                                 |
+| `NPM_INTERNAL_PROXY_REGEX`                     | Docker   | loopback only                                                                                            | Exact Tomcat trusted-proxy address regex; set to the NPM container's reserved address on the proxy network                                                                           |
+| `OAUTH2_ISSUER`                                | production | —                                                                                                    | Stable public issuer URL for the Authorization Server                                                                                                                                |
+| `OAUTH2_BOT_CLIENT_ID`                         | production | —                                                                                                   | Registered confidential Telegram OAuth client ID                                                                                                                                    |
+| `OAUTH2_BOT_CLIENT_SECRET`                     | operator only | —                                                                                                 | High-entropy BOT client secret used by the BOT and operator tools; do not pass it to the API container                                                                              |
+| `OAUTH2_SIGNING_KEY_PATH`                      | production | —                                                                                                   | Path to a durable PKCS#12 RSA signing keystore                                                                                                                                       |
+| `OAUTH2_SIGNING_KEY_PASSWORD` or `OAUTH2_SIGNING_KEY_PASSWORD_FILE` | production | —                                                           | Keystore password supplied through the deployment secret store                                                                                                                       |
+| `OAUTH2_SIGNING_KEY_ALIAS`                     | production | `portroyal-signing`                                                                                 | Alias containing the RSA private key and certificate                                                                                                                                 |
+| `OAUTH2_SIGNING_KEY_FILE`                      | Docker only | —                                                                                                   | Host path mounted into the API container as a Docker secret                                                                                                                          |
+| `DEV_SEED_ADMIN_PASSWORD`                      | dev only | —                                                                                                      | Required when the `dev` profile creates its local admin seed account; no default is provided                                                                                         |
+| `ADMIN_BOOTSTRAP_USERNAME` and `ADMIN_BOOTSTRAP_PASSWORD` | operator only | —                                                                    | One-time bootstrap inputs for `AdminBootstrapTool`; remove after provisioning                                                                                                        |
 | `server.port`                                  | no       | `8080`                                                                                                 | HTTP port the API listens on                                                                                                                                                         |
 | `be_app.baseurl`                               | no       | `prbe.mightyshaman.com`                                                                                | Public base URL used to build links sent in emails (e.g. email confirmation links)                                                                                                   |
 | `be_app.user.telegram_unification.enabled`     | no       | `true`                                                                                                 | Feature flag for the Telegram/email account unification flow                                                                                                                         |
@@ -202,19 +207,29 @@ and HTTP request/response logging is provided by [Logbook](https://github.com/za
 
 ## Database
 
-The API uses PostgreSQL through Spring Data JPA/Hibernate. There is **no Flyway/Liquibase**
-migration tool in the project: the schema is derived directly from the JPA entities. In development,
-Hibernate is configured to export the schema it would generate to the repository-root
-[`create-schema.sql`](create-schema.sql) / [`drop-schema.sql`](drop-schema.sql) files on every
-startup (`spring.jpa.properties.jakarta.persistence.schema-generation.scripts.action=drop-and-create`)
-— these files are a convenient, always-up-to-date **reference** of the current schema, not something
-you need to run by hand for a real deployment (`ddl-auto` is left to Hibernate's normal behavior for
-actually creating/updating the live schema).
+The API uses PostgreSQL through Spring Data JPA/Hibernate, with Flyway migrations under
+[`portroyal_be/src/main/resources/db/migration`](portroyal_be/src/main/resources/db/migration).
+`V1` establishes the existing schema and `V2` creates the OAuth authorization tables. Flyway applies
+these migrations to an empty database; Hibernate is set to `ddl-auto=validate` and does not create
+or update the live schema. Hibernate's reference schema export is limited to the `dev` profile.
+
+For an existing database without Flyway history, first back it up and verify that its schema matches
+the `V1` baseline. Then enable `SPRING_FLYWAY_BASELINE_ON_MIGRATE=true` for one controlled startup
+to record version 1 and apply later migrations. Unset that override after Flyway creates its history
+table. Do not baseline an unverified or partially migrated database.
+
+In Docker Compose, PostgreSQL is attached only to the private backend network. The API is reachable
+by NPM over `npm_main_net` but does not publish a host port. Reserve NPM's address on that network,
+set `NPM_INTERNAL_PROXY_REGEX` to that exact address, and configure NPM to overwrite forwarded
+scheme/host/client headers rather than pass through client-supplied values. Set
+`APP_CORS_ALLOWED_ORIGINS` to comma-separated, exact browser origins; leaving it empty denies
+cross-origin browser requests.
 
 Key tables (see [`create-schema.sql`](create-schema.sql) for the authoritative, generated DDL):
 
-- `users` — accounts; unique on `username`, `email`, `telegram_id`; `roles` is a Postgres array of
-  `ADMIN`/`USER`/`BOT` (autonomous AI players are **not** stored here — see
+- `users` — human accounts; unique on `username`, `email`, `telegram_id`; `roles` is a Postgres
+  array of `ADMIN`/`USER` (the Telegram BOT is an OAuth client, and autonomous AI players are
+  **not** stored here — see
   [Autonomous (AI) players](#autonomous-ai-players)).
 - `ai_players` — one row per autonomous per-match AI player, FK'd to its owning `matches` row
   (cascade-deleted with the match); holds `username`, `display_name`, and `difficulty`
@@ -231,6 +246,8 @@ Key tables (see [`create-schema.sql`](create-schema.sql) for the authoritative, 
 - `temporary_tokens` — OTP tokens for email confirmation and Telegram unification flows.
 - `callbacks` — webhook subscriptions for match notifications (see `sentinel` API).
 - `emails_queue` — outbound transactional emails, queued for asynchronous delivery.
+- `oauth2_registered_client`, `oauth2_authorization`, and `oauth2_authorization_consent` —
+  PostgreSQL-backed OAuth client, authorization, token, and consent state.
 
 ## Build & run
 
@@ -244,21 +261,25 @@ Run the API module directly:
 
 ```bash
 cd portroyal_be
-mvn spring-boot:run
+mvn spring-boot:run -Dspring-boot.run.profiles=dev
 ```
 
-Run the standalone CLI tester against the Spring API running on localhost:8080:
+The `dev` profile uses an ephemeral signing key and seeds only the local administrator. Set
+`DEV_SEED_ADMIN_PASSWORD` to a non-empty development secret. Do not use this profile in production.
+
+Run the standalone CLI against the Spring API running on localhost:8080. It accepts an OAuth bearer
+token obtained through the registered client's flow:
 
 ```bash
 cd portroyal_be
 mvn exec:java -Dexec.mainClass=com.matteopaciolla.prbe.cli.PortRoyalCli
 ```
 
-This CLI can register users, inspect the current user, request an account-unification OTP and
-complete Telegram/email account unification, list/host/join/start matches, add/remove autonomous AI
-players before starting a match, issue arbitrary HTTP calls to the REST API, and play a match
-interactively without starting the Spring app in the same JVM. Request the OTP while configured
-with the email account's credentials; complete unification with the bot credentials and its `tgId`.
+This CLI can inspect the current user, register accounts, request an account-unification OTP,
+complete Telegram/email account unification, play matches, and issue HTTP requests. It does not
+implement the interactive OIDC login flow; obtain a token with a standards-compliant OIDC client.
+See [OAuth client operations](docs/OAUTH_CLIENT_OPERATIONS.md) for operator registration and the
+Telegram delegated-token flow.
 
 or run the packaged jar:
 
@@ -284,16 +305,16 @@ standing up the full API/database stack.
 
 - For an end-to-end description of the rules, move payloads, and match workflow, see the
   [Game Rules and API Guide](docs/GAME_RULES_AND_API.md).
-- For the planned production hardening, integrated OIDC/OAuth 2.0 architecture, and go-live
-  criteria, see the [Production Roadmap](docs/PRODUCTION_ROADMAP.md).
+- For the staged production hardening and go-live criteria, see the [Production Roadmap](docs/PRODUCTION_ROADMAP.md).
+- For OAuth client setup and Telegram delegation, see [OAuth client operations](docs/OAUTH_CLIENT_OPERATIONS.md).
+- For operational health and incident procedures, see the [Operations runbook draft](docs/OPERATIONS_RUNBOOK.md).
 - Base path: `/api/v1`
 - Interactive docs: Swagger UI at `/swagger-ui/index.html`, raw OpenAPI spec at `/api/v1/api-docs`
   (see `springdoc.api-docs.path`).
-- Authentication: HTTP Basic Auth on essentially every endpoint under `/api/v1/**` (see
-  [Designed to scale horizontally](#designed-to-scale-horizontally)); roles are `ADMIN`, `USER`,
-  `BOT` (see [Designed for many kinds of clients](#designed-for-many-kinds-of-clients) for how `BOT`
-  callers mediate for other users via the `tgId` header) and `AI` (autonomous, per-match AI players
-  that never authenticate — see [Autonomous (AI) players](#autonomous-ai-players)).
+- Authentication: OAuth 2.0 bearer tokens protect `/api/v1/**`; public clients use Authorization
+  Code with PKCE and the Telegram integration uses a confidential BOT client plus the delegated
+  token grant. `tgId` is accepted only for BOT-authorized account onboarding/linking and token
+  exchange. `AI` denotes autonomous per-match players that never authenticate.
 
 | Tag         | Base path          | Purpose                                                                                                     |
 |-------------|--------------------|-------------------------------------------------------------------------------------------------------------|
@@ -311,9 +332,9 @@ Paths in this table are relative to `/api/v1`.
 | Method & path                                      | Description                                                                                                                             |
 |----------------------------------------------------|-----------------------------------------------------------------------------------------------------------------------------------------|
 | `POST /public/register`                            | Register a new user (username/email/password, web/app flow)                                                                             |
-| `POST /user/register/telegram`                     | Register a new user from the bot (Telegram id only) — `BOT` role only                                                                   |
-| `GET /user/new-tg-unify-email-otp`                 | Request an OTP to unify a Telegram id with an email account; authentication required                                                     |
-| `POST /user/unify`                                 | Confirm Telegram/email unification with the OTP — `BOT` role only                                                                       |
+| `POST /user/register/telegram`                     | Register a new user from the bot (Telegram id only) — BOT `bot:onboard` scope                                                         |
+| `POST /user/new-tg-unify-email-otp`                | Request an OTP to unify a Telegram identity with an email account                                                                        |
+| `POST /user/unify`                                 | Confirm Telegram/email unification with the OTP — BOT `bot:onboard` scope                                                               |
 | `GET /user/me`                                     | Get the currently authenticated user                                                                                                    |
 | `PATCH /user/update?username=...`                  | Partially update a user profile                                                                                                          |
 | `POST /match/host`                                 | Host a new match (optionally with a custom configuration)                                                                               |
@@ -332,9 +353,8 @@ Paths in this table are relative to `/api/v1`.
 | `GET /sentinel/long-polling/subscribe?key_code=...` | Long-poll for the next match alert (requires sticky routing at scale)                                                                   |
 | `GET /sentinel/sse/subscribe?key_code=...`          | Subscribe to match alerts via Server-Sent Events (requires sticky routing at scale)                                                     |
 
-Bot-mediated calls (`MatchController`, `GameController`, `UserController#registerTelegramPlayer`,
-`UserController#unifyTelegramAndEmailAccounts`) require the `tgId` request header, set to the
-Telegram id of the human player the bot is acting for.
+Only BOT-authorized account onboarding/linking and the Telegram delegation token exchange accept a
+`tgId`. Ordinary game and match requests resolve the human user from the delegated bearer token.
 
 ## Testing
 
@@ -348,10 +368,10 @@ or scoped to a single module, e.g. `mvn -pl portroyal_lib test` for the game eng
 
 ## Development notes
 
-- On startup, `Main.java` seeds two default accounts if they don't already exist: an `admin` user
-  (`ADMIN`+`USER` roles) and a `shaslabot` user (`BOT` role) — both with the **hardcoded password
-  `"password"`**. This is a convenience for local development only; **rotate or remove these
-  credentials before exposing an instance publicly**.
-- CORS is currently configured with a wildcard origin pattern and credentials enabled
-  (`WebSecurityConfig#corsConfigurationSource`); restrict `allowedOriginPatterns` to your real front
-  end origins for any non-local environment.
+- Startup account seeding is disabled unless the `dev` Spring profile is active. When enabled,
+  the local `admin` account requires a non-empty `DEV_SEED_ADMIN_PASSWORD`. The Telegram BOT is an
+  OAuth client, never a seeded `UserEntity`. No default credentials are provided.
+  Production must not activate the `dev` profile.
+- CORS uses an environment-configured exact origin allowlist
+  (`WebSecurityConfig#corsConfigurationSource`); set `APP_CORS_ALLOWED_ORIGINS` to the browser
+  origins that should be allowed. An empty value denies cross-origin requests.

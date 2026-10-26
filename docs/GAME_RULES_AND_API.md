@@ -173,14 +173,15 @@ board index is not the contract's catalog ID.
 ## 4. API basics
 
 Set `BASE` to the service root, for example `http://localhost:8080/api/v1`. Unless noted as public,
-endpoints require **HTTP Basic authentication**. Send JSON with `Content-Type: application/json`.
-Bot-mediated calls use the bot account's Basic credentials plus a `tgId` header containing the
-human player's Telegram ID. AI players are match participants, not API identities.
+endpoints require an OAuth 2.0 bearer access token. Public clients obtain tokens with Authorization
+Code and PKCE (`S256`). Telegram game requests use a delegated human token; only the Telegram
+delegation and BOT-authorized account onboarding/linking flows accept `tgId`. AI players are match
+participants, not API identities.
 
 Example authenticated request:
 
 ```sh
-curl -u alice:password "$BASE/user/me"
+curl -H "Authorization: Bearer $ACCESS_TOKEN" "$BASE/user/me"
 ```
 
 The server returns JSON response wrappers for most operations. Validation failures, illegal moves,
@@ -196,9 +197,9 @@ API paths below are relative to `BASE` (`/api/v1`).
 |-----------------------------------------------------------|----------------------------------------------------------------------------------------------------------------|
 | `POST /public/register`                                   | Create a standard account; public.                                                                             |
 | `GET /user/new-email-confirmation?email=...`                  | Request email confirmation; authentication required.                                                           |
-| `GET /user/new-tg-unify-email-otp?email=...&telegram_id=...`  | Request the email OTP to link a Telegram identity; authentication required. The email must be confirmed and not already linked. |
-| `POST /user/register/telegram`                            | Create a Telegram-linked player; requires `BOT` authentication.                                                |
-| `POST /user/unify`                                        | Link the Telegram ID to the email account using the OTP; requires `BOT` authentication.                        |
+| `POST /user/new-tg-unify-email-otp`                       | Request the email OTP as the human account, or as BOT with `bot:onboard` scope and `tgId`.                    |
+| `POST /user/register/telegram`                            | Create a Telegram-linked player; requires BOT `bot:onboard` scope and matching `tgId`.                         |
+| `POST /user/unify`                                        | Link the Telegram ID to the email account using the OTP; requires BOT `bot:onboard` scope and `tgId`.          |
 | `GET /user/me`                                            | Get the authenticated account.                                                                                 |
 | `GET /user/retrieve?username=...`                         | Look up a user by username, Telegram ID, or email; use `telegram_id` when identifying by Telegram ID.          |
 | `PATCH /user/update?username=...`                         | Partially update user profile; requires `ADMIN` or `BOT` authorization.                                        |
@@ -222,10 +223,9 @@ Standard registration body:
 Usernames must be 5-30 characters and contain letters, digits, `_`, or `-`. The public
 `/public/register` endpoint requires `username`, `email`, and `password`; first and last names are
 optional, and a Telegram ID is not required. Telegram IDs are numeric strings. Bot registration
-requires BOT authentication, a username, a Telegram ID, and a `tgId` header matching the ID in the
-body. It does not require an email or password: the server generates an internal password that is
-not returned, and the player uses the bot-mediated API rather than signing in with personal
-credentials. For example:
+requires BOT `bot:onboard` authorization, a username, a Telegram ID, and a `tgId` header matching
+the ID in the body. It does not require an email or password: the server generates an internal
+password that is not returned. For example:
 
 ```json
 {
@@ -236,14 +236,16 @@ credentials. For example:
 
 Do not use development seed credentials in a deployed environment.
 
-For bot requests to match and game endpoints, include, for example:
+After registering or linking the account, exchange the Telegram sender ID for a delegated human
+access token as described in [`OAUTH_CLIENT_OPERATIONS.md`](OAUTH_CLIENT_OPERATIONS.md). Use that
+token on ordinary match and game requests without a `tgId` header:
 
 ```sh
-curl -u shaslabot:replace-with-secret -H "tgId: 123456789" ...
+curl -H "Authorization: Bearer $DELEGATED_ACCESS_TOKEN" "$BASE/match/status"
 ```
 
-The API resolves that Telegram ID to the real player for supported bot-mediated operations. It is
-not an optional identity hint for a bot request.
+The access token resolves to the human player and records the BOT client as its actor. `tgId` is
+not an optional identity hint for game requests.
 
 ## 6. Create and manage a match
 
@@ -265,17 +267,17 @@ Typical sequence:
 
 ```sh
 # Host (save the keyCode returned in the response)
-curl -u alice:password -H "Content-Type: application/json" \
+curl -H "Authorization: Bearer $ALICE_ACCESS_TOKEN" -H "Content-Type: application/json" \
   -d '{"id":1,"name":"default"}' "$BASE/match/host"
 
 # Another player joins with that keyCode
-curl -u bob:password -X POST "$BASE/match/join?key_code=ABC123"
+curl -H "Authorization: Bearer $BOB_ACCESS_TOKEN" -X POST "$BASE/match/join?key_code=ABC123"
 
 # Host starts
-curl -u alice:password -X POST "$BASE/match/start"
+curl -H "Authorization: Bearer $ALICE_ACCESS_TOKEN" -X POST "$BASE/match/start"
 
 # Read state before choosing a move
-curl -u alice:password "$BASE/match/retrieve?key_code=ABC123"
+curl -H "Authorization: Bearer $ALICE_ACCESS_TOKEN" "$BASE/match/retrieve?key_code=ABC123"
 ```
 
 The host is automatically a player. A player cannot join multiple open matches. Human and AI
@@ -307,7 +309,7 @@ ship. For a normal `HIRE`, `parameterIndex` is the employee's current harbor ind
 Example discover:
 
 ```sh
-curl -u alice:password -H "Content-Type: application/json" \
+curl -H "Authorization: Bearer $ALICE_ACCESS_TOKEN" -H "Content-Type: application/json" \
   -d '{"move":"DISCOVER"}' "$BASE/game/move"
 ```
 
@@ -328,7 +330,7 @@ To sign a manual contract, read the current match snapshot, find the contract in
 then send its **zero-based board index** as `parameterIndex`:
 
 ```sh
-curl -u alice:password -H "Content-Type: application/json" \
+curl -H "Authorization: Bearer $ALICE_ACCESS_TOKEN" -H "Content-Type: application/json" \
   -d '{"move":"SIGN_CONTRACT","parameterIndex":1}' "$BASE/game/move"
 ```
 
@@ -408,8 +410,8 @@ generated event/side-event payload.
 
 ## 9. Client integration checklist
 
-1. Authenticate each protected request with HTTP Basic; use `tgId` when a bot acts on behalf of a
-   human player.
+1. Authenticate protected requests with a bearer token; for Telegram game actions, use a delegated
+   human token and omit `tgId`.
 2. Host or join a match, and wait for the host to start it.
 3. Read the match snapshot before a move. Use its current player ordering and board lists to
    resolve all indices.

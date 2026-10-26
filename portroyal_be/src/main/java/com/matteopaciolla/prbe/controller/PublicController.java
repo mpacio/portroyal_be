@@ -32,7 +32,7 @@ public class PublicController {
 
     @Operation(
         summary = "Register a new user",
-        description = "Creates a standard web/app account. Username, email, and password are required; first name and last name are optional and generated when omitted. Passwordless registration is available only through the BOT-only Telegram registration endpoint.",
+        description = "Creates a standard web/app account. Username, email, and password are required; first name and last name are optional and generated when omitted. Telegram identity linking must use the verified account-unification flow.",
         responses = {
             @ApiResponse(responseCode = "201", description = "User registered successfully",
                 content = @Content(mediaType = "application/json", schema = @Schema(implementation = UserResponse.class),
@@ -43,7 +43,7 @@ public class PublicController {
     @PostMapping("/register")
     public ResponseEntity<UserResponse> registerUser(@Valid @RequestBody UserReqDto userReqDto) {
         UserDto savedUserDto = userService.registerUser(userReqDto, false);
-        log.info("User {} registered successfully with id {}", savedUserDto.getUsername(), savedUserDto.getId());
+        log.info("User registered successfully");
         UserResponse res = new UserResponse(HttpStatus.CREATED.value(), "User registered successfully", savedUserDto);
         return new ResponseEntity<>(res, HttpStatus.CREATED);
     }

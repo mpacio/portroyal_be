@@ -36,7 +36,7 @@ public class UserReqDto {
     @Email(message = "Email should be valid")
     private String email;
 
-    @Schema(description = "Telegram numeric id if the account is linked to a Telegram user.", example = "123456789")
+    @Schema(description = "Telegram numeric id. Accepted only for BOT-authorized Telegram registration; other accounts link Telegram through the verified account-unification flow.", example = "123456789")
     @Pattern(regexp = "^[0-9]+$", message = "Telegram ID should be a sequence of digits")
     private String telegramId;
 }

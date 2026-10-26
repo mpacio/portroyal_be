@@ -33,14 +33,14 @@ public class GlobalExceptionHandler {
 
     @ExceptionHandler(HttpRequestMethodNotSupportedException.class)
     public ResponseEntity<ErrorResponse> handleMethodNotAllowedException(HttpRequestMethodNotSupportedException e) {
-        log.debug("Captured HttpRequestMethodNotSupportedException: {}", e.getMessage());
+        log.debug("Captured HttpRequestMethodNotSupportedException");
         return response(HttpStatus.METHOD_NOT_ALLOWED,
                 "The HTTP method '" + e.getMethod() + "' is not supported for this endpoint.");
     }
 
     @ExceptionHandler(MissingServletRequestParameterException.class)
     public ResponseEntity<ErrorResponse> handleMissingParams(MissingServletRequestParameterException e) {
-        log.debug("Captured MissingServletRequestParameterException: {}", e.getMessage());
+        log.debug("Captured MissingServletRequestParameterException");
         return response(HttpStatus.BAD_REQUEST,
                 "The required request parameter '" + e.getParameterName() + "' is missing.");
     }
@@ -61,7 +61,7 @@ public class GlobalExceptionHandler {
 
     @ExceptionHandler(NoResourceFoundException.class)
     public ResponseEntity<ErrorResponse> handleNoResourceFoundException(NoResourceFoundException e) {
-        log.debug("Captured NoResourceFoundException: {}", e.getMessage());
+        log.debug("Captured NoResourceFoundException");
         return response(HttpStatus.NOT_FOUND, "The requested endpoint was not found.",
                 List.of(new ErrorResponse.ErrorDetail("path", e.getResourcePath())));
     }
@@ -85,7 +85,7 @@ public class GlobalExceptionHandler {
 
     @ExceptionHandler(HttpMediaTypeNotSupportedException.class)
     public ResponseEntity<ErrorResponse> handleHttpMediaTypeNotSupportedException(HttpMediaTypeNotSupportedException e) {
-        log.debug("Captured HttpMediaTypeNotSupportedException: {}", e.getMessage());
+        log.debug("Captured HttpMediaTypeNotSupportedException");
         String mediaType = e.getContentType() == null ? "the supplied media type" : "'" + e.getContentType() + "'";
         return response(HttpStatus.UNSUPPORTED_MEDIA_TYPE,
                 "The request content type " + mediaType + " is not supported for this endpoint.");
@@ -93,14 +93,14 @@ public class GlobalExceptionHandler {
 
     @ExceptionHandler(HttpMessageNotReadableException.class)
     public ResponseEntity<ErrorResponse> handleHttpMessageNotReadableException(HttpMessageNotReadableException e) {
-        log.debug("Captured HttpMessageNotReadableException: {}", e.getMessage());
+        log.debug("Captured HttpMessageNotReadableException");
         return response(HttpStatus.BAD_REQUEST,
                 "The request body is missing or malformed. Ensure it is valid JSON and matches the expected format.");
     }
 
     @ExceptionHandler(AsyncRequestTimeoutException.class)
     public ResponseEntity<ErrorResponse> handleAsyncRequestTimeoutException(AsyncRequestTimeoutException e) {
-        log.debug("Captured AsyncRequestTimeoutException: {}", e.getMessage());
+        log.debug("Captured AsyncRequestTimeoutException");
         return response(HttpStatus.REQUEST_TIMEOUT,
                 "The request timed out before it could be completed. Please try again.");
     }
@@ -108,23 +108,23 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(IOException.class)
     public ResponseEntity<ErrorResponse> handleIOException(IOException e) {
         if ("An established connection was aborted by the software in your host machine".equals(e.getMessage())) {
-            log.error("Captured IOException: {}", e.getMessage());
+            log.error("Captured IOException");
         } else {
-            log.error("Captured IOException: {}", e.getMessage(), e);
+            log.error("Captured IOException", e);
         }
         return internalError();
     }
 
     @ExceptionHandler(ResourceNotFoundException.class)
     public ResponseEntity<ErrorResponse> handleResourceNotFoundException(ResourceNotFoundException e) {
-        log.debug("Captured ResourceNotFoundException: {}", e.getMessage());
+        log.debug("Captured ResourceNotFoundException");
         return response(HttpStatus.NOT_FOUND, "The requested resource could not be found.",
                 List.of(), e.getDescription(), null);
     }
 
     @ExceptionHandler(BaseClientCausedException.class)
     public ResponseEntity<ErrorResponse> handleBaseClientCausedException(BaseClientCausedException e) {
-        log.debug("Captured BaseClientCausedException: {}", e.getMessage());
+        log.debug("Captured BaseClientCausedException");
         List<ErrorResponse.ErrorDetail> details = e.getDetails() == null
                 ? List.of()
                 : e.getDetails().entrySet().stream()
@@ -139,13 +139,13 @@ public class GlobalExceptionHandler {
 
     @ExceptionHandler(BaseInternalException.class)
     public ResponseEntity<ErrorResponse> handleBaseInternalException(BaseInternalException e) {
-        log.error("Captured BaseInternalException: {}", e.getMessage(), e);
+        log.error("Captured BaseInternalException of type {}", e.getClass().getSimpleName());
         return internalError();
     }
 
     @ExceptionHandler(Exception.class)
     public ResponseEntity<ErrorResponse> handleGeneralExceptions(Exception e) {
-        log.error("Captured Exception: {}", e.getMessage(), e);
+        log.error("Captured exception of type {}", e.getClass().getSimpleName());
         return internalError();
     }
 

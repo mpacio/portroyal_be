@@ -22,12 +22,9 @@ public class UserConverter {
         return userDto;
     }
 
-    public static UserDto toDtoLight(UserEntity userEntity, boolean includeTgId) {
+    public static UserDto toDtoLight(UserEntity userEntity) {
         UserDto userDto = new UserDto();
         userDto.setUsername(userEntity.getUsername());
-        if (includeTgId) {
-            userDto.setTelegramId(userEntity.getTelegramId());
-        }
         userDto.setRoles(userEntity.getRoles().stream().map(UserRole::name).toList());
         return userDto;
     }

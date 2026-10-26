@@ -16,8 +16,9 @@ The API base URL is the server root plus `/api/v1`, for example:
 https://api.example.com/api/v1
 ```
 
-Unless listed as public below, API requests require HTTP Basic authentication. Send JSON request
-bodies with `Content-Type: application/json`. Most successful API responses use an envelope with
+Unless listed as public below, API requests require an OAuth 2.0 bearer access token. Public browser
+and native clients use Authorization Code with PKCE (`S256`); do not send a password to game API
+endpoints. Send JSON request bodies with `Content-Type: application/json`. Most successful API responses use an envelope with
 `status`, `message`, and `data`; some catalog endpoints return arrays directly. Errors use HTTP
 status codes and generally return an object with `status`, `error`, and `message`, with optional
 `errorDetails`, `description`, or `suggestion`.
@@ -25,20 +26,20 @@ status codes and generally return an object with `status`, `error`, and `message
 | Endpoint group | Authentication | Purpose                                                                               |
 |----------------|----------------|---------------------------------------------------------------------------------------|
 | `/public/**`   | None           | JSON registration/OTP; HTML email confirmation at server-root `/public/confirm-email` |
-| `/user/**`     | Basic          | User profile and identity operations                                                  |
-| `/match/**`    | Basic          | Create, join, start, close, and retrieve matches                                      |
-| `/game/**`     | Basic          | Submit moves and read move history                                                    |
-| `/card/**`     | Basic          | Read the card and contract catalogs                                                   |
-| `/sentinel/**` | Basic          | Subscribe to match notifications                                                      |
+| `/user/**`     | Bearer; BOT onboarding scope for Telegram-only flows | User profile and identity operations |
+| `/match/**`    | Human bearer token with `game:play` | Create, join, start, close, and retrieve matches |
+| `/game/**`     | Human bearer token with `game:play` | Submit moves and read move history |
+| `/card/**`     | Human bearer token with `game:play` | Read the card and contract catalogs |
+| `/sentinel/**` | Human bearer token with `game:play` | Subscribe to match notifications |
 
 ## 2. Choose an identity model
 
 ### Normal web or app client
 
-Each human player authenticates with their own username and password. Register an account through
-`POST /public/register`. This public web/app endpoint requires `username`, `email`, and `password`;
-`firstName` and `lastName` are optional, and a `telegramId` is not required. Omitting the password
-is rejected.
+Each human player has their own account. Register it through `POST /public/register`. This public
+web/app endpoint requires `username`, `email`, and `password`; `firstName` and `lastName` are
+optional. Do not include `telegramId` in public registration; link Telegram later through the
+verified account-unification flow.
 
 ```json
 {
@@ -51,11 +52,13 @@ is rejected.
 ```
 
 Usernames must be 5-30 characters and contain only letters, digits, `_`, or `-`. Email is used for
-account confirmation and Telegram identity-unification flows. After registration, the client can
-use the account's Basic credentials on protected endpoints:
+account confirmation and Telegram identity-unification flows. After registration and email
+confirmation, obtain an access token through the Authorization Server's OIDC discovery document
+and Authorization Code with PKCE. Public clients must be registered by an operator with exact
+redirect URIs; see [`OAUTH_CLIENT_OPERATIONS.md`](OAUTH_CLIENT_OPERATIONS.md).
 
 ```sh
-curl -u alice42:your-password \
+curl -H "Authorization: Bearer $ACCESS_TOKEN" \
   "https://api.example.com/api/v1/user/me"
 ```
 
@@ -63,30 +66,25 @@ Profile changes use `PATCH /user/update?username=...`. Include the username in t
 send only fields to change; omitted fields remain unchanged:
 
 ```sh
-curl -u alice42:your-password -X PATCH \
+curl -H "Authorization: Bearer $ACCESS_TOKEN" -X PATCH \
   -H "Content-Type: application/json" \
   -d '{"username":"alice42","firstName":"Alice"}' \
   "https://api.example.com/api/v1/user/update?username=alice42"
 ```
 
-For a browser-based client, call the API over HTTPS and do not persist passwords or encoded Basic
-credentials in `localStorage`. A backend-for-frontend (BFF) can keep credentials out of browser
-JavaScript entirely. If the browser calls this API directly, keep credentials in memory where
-practical, handle CORS preflight requests, and never place credentials in URLs or logs.
+For a browser-based client, use a standards-compliant OIDC library for Authorization Code with
+PKCE (`S256`). Keep access tokens in memory where practical, call the API over HTTPS, and never
+place tokens in URLs or logs. If cookie-based sessions are used in a BFF, keep them at the BFF
+boundary and retain CSRF protections there.
 
 Example browser request using credentials entered by the user at runtime:
 
 ```js
 const apiBase = "https://api.example.com/api/v1";
-const bytes = new TextEncoder().encode(`${username}:${password}`);
-let binary = "";
-bytes.forEach((byte) => {
-  binary += String.fromCharCode(byte);
-});
 
 const response = await fetch(`${apiBase}/user/me`, {
   headers: {
-    Authorization: `Basic ${btoa(binary)}`,
+    Authorization: `Bearer ${accessToken}`,
   },
 });
 
@@ -97,29 +95,47 @@ if (!response.ok) {
 const currentUser = await response.json();
 ```
 
-Do not hardcode `username` or `password` in the application bundle.
+Do not hardcode client secrets, user passwords, or tokens in the application bundle.
 
 ### Telegram Bot client
 
-The Telegram Bot authenticates with one technical account with the `BOT` role. It does **not**
-create a backend account for every Telegram user. For supported player actions, the bot sends the
-human player's Telegram numeric ID in the `tgId` request header:
+The Telegram integration uses one confidential OAuth client; it does **not** create a technical
+`UserEntity` or a backend account for every Telegram user. Keep the BOT client secret only in the
+server-side secret store. Public/browser clients must never receive it.
 
 ```sh
-curl -u "$BOT_USERNAME:$BOT_PASSWORD" \
-  -H "tgId: 123456789" \
+ISSUER="https://api.example.com"
+BOT_CLIENT_ID="portroyal-telegram-bot"
+
+# curl prompts for the secret; do not place it in command arguments or logs.
+curl --user "$BOT_CLIENT_ID" \
+  --data-urlencode "grant_type=urn:portroyal:grant-type:telegram-delegation" \
+  --data-urlencode "tgId=123456789" \
+  "$ISSUER/oauth2/token"
+```
+
+The Telegram delegation grant authenticates the BOT client at the token endpoint and accepts the
+Telegram sender ID as `tgId`. The returned short-lived access token represents the linked human:
+its `sub` is the stable user ID, and `actor_client_id` records the BOT. Use that token for normal
+game requests without a `tgId` header:
+
+```sh
+curl -H "Authorization: Bearer $DELEGATED_ACCESS_TOKEN" \
   "https://api.example.com/api/v1/match/status"
 ```
 
-Use the same bot credentials for each Telegram user, but set `tgId` to the Telegram user represented
-by that particular request. Do not expose the bot credentials to Telegram users, browser code, or
-mobile clients. Provision bot credentials as a server-side secret; the development seed account
-must not be used in production.
+For account onboarding/linking, first obtain a BOT client-credentials token with `bot:onboard`:
 
-The header applies when the API must resolve the real player for an action, including hosting,
-joining, starting or closing a match, managing the host's AI players, retrieving a player's current
-match status, and submitting a move. If a bot-mediated action omits `tgId`, the request is rejected.
-`GET /match/retrieve?key_code=...` retrieves a match by key and does not require the header.
+```sh
+curl --user "$BOT_CLIENT_ID" \
+  --data-urlencode "grant_type=client_credentials" \
+  --data-urlencode "scope=bot:onboard" \
+  "$ISSUER/oauth2/token"
+```
+
+Use this onboarding token only for the BOT-authorized account flows below. `tgId` is accepted only
+by the Telegram token exchange and the account onboarding/linking routes; ordinary match, game,
+profile, and notification requests must not include it.
 
 Register a Telegram-only player with the bot account using `POST /user/register/telegram`:
 
@@ -130,13 +146,10 @@ Register a Telegram-only player with the bot account using `POST /user/register/
 }
 ```
 
-This registration body contains the Telegram ID; it is distinct from the `tgId` header used on
-player actions. Unlike public web/app registration, this BOT-only endpoint does not require an
-email or password. The request must authenticate as the technical account with the `BOT` role, and
-its `tgId` header must match the `telegramId` in the body. If no password is supplied, the server
-stores a generated internal password that is not returned; Telegram players do not sign in with
-those credentials. They access player operations through the authenticated bot, which supplies their
-Telegram ID in `tgId`.
+This registration body contains the Telegram ID. Unlike public web/app registration, this
+BOT-authorized endpoint does not require an email or password. Authenticate with the BOT
+`bot:onboard` token and include a matching `tgId` header; the player will use delegated bearer
+tokens for ordinary API requests.
 
 ### Unifying web and Telegram accounts
 
@@ -164,7 +177,7 @@ Web client's OTP request:
 
 ```http
 POST /api/v1/user/new-tg-unify-email-otp
-Authorization: Basic <web-account-credentials>
+Authorization: Bearer <HUMAN_ACCESS_TOKEN>
 Content-Type: application/json
 ```
 
@@ -181,8 +194,8 @@ Telegram-only account to an existing web account:
 
 1. The user asks the bot to unify accounts and provides the email address of the existing web
    account.
-2. The bot calls `POST /user/new-tg-unify-email-otp` using its `BOT` credentials, with the user's
-   Telegram ID in the `tgId` header and the supplied email in the JSON body.
+2. The bot calls `POST /user/new-tg-unify-email-otp` using its `bot:onboard` bearer token, with the
+   user's Telegram ID in the `tgId` header and the supplied email in the JSON body.
 3. The API emails an OTP to the supplied address.
 4. The user provides the email and OTP to the bot. The bot calls `POST /user/unify` with the same
    `tgId` and those values.
@@ -194,7 +207,7 @@ Bot's OTP request:
 
 ```http
 POST /api/v1/user/new-tg-unify-email-otp
-Authorization: Basic <bot-credentials>
+Authorization: Bearer <BOT_ONBOARDING_ACCESS_TOKEN>
 tgId: 123456789
 Content-Type: application/json
 ```
@@ -207,13 +220,13 @@ Content-Type: application/json
 
 #### Completing unification from Telegram
 
-For either flow, the bot makes the final request using its `BOT` credentials and the Telegram ID
+For either flow, the bot makes the final request using its `bot:onboard` bearer token and the Telegram ID
 of the user who is unifying. The email and token in the request body must match the address and
 OTP used for the request:
 
 ```http
 POST /api/v1/user/unify
-Authorization: Basic <bot-credentials>
+Authorization: Bearer <BOT_ONBOARDING_ACCESS_TOKEN>
 tgId: 123456789
 Content-Type: application/json
 ```
@@ -231,25 +244,24 @@ its credentials server-side and must set `tgId` to the Telegram user represented
 
 ## 3. Typical match lifecycle
 
-The host creates a match, other players join before it starts, and the host starts it. The
-following requests show the flow for a normal client; use the bot authentication and `tgId` header
-described above when the bot performs one of these player actions.
+The host creates a match, other players join before it starts, and the host starts it. Each human
+player, including a Telegram user, uses their own bearer token for these requests.
 
 ```sh
 BASE="https://api.example.com/api/v1"
 
 # Host a match. The request body is optional; this selects configuration ID 1.
-curl -u alice42:your-password -H "Content-Type: application/json" \
+curl -H "Authorization: Bearer $ALICE_ACCESS_TOKEN" -H "Content-Type: application/json" \
   -d '{"id":1,"name":"default"}' "$BASE/match/host"
 
 # A second player joins using the keyCode returned by the host request.
-curl -u bob42:your-password -X POST "$BASE/match/join?key_code=ABC123"
+curl -H "Authorization: Bearer $BOB_ACCESS_TOKEN" -X POST "$BASE/match/join?key_code=ABC123"
 
 # The host starts the match.
-curl -u alice42:your-password -X POST "$BASE/match/start"
+curl -H "Authorization: Bearer $ALICE_ACCESS_TOKEN" -X POST "$BASE/match/start"
 
 # Read the authoritative current state.
-curl -u alice42:your-password "$BASE/match/retrieve?key_code=ABC123"
+curl -H "Authorization: Bearer $ALICE_ACCESS_TOKEN" "$BASE/match/retrieve?key_code=ABC123"
 ```
 
 The match response's `data` contains the current snapshot. Use that snapshot to render the board
@@ -276,14 +288,14 @@ Submit a move to `POST /game/move`. The required `move` field selects the action
 are used only by moves that need them.
 
 ```sh
-curl -u alice42:your-password \
+curl -H "Authorization: Bearer $ALICE_ACCESS_TOKEN" \
   -H "Content-Type: application/json" \
   -d '{"move":"DISCOVER"}' \
   "$BASE/game/move"
 ```
 
-For a bot acting as Alice, add `-H "tgId: 123456789"` and authenticate as the bot technical
-account. A move request may include fields such as `parameterIndex`, `pickPlayerIndex`, and
+For a Telegram player, use the delegated human access token; do not send `tgId` on game requests.
+A move request may include fields such as `parameterIndex`, `pickPlayerIndex`, and
 `expeditionEmployeesList`; their meaning depends on the move. For example, indices are zero-based
 and must refer to the current snapshot, not catalog IDs. See the move table in
 [`GAME_RULES_AND_API.md`](GAME_RULES_AND_API.md) for the complete set of move names and parameters.
@@ -304,8 +316,7 @@ Useful read endpoints:
 | `GET /game/move?key_code=...&move_number=N`      | Retrieve one persisted move                                                       |
 | `GET /game/moves?key_code=...`                   | Retrieve paged move history                                                       |
 
-For bot requests to `/match/status`, include `tgId` so the API can resolve which player's match to
-return. The `move_number` option is a lightweight unchanged-state check, not a substitute for
+The `move_number` option is a lightweight unchanged-state check, not a substitute for
 processing move events or reading the full snapshot when state changes.
 
 ## 5. Live updates
@@ -349,7 +360,8 @@ should refresh the match snapshot rather than relying on notifications as a dura
   choose an action valid in the new phase.
 - Handle `401` by requesting or refreshing the user's credentials. A `403` indicates the
   authenticated role is not permitted to perform the operation.
-- Keep Basic credentials and bot secrets out of URLs, client logs, analytics, and error reports.
+- Keep access and refresh tokens and the BOT client secret out of URLs, client logs, analytics, and
+  error reports. Revoke tokens when they are no longer needed.
 - Use `GET /card` and `GET /card/contract` to load card and contract definitions rather than
   hardcoding catalog content.
 - Encode query parameter values such as match keys, usernames, and Telegram IDs.
@@ -366,11 +378,11 @@ is served at `/public/confirm-email` from the server root.
 | `POST`            | `/public/register`                           | Register a standard username/password account; public                                                        |
 | `GET`             | `/user/new-email-confirmation?email=...`     | Request an email confirmation; authentication required                                                       |
 | `GET`             | `SERVER_ROOT/public/confirm-email?token=...` | Confirm an email token; public browser flow                                                                  |
-| `POST`            | `/user/new-tg-unify-email-otp`               | Request an unification OTP as the email account, or as `BOT` with the user's `tgId`; body: `{"email":"..."}` |
-| `GET`             | `/user/me`                                   | Get the authenticated API account; for bot auth this is the technical bot account                            |
+| `POST`            | `/user/new-tg-unify-email-otp`               | Request an unification OTP as the human account, or as BOT with `bot:onboard` scope and `tgId`               |
+| `GET`             | `/user/me`                                   | Get the human account represented by the bearer token                                                        |
 | `GET`             | `/user/retrieve?username=...`                | Look up a user by username, Telegram ID, or email; use `telegram_id` for Telegram ID                         |
-| `POST`            | `/user/register/telegram`                    | Create a Telegram-linked user; requires `BOT` role                                                           |
-| `POST`            | `/user/unify`                                | Complete unification with `{"email":"...","token":"..."}`; requires `BOT` role and the user's `tgId` header  |
+| `POST`            | `/user/register/telegram`                    | Create a Telegram-linked user; requires BOT `bot:onboard` scope and matching `tgId`                          |
+| `POST`            | `/user/unify`                                | Complete unification; requires BOT `bot:onboard` scope and `tgId`                                           |
 | `POST`            | `/match/host`                                | Host a match                                                                                                 |
 | `POST`            | `/match/join?key_code=...`                   | Join a match before it starts                                                                                |
 | `POST`            | `/match/start`                               | Start the hosted match                                                                                       |

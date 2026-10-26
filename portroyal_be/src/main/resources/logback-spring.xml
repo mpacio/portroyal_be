@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <configuration>
 
-    <property name="LOGS_DIR" value="./logs" />
+    <property name="LOGS_DIR" value="${LOGS_DIR:-./logs}" />
     <property name="LOG_NAME" value="portroyal-be" />
 
     <appender name="Console"
@@ -38,8 +38,8 @@
         <appender-ref ref="Console" />
     </root>
 
-    <!-- LOG "com.matteopaciolla.*" at TRACE level -->
-    <logger name="com.matteopaciolla" level="TRACE" additivity="false">
+    <logger name="org.zalando.logbook" level="INFO"/>
+    <logger name="com.matteopaciolla" level="INFO" additivity="false">
         <appender-ref ref="RollingFile" />
         <appender-ref ref="Console" />
     </logger>
