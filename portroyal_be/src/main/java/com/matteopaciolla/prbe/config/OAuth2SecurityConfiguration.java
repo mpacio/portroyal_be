@@ -241,8 +241,41 @@ public class OAuth2SecurityConfiguration {
     }
 
     @Bean
-    RegisteredClientRepository registeredClientRepository(JdbcTemplate jdbcTemplate) {
-        return new JdbcRegisteredClientRepository(jdbcTemplate);
+    RegisteredClientRepository registeredClientRepository(
+            JdbcTemplate jdbcTemplate,
+            @Value("${app.oauth2.bot.client-id:}") String botClientId) {
+        RegisteredClientRepository delegate = new JdbcRegisteredClientRepository(jdbcTemplate);
+        return new RegisteredClientRepository() {
+            @Override
+            public void save(RegisteredClient registeredClient) {
+                delegate.save(registeredClient);
+            }
+
+            @Override
+            public RegisteredClient findById(String id) {
+                return restrictBotScopes(delegate.findById(id), botClientId);
+            }
+
+            @Override
+            public RegisteredClient findByClientId(String clientId) {
+                return restrictBotScopes(delegate.findByClientId(clientId), botClientId);
+            }
+        };
+    }
+
+    static RegisteredClient restrictBotScopes(RegisteredClient registeredClient, String botClientId) {
+        if (registeredClient == null
+                || botClientId == null
+                || botClientId.isBlank()
+                || !botClientId.equals(registeredClient.getClientId())) {
+            return registeredClient;
+        }
+        return RegisteredClient.from(registeredClient)
+                .scopes(scopes -> {
+                    scopes.clear();
+                    scopes.add(BOT_ONBOARD_SCOPE);
+                })
+                .build();
     }
 
     @Bean

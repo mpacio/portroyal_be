@@ -124,8 +124,6 @@ public final class OAuthClientRegistrationTool {
                 .authorizationGrantType(AuthorizationGrantType.CLIENT_CREDENTIALS)
                 .authorizationGrantType(TelegramDelegationGrantAuthenticationToken.GRANT_TYPE)
                 .scope("bot:onboard")
-                .scope("bot:delegate")
-                .scope("game:play")
                 .clientSettings(ClientSettings.builder().requireAuthorizationConsent(false).build())
                 .tokenSettings(tokenSettings())
                 .build();

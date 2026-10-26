@@ -2,7 +2,10 @@ package com.matteopaciolla.prbe.config;
 
 import org.junit.jupiter.api.Test;
 import org.springframework.security.core.GrantedAuthority;
+import org.springframework.security.oauth2.core.AuthorizationGrantType;
+import org.springframework.security.oauth2.core.ClientAuthenticationMethod;
 import org.springframework.security.oauth2.jwt.Jwt;
+import org.springframework.security.oauth2.server.authorization.client.RegisteredClient;
 
 import java.util.Collection;
 import java.util.List;
@@ -35,6 +38,31 @@ class OAuth2ScopeAuthorityTest {
                 .doesNotContain("ROLE_BOT_CLIENT");
         assertThat(authorities(converter.convert(onboarding).getAuthorities()))
                 .contains("ROLE_BOT_CLIENT");
+    }
+
+    @Test
+    void registeredBotScopesAreRestrictedWithoutChangingItsSecret() {
+        RegisteredClient bot = RegisteredClient.withId("bot-id")
+                .clientId("telegram-bot")
+                .clientSecret("encoded-secret")
+                .clientAuthenticationMethod(ClientAuthenticationMethod.CLIENT_SECRET_BASIC)
+                .authorizationGrantType(AuthorizationGrantType.CLIENT_CREDENTIALS)
+                .scope("bot:onboard")
+                .scope("bot:delegate")
+                .scope("game:play")
+                .build();
+        RegisteredClient otherClient = RegisteredClient.withId("other-id")
+                .clientId("other-client")
+                .clientAuthenticationMethod(ClientAuthenticationMethod.CLIENT_SECRET_BASIC)
+                .authorizationGrantType(AuthorizationGrantType.CLIENT_CREDENTIALS)
+                .scope("game:play")
+                .build();
+
+        RegisteredClient restricted = OAuth2SecurityConfiguration.restrictBotScopes(bot, "telegram-bot");
+        assertThat(restricted.getScopes()).containsExactly("bot:onboard");
+        assertThat(restricted.getClientSecret()).isEqualTo("encoded-secret");
+        assertThat(OAuth2SecurityConfiguration.restrictBotScopes(otherClient, "telegram-bot"))
+                .isSameAs(otherClient);
     }
 
     private static Jwt token(List<String> roles, String scope) {

@@ -71,10 +71,6 @@ public final class TelegramDelegationGrantAuthenticationProvider implements Auth
                 || !TELEGRAM_ID_PATTERN.matcher(grant.getTelegramId()).matches()) {
             throw new OAuth2AuthenticationException(OAuth2ErrorCodes.INVALID_REQUEST);
         }
-        if (!registeredClient.getScopes().contains(GAME_SCOPE)) {
-            throw new OAuth2AuthenticationException(OAuth2ErrorCodes.INVALID_SCOPE);
-        }
-
         UserEntity user = userRepository.findByTelegramId(grant.getTelegramId())
                 .filter(UserEntity::isEnabled)
                 .orElseThrow(() -> new OAuth2AuthenticationException(OAuth2ErrorCodes.INVALID_GRANT));
